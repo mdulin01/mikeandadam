@@ -972,7 +972,7 @@ export default function TripPlanner() {
   const [dataLoading, setDataLoading] = useState(false);
 
   // Main section navigation
-  const [activeSection, setActiveSection] = useState('travel'); // 'travel' | 'fitness' | 'nutrition' | 'lifePlanning'
+  const [activeSection, setActiveSection] = useState('home'); // 'home' | 'travel' | 'fitness' | 'nutrition' | 'lifePlanning'
 
   // App state
   const [trips, setTrips] = useState(defaultTrips);
@@ -1030,13 +1030,144 @@ export default function TripPlanner() {
     }
   ];
 
-  // Generate training weeks from startDate to endDate
+  // Hardcoded Indy Half Marathon Training Plan - "Salad, Run, Salad"
+  const indyHalfTrainingPlan = [
+    { weekNumber: 1, startDate: '2026-01-11', endDate: '2026-01-17', runs: [
+      { id: 1, label: 'Run #1', distance: '2', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Run #2', distance: '3', mike: true, adam: true, notes: '' },
+      { id: 3, label: 'Run #3', distance: '4', mike: true, adam: true, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Cross #2', mike: true, adam: true, notes: '' }
+    ], totalMiles: 9, weekNotes: '' },
+    { weekNumber: 2, startDate: '2026-01-18', endDate: '2026-01-24', runs: [
+      { id: 1, label: 'Run #1', distance: '2', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Run #2', distance: '3', mike: true, adam: true, notes: '' },
+      { id: 3, label: 'Run #3', distance: '4', mike: true, adam: true, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Cross #2', mike: true, adam: true, notes: '' }
+    ], totalMiles: 9, weekNotes: '' },
+    { weekNumber: 3, startDate: '2026-01-25', endDate: '2026-01-31', runs: [
+      { id: 1, label: 'Run #1', distance: '2', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Run #2', distance: '3', mike: true, adam: true, notes: '' },
+      { id: 3, label: 'Run #3', distance: '5', mike: true, adam: true, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Cross #2', mike: true, adam: true, notes: '' }
+    ], totalMiles: 10, weekNotes: '' },
+    { weekNumber: 4, startDate: '2026-02-01', endDate: '2026-02-07', runs: [
+      { id: 1, label: 'Run #1', distance: '2', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '6', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 11, weekNotes: 'SOBER!! 🎯' },
+    { weekNumber: 5, startDate: '2026-02-08', endDate: '2026-02-14', runs: [
+      { id: 1, label: 'Run #1', distance: '2', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '4', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '6', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 12, weekNotes: '' },
+    { weekNumber: 6, startDate: '2026-02-15', endDate: '2026-02-21', runs: [
+      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '4', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '6', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 13, weekNotes: '' },
+    { weekNumber: 7, startDate: '2026-02-22', endDate: '2026-02-28', runs: [
+      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '4', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '7', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 14, weekNotes: '' },
+    { weekNumber: 8, startDate: '2026-03-01', endDate: '2026-03-07', runs: [
+      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '4', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '8', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 15, weekNotes: '✈️ Mike in Spain (Fri-Sat)' },
+    { weekNumber: 9, startDate: '2026-03-08', endDate: '2026-03-14', runs: [
+      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '8', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 16, weekNotes: '✈️ Mike in Spain (all week)' },
+    { weekNumber: 10, startDate: '2026-03-15', endDate: '2026-03-21', runs: [
+      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '9', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 17, weekNotes: '🗽 Adam and Mike in NYC (Thurs-Sat)' },
+    { weekNumber: 11, startDate: '2026-03-22', endDate: '2026-03-28', runs: [
+      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '10', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 18, weekNotes: '🗽 Adam and Mike in NYC (Sun-Mon)' },
+    { weekNumber: 12, startDate: '2026-03-29', endDate: '2026-04-04', runs: [
+      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '11', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 19, weekNotes: '' },
+    { weekNumber: 13, startDate: '2026-04-05', endDate: '2026-04-11', runs: [
+      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '6', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '12', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 21, weekNotes: '🏛️ Adam and Mike in DC (Thurs-Sat)' },
+    { weekNumber: 14, startDate: '2026-04-12', endDate: '2026-04-18', runs: [
+      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '14', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 22, weekNotes: '🏛️ Adam and Mike in DC (Sun-Mon)' },
+    { weekNumber: 15, startDate: '2026-04-19', endDate: '2026-04-25', runs: [
+      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '4', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '8', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 15, weekNotes: '📉 Taper Week - Rest up!' },
+    { weekNumber: 16, startDate: '2026-04-26', endDate: '2026-05-02', runs: [
+      { id: 1, label: 'Run #1', distance: '2', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Run #2', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Run #3', distance: '13.1', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 18.1, weekNotes: '🏁 RACE WEEK! You got this! 🎉', isRaceWeek: true }
+  ].map(week => ({ ...week, id: `indy-half-2026-week-${week.weekNumber}` }));
+
+  // Generate generic training weeks for other events
   const generateTrainingWeeks = (startDate, eventDate, eventId) => {
     const weeks = [];
     const start = parseLocalDate(startDate);
     const end = parseLocalDate(eventDate);
 
-    // Start from the Monday of the start week
     const firstMonday = new Date(start);
     firstMonday.setDate(start.getDate() - start.getDay() + 1);
 
@@ -1054,13 +1185,13 @@ export default function TripPlanner() {
         startDate: weekStart.toISOString().split('T')[0],
         endDate: weekEnd.toISOString().split('T')[0],
         runs: [
-          { id: 1, day: 'Tuesday', distance: '', type: 'easy', completed: false, notes: '' },
-          { id: 2, day: 'Thursday', distance: '', type: 'tempo', completed: false, notes: '' },
-          { id: 3, day: 'Saturday', distance: '', type: 'long', completed: false, notes: '' }
+          { id: 1, label: 'Run #1', distance: '', mike: false, adam: false, notes: '' },
+          { id: 2, label: 'Run #2', distance: '', mike: false, adam: false, notes: '' },
+          { id: 3, label: 'Run #3', distance: '', mike: false, adam: false, notes: '' }
         ],
         crossTraining: [
-          { id: 1, day: 'Wednesday', type: 'strength', duration: '', completed: false, notes: '' },
-          { id: 2, day: 'Sunday', type: 'yoga/stretch', duration: '', completed: false, notes: '' }
+          { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
+          { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
         ],
         weekNotes: ''
       });
@@ -1082,11 +1213,11 @@ export default function TripPlanner() {
         endDate: weekEnd.toISOString().split('T')[0],
         isRecovery: true,
         runs: [
-          { id: 1, day: 'Tuesday', distance: '', type: 'recovery', completed: false, notes: '' },
-          { id: 2, day: 'Saturday', distance: '', type: 'easy', completed: false, notes: '' }
+          { id: 1, label: 'Run #1', distance: '', mike: false, adam: false, notes: '' },
+          { id: 2, label: 'Run #2', distance: '', mike: false, adam: false, notes: '' }
         ],
         crossTraining: [
-          { id: 1, day: 'Thursday', type: 'light activity', duration: '', completed: false, notes: '' }
+          { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' }
         ],
         weekNotes: 'Recovery Week - Take it easy! 🌟'
       });
@@ -1330,8 +1461,14 @@ export default function TripPlanner() {
     const event = fitnessEvents.find(e => e.id === eventId);
     if (!event) return;
 
-    const today = new Date().toISOString().split('T')[0];
-    const weeks = generateTrainingWeeks(today, event.date, eventId);
+    // Use hardcoded plan for Indy Half Marathon
+    let weeks;
+    if (eventId === 'indy-half-2026') {
+      weeks = indyHalfTrainingPlan;
+    } else {
+      const today = new Date().toISOString().split('T')[0];
+      weeks = generateTrainingWeeks(today, event.date, eventId);
+    }
 
     const newPlans = { ...fitnessTrainingPlans, [eventId]: weeks };
     setFitnessTrainingPlans(newPlans);
@@ -3575,40 +3712,19 @@ export default function TripPlanner() {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const newClicks = easterEggClicks + 1;
-                  setEasterEggClicks(newClicks);
-                  if (newClicks >= 7) {
-                    setShowDisneyMagic(true);
-                    setEasterEggClicks(0);
-                    // Auto-hide after 10 seconds
-                    setTimeout(() => setShowDisneyMagic(false), 10000);
-                  }
-                }}
-                className={`w-16 h-16 bg-gradient-to-br from-teal-400 via-purple-400 to-indigo-400 rounded-2xl flex items-center justify-center shadow-lg relative transition-transform hover:scale-110 ${showDisneyMagic ? 'animate-bounce' : ''}`}
-                title={easterEggClicks > 2 ? `${7 - easterEggClicks} more...` : 'Trip Planner'}
+                onClick={() => setActiveSection('home')}
+                className="w-14 h-14 bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg transition-transform hover:scale-110"
+                title="Home"
               >
-                <span className="text-3xl">{showDisneyMagic ? '🏰' : '🦄'}</span>
-                {showDisneyMagic && (
-                  <span className="absolute -top-1 -right-1 text-lg animate-ping">✨</span>
-                )}
+                <span className="text-2xl">🏳️‍🌈</span>
               </button>
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-                  {showDisneyMagic ? (
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-500">
-                      ✨ Where Dreams Come True ✨
-                    </span>
-                  ) : (
-                    <>
-                      Bon Voyage! <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-purple-400">✈️</span>
-                    </>
-                  )}
+                <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+                  Mike & Adam
                 </h1>
                 <p className="text-slate-400 flex items-center gap-2">
-                  Mike & Adam's Adventure Planner
-                  <span className="text-purple-400">💕</span>
+                  Living our best life together
+                  <span className="text-pink-400">💕</span>
                 </p>
               </div>
             </div>
@@ -3693,6 +3809,7 @@ export default function TripPlanner() {
           {/* Section Navigation */}
           <div className="mt-6 flex gap-2 flex-wrap">
             {[
+              { id: 'home', label: 'Home', emoji: '🏠', gradient: 'from-pink-500 to-purple-500' },
               { id: 'travel', label: 'Travel', emoji: '✈️', gradient: 'from-teal-400 to-cyan-500' },
               { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
               { id: 'nutrition', label: 'Nutrition', emoji: '🥗', gradient: 'from-green-400 to-emerald-500' },
@@ -3777,9 +3894,210 @@ export default function TripPlanner() {
       <main className="relative z-10 px-6 pb-12">
         <div className="max-w-6xl mx-auto">
 
+          {/* ========== HOME SECTION ========== */}
+          {activeSection === 'home' && (
+            <div className="mt-8">
+              {/* Photo Gallery Hero */}
+              {(() => {
+                // Gallery images - replace URLs with your hosted images
+                const galleryImages = [
+                  { id: 1, url: '/gallery/pier-painting.jpg', caption: 'Provincetown vibes 🌊' },
+                  { id: 2, url: '/gallery/pool-party.jpg', caption: 'Living our best life 🌴' },
+                  { id: 3, url: '/gallery/romantic-night.jpg', caption: 'Under the stars ✨' },
+                  { id: 4, url: '/gallery/holding-hands.jpg', caption: 'Together always 💕' },
+                  { id: 5, url: '/gallery/pride-party.jpg', caption: 'Pride & mimosas 🥂' },
+                ];
+                const [currentImg, setCurrentImg] = React.useState(0);
+
+                React.useEffect(() => {
+                  const timer = setInterval(() => {
+                    setCurrentImg(prev => (prev + 1) % galleryImages.length);
+                  }, 5000);
+                  return () => clearInterval(timer);
+                }, []);
+
+                return (
+                  <div className="mb-12">
+                    <div className="relative rounded-3xl overflow-hidden shadow-2xl mb-4" style={{ height: '400px' }}>
+                      <div className="absolute inset-0 bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center">
+                        <div className="text-center text-white">
+                          <span className="text-8xl block mb-4">🏳️‍🌈</span>
+                          <h2 className="text-4xl font-bold">Mike & Adam</h2>
+                          <p className="text-white/80 mt-2">{galleryImages[currentImg].caption}</p>
+                        </div>
+                      </div>
+                      <img
+                        src={galleryImages[currentImg].url}
+                        alt="Mike and Adam"
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6">
+                        <p className="text-white text-xl font-medium">{galleryImages[currentImg].caption}</p>
+                      </div>
+                      <button
+                        onClick={() => setCurrentImg(prev => (prev - 1 + galleryImages.length) % galleryImages.length)}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center text-white transition"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                      <button
+                        onClick={() => setCurrentImg(prev => (prev + 1) % galleryImages.length)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center text-white transition"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    </div>
+                    <div className="flex justify-center gap-2">
+                      {galleryImages.map((img, idx) => (
+                        <button
+                          key={img.id}
+                          onClick={() => setCurrentImg(idx)}
+                          className={`w-3 h-3 rounded-full transition ${
+                            idx === currentImg ? 'bg-purple-400 scale-125' : 'bg-white/40 hover:bg-white/60'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Welcome Text */}
+              <div className="text-center mb-12">
+                <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                  Welcome to Our World
+                </h2>
+                <p className="text-xl text-slate-300 max-w-2xl mx-auto">
+                  A space for Mike & Adam to plan adventures, stay healthy, and build our future together.
+                </p>
+              </div>
+
+              {/* Values Cards */}
+              <div className="grid md:grid-cols-3 gap-6 mb-12">
+                {/* Travel Value */}
+                <div
+                  onClick={() => setActiveSection('travel')}
+                  className="bg-gradient-to-br from-teal-500/20 to-cyan-500/20 rounded-3xl p-8 border border-teal-500/30 hover:border-teal-500/60 transition cursor-pointer group"
+                >
+                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">✈️</div>
+                  <h3 className="text-2xl font-bold text-white mb-3">Love of Travel</h3>
+                  <p className="text-slate-300">
+                    Exploring the world together, one adventure at a time. From beaches to cities, every journey is better when we're together.
+                  </p>
+                  <div className="mt-4 flex items-center gap-2 text-teal-400 font-medium">
+                    <span>View trips</span>
+                    <span>→</span>
+                  </div>
+                </div>
+
+                {/* Health Value */}
+                <div
+                  onClick={() => setActiveSection('fitness')}
+                  className="bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-3xl p-8 border border-orange-500/30 hover:border-orange-500/60 transition cursor-pointer group"
+                >
+                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">💪</div>
+                  <h3 className="text-2xl font-bold text-white mb-3">Being Healthy</h3>
+                  <p className="text-slate-300">
+                    Training for half marathons, triathlons, and beyond. Supporting each other to be our strongest selves.
+                  </p>
+                  <div className="mt-4 flex items-center gap-2 text-orange-400 font-medium">
+                    <span>View fitness</span>
+                    <span>→</span>
+                  </div>
+                </div>
+
+                {/* Pride Value */}
+                <div className="bg-gradient-to-br from-pink-500/20 via-purple-500/20 to-indigo-500/20 rounded-3xl p-8 border border-purple-500/30 hover:border-purple-500/60 transition group">
+                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">🏳️‍🌈</div>
+                  <h3 className="text-2xl font-bold text-white mb-3">Embracing Who We Are</h3>
+                  <p className="text-slate-300">
+                    Living authentically, celebrating our love, and building a life filled with pride, joy, and adventure.
+                  </p>
+                  <div className="mt-4 flex items-center gap-2 text-purple-400 font-medium">
+                    <span>Love is love</span>
+                    <span>💕</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="bg-white/5 backdrop-blur-sm rounded-3xl p-8 border border-white/10 mb-12">
+                <h3 className="text-xl font-bold text-white mb-6 text-center">Our Journey So Far</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+                  <div>
+                    <div className="text-4xl font-bold text-teal-400">{trips.length}</div>
+                    <div className="text-slate-400">Trips Planned</div>
+                  </div>
+                  <div>
+                    <div className="text-4xl font-bold text-purple-400">{wishlist.length}</div>
+                    <div className="text-slate-400">Dream Destinations</div>
+                  </div>
+                  <div>
+                    <div className="text-4xl font-bold text-orange-400">{fitnessEvents.length}</div>
+                    <div className="text-slate-400">Fitness Goals</div>
+                  </div>
+                  <div>
+                    <div className="text-4xl font-bold text-pink-400">∞</div>
+                    <div className="text-slate-400">Adventures Ahead</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Love Note */}
+              <div className="text-center">
+                <div className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-indigo-500/20 rounded-full border border-purple-500/30">
+                  <span className="text-2xl">💕</span>
+                  <span className="text-lg text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-purple-300 to-indigo-300 font-medium">
+                    Together since March 2nd, 2025
+                  </span>
+                  <span className="text-2xl">💕</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* ========== END HOME SECTION ========== */}
+
           {/* ========== TRAVEL SECTION ========== */}
           {activeSection === 'travel' && (
           <>
+          {/* Travel Section Header */}
+          <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const newClicks = easterEggClicks + 1;
+                setEasterEggClicks(newClicks);
+                if (newClicks >= 7) {
+                  setShowDisneyMagic(true);
+                  setEasterEggClicks(0);
+                  setTimeout(() => setShowDisneyMagic(false), 10000);
+                }
+              }}
+              className={`w-16 h-16 bg-gradient-to-br from-teal-400 via-purple-400 to-indigo-400 rounded-2xl flex items-center justify-center shadow-lg relative transition-transform hover:scale-110 ${showDisneyMagic ? 'animate-bounce' : ''}`}
+              title={easterEggClicks > 2 ? `${7 - easterEggClicks} more...` : 'Trip Planner'}
+            >
+              <span className="text-3xl">{showDisneyMagic ? '🏰' : '🦄'}</span>
+              {showDisneyMagic && (
+                <span className="absolute -top-1 -right-1 text-lg animate-ping">✨</span>
+              )}
+            </button>
+            <div>
+              <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+                {showDisneyMagic ? (
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-500">
+                    ✨ Where Dreams Come True ✨
+                  </span>
+                ) : (
+                  <>
+                    Bon Voyage! <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-purple-400">✈️</span>
+                  </>
+                )}
+              </h2>
+              <p className="text-slate-400">Our adventures around the world</p>
+            </div>
+          </div>
+
           {/* Countdown Banner for Next Trip */}
           {(() => {
             const today = new Date();
@@ -4745,6 +5063,94 @@ export default function TripPlanner() {
 
                   {selectedFitnessEvent && fitnessTrainingPlans[selectedFitnessEvent.id] && (
                     <div className="space-y-4">
+                      {/* Stats and Encouragement */}
+                      {(() => {
+                        const plan = fitnessTrainingPlans[selectedFitnessEvent.id];
+                        // A week is "done" if both Mike and Adam completed all workouts
+                        const completedWeeks = plan.filter(w =>
+                          w.runs?.every(r => r.mike && r.adam) && w.crossTraining?.every(c => c.mike && c.adam)
+                        ).length;
+                        // Calculate miles for Mike and Adam separately
+                        const mikeMiles = plan.reduce((acc, w) => {
+                          const weekMiles = w.runs?.filter(r => r.mike).reduce((sum, r) => sum + (parseFloat(r.distance) || 0), 0) || 0;
+                          return acc + weekMiles;
+                        }, 0);
+                        const adamMiles = plan.reduce((acc, w) => {
+                          const weekMiles = w.runs?.filter(r => r.adam).reduce((sum, r) => sum + (parseFloat(r.distance) || 0), 0) || 0;
+                          return acc + weekMiles;
+                        }, 0);
+                        const mikeWorkouts = plan.reduce((acc, w) => acc + (w.runs?.filter(r => r.mike).length || 0) + (w.crossTraining?.filter(c => c.mike).length || 0), 0);
+                        const adamWorkouts = plan.reduce((acc, w) => acc + (w.runs?.filter(r => r.adam).length || 0) + (w.crossTraining?.filter(c => c.adam).length || 0), 0);
+
+                        const encouragements = [
+                          "You're crushing it! 💪",
+                          "Every mile makes you stronger! 🔥",
+                          "Keep going, champions! 🏆",
+                          "The finish line is waiting for you! 🎯",
+                          "Together you're unstoppable! 💕"
+                        ];
+                        const encouragement = encouragements[Math.floor(mikeMiles + adamMiles) % encouragements.length];
+
+                        return (
+                          <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 rounded-2xl p-6 border border-orange-500/30 mb-6">
+                            {/* Color Legend */}
+                            <div className="flex justify-center gap-6 mb-4 text-sm">
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+                                <span className="text-blue-400">Mike</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 rounded-full bg-purple-500"></div>
+                                <span className="text-purple-400">Adam</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 rounded bg-green-500/40"></div>
+                                <span className="text-green-400">Both ✓</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 rounded bg-yellow-500/40"></div>
+                                <span className="text-yellow-400">One ✓</span>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 text-center mb-4">
+                              <div>
+                                <div className="text-3xl font-bold text-orange-400">{completedWeeks}</div>
+                                <div className="text-white/60 text-sm">Weeks Done (Both)</div>
+                              </div>
+                              <div>
+                                <div className="flex justify-center gap-4">
+                                  <div>
+                                    <div className="text-2xl font-bold text-blue-400">{mikeMiles.toFixed(1)}</div>
+                                    <div className="text-white/40 text-xs">Mike</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-2xl font-bold text-purple-400">{adamMiles.toFixed(1)}</div>
+                                    <div className="text-white/40 text-xs">Adam</div>
+                                  </div>
+                                </div>
+                                <div className="text-white/60 text-sm">Miles Run</div>
+                              </div>
+                              <div>
+                                <div className="flex justify-center gap-4">
+                                  <div>
+                                    <div className="text-2xl font-bold text-blue-400">{mikeWorkouts}</div>
+                                    <div className="text-white/40 text-xs">Mike</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-2xl font-bold text-purple-400">{adamWorkouts}</div>
+                                    <div className="text-white/40 text-xs">Adam</div>
+                                  </div>
+                                </div>
+                                <div className="text-white/60 text-sm">Workouts</div>
+                              </div>
+                            </div>
+                            <div className="text-center text-lg text-white font-medium">
+                              {encouragement}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {/* Current Week Highlight */}
                       {(() => {
                         const today = new Date();
@@ -4761,9 +5167,15 @@ export default function TripPlanner() {
                             <div className="bg-gradient-to-r from-orange-500/30 to-red-500/30 rounded-2xl p-6 border-2 border-orange-500/50 mb-6">
                               <div className="flex items-center gap-2 mb-4">
                                 <span className="text-2xl">📅</span>
-                                <h3 className="text-xl font-bold text-white">This Week - Week {currentWeekIndex + 1}</h3>
+                                <h3 className="text-xl font-bold text-white">This Week - Week {currentWeek.weekNumber || currentWeekIndex + 1}</h3>
                                 <span className="px-3 py-1 bg-orange-500 text-white text-sm font-bold rounded-full">CURRENT</span>
+                                {currentWeek.totalMiles && (
+                                  <span className="px-3 py-1 bg-white/20 text-white text-sm rounded-full">{currentWeek.totalMiles} mi goal</span>
+                                )}
                               </div>
+                              {currentWeek.weekNotes && (
+                                <div className="mb-4 px-4 py-2 bg-white/10 rounded-lg text-white/90">{currentWeek.weekNotes}</div>
+                              )}
 
                               <div className="grid md:grid-cols-2 gap-4">
                                 {/* Runs */}
@@ -4775,27 +5187,37 @@ export default function TripPlanner() {
                                     {currentWeek.runs?.map(run => (
                                       <div
                                         key={run.id}
-                                        className={`flex items-center gap-3 p-3 rounded-lg ${run.completed ? 'bg-green-500/20' : 'bg-white/5'}`}
+                                        className={`flex items-center gap-3 p-3 rounded-lg ${(run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5'}`}
                                       >
-                                        <button
-                                          onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { completed: !run.completed })}
-                                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
-                                            run.completed ? 'bg-green-500 border-green-500' : 'border-white/40 hover:border-white'
-                                          }`}
-                                        >
-                                          {run.completed && <Check className="w-4 h-4 text-white" />}
-                                        </button>
-                                        <div className="flex-1">
-                                          <div className="text-white font-medium">{run.day}</div>
-                                          <div className="text-white/60 text-sm">{run.type} run</div>
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { mike: !run.mike })}
+                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
+                                              run.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40 hover:border-white'
+                                            }`}
+                                            title="Mike"
+                                          >
+                                            {run.mike && <Check className="w-4 h-4 text-white" />}
+                                          </button>
+                                          <button
+                                            onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { adam: !run.adam })}
+                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
+                                              run.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'
+                                            }`}
+                                            title="Adam"
+                                          >
+                                            {run.adam && <Check className="w-4 h-4 text-white" />}
+                                          </button>
                                         </div>
-                                        <input
-                                          type="text"
-                                          value={run.distance}
-                                          onChange={(e) => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { distance: e.target.value })}
-                                          placeholder="Distance"
-                                          className="w-20 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm text-center"
-                                        />
+                                        <div className="flex-1">
+                                          <div className="text-white font-medium">{run.label || run.day}</div>
+                                          <div className="text-xs text-white/50">
+                                            <span className={run.mike ? 'text-blue-400' : 'text-white/30'}>M</span>
+                                            {' / '}
+                                            <span className={run.adam ? 'text-purple-400' : 'text-white/30'}>A</span>
+                                          </div>
+                                        </div>
+                                        <div className="text-white font-bold">{run.distance} mi</div>
                                       </div>
                                     ))}
                                   </div>
@@ -4810,27 +5232,37 @@ export default function TripPlanner() {
                                     {currentWeek.crossTraining?.map(ct => (
                                       <div
                                         key={ct.id}
-                                        className={`flex items-center gap-3 p-3 rounded-lg ${ct.completed ? 'bg-green-500/20' : 'bg-white/5'}`}
+                                        className={`flex items-center gap-3 p-3 rounded-lg ${(ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5'}`}
                                       >
-                                        <button
-                                          onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { completed: !ct.completed })}
-                                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
-                                            ct.completed ? 'bg-green-500 border-green-500' : 'border-white/40 hover:border-white'
-                                          }`}
-                                        >
-                                          {ct.completed && <Check className="w-4 h-4 text-white" />}
-                                        </button>
-                                        <div className="flex-1">
-                                          <div className="text-white font-medium">{ct.day}</div>
-                                          <div className="text-white/60 text-sm">{ct.type}</div>
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { mike: !ct.mike })}
+                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
+                                              ct.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40 hover:border-white'
+                                            }`}
+                                            title="Mike"
+                                          >
+                                            {ct.mike && <Check className="w-4 h-4 text-white" />}
+                                          </button>
+                                          <button
+                                            onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { adam: !ct.adam })}
+                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
+                                              ct.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'
+                                            }`}
+                                            title="Adam"
+                                          >
+                                            {ct.adam && <Check className="w-4 h-4 text-white" />}
+                                          </button>
                                         </div>
-                                        <input
-                                          type="text"
-                                          value={ct.duration}
-                                          onChange={(e) => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { duration: e.target.value })}
-                                          placeholder="Duration"
-                                          className="w-20 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm text-center"
-                                        />
+                                        <div className="flex-1">
+                                          <div className="text-white font-medium">{ct.label || ct.day}</div>
+                                          <div className="text-xs text-white/50">
+                                            <span className={ct.mike ? 'text-blue-400' : 'text-white/30'}>M</span>
+                                            {' / '}
+                                            <span className={ct.adam ? 'text-purple-400' : 'text-white/30'}>A</span>
+                                          </div>
+                                        </div>
+                                        <span className="text-white/60 text-sm">30+ min</span>
                                       </div>
                                     ))}
                                   </div>
@@ -4912,24 +5344,30 @@ export default function TripPlanner() {
                                       {week.runs?.map(run => (
                                         <div
                                           key={run.id}
-                                          className={`flex items-center gap-2 p-2 rounded ${run.completed ? 'bg-green-500/20' : 'bg-white/5'}`}
+                                          className={`flex items-center gap-2 p-2 rounded ${(run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5'}`}
                                         >
-                                          <button
-                                            onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { completed: !run.completed })}
-                                            className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                              run.completed ? 'bg-green-500 border-green-500' : 'border-white/40'
-                                            }`}
-                                          >
-                                            {run.completed && <Check className="w-3 h-3 text-white" />}
-                                          </button>
-                                          <span className="text-white/80 text-sm flex-1">{run.day} - {run.type}</span>
-                                          <input
-                                            type="text"
-                                            value={run.distance}
-                                            onChange={(e) => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { distance: e.target.value })}
-                                            placeholder="mi"
-                                            className="w-16 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs text-center"
-                                          />
+                                          <div className="flex gap-1">
+                                            <button
+                                              onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { mike: !run.mike })}
+                                              className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                                                run.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40'
+                                              }`}
+                                              title="Mike"
+                                            >
+                                              {run.mike && <Check className="w-3 h-3 text-white" />}
+                                            </button>
+                                            <button
+                                              onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { adam: !run.adam })}
+                                              className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                                                run.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40'
+                                              }`}
+                                              title="Adam"
+                                            >
+                                              {run.adam && <Check className="w-3 h-3 text-white" />}
+                                            </button>
+                                          </div>
+                                          <span className="text-white/80 text-sm flex-1">{run.label || run.day}</span>
+                                          <span className="text-white font-medium text-sm">{run.distance} mi</span>
                                         </div>
                                       ))}
                                     </div>
@@ -4942,24 +5380,30 @@ export default function TripPlanner() {
                                       {week.crossTraining?.map(ct => (
                                         <div
                                           key={ct.id}
-                                          className={`flex items-center gap-2 p-2 rounded ${ct.completed ? 'bg-green-500/20' : 'bg-white/5'}`}
+                                          className={`flex items-center gap-2 p-2 rounded ${(ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5'}`}
                                         >
-                                          <button
-                                            onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { completed: !ct.completed })}
-                                            className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                              ct.completed ? 'bg-green-500 border-green-500' : 'border-white/40'
-                                            }`}
-                                          >
-                                            {ct.completed && <Check className="w-3 h-3 text-white" />}
-                                          </button>
-                                          <span className="text-white/80 text-sm flex-1">{ct.day} - {ct.type}</span>
-                                          <input
-                                            type="text"
-                                            value={ct.duration}
-                                            onChange={(e) => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { duration: e.target.value })}
-                                            placeholder="min"
-                                            className="w-16 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs text-center"
-                                          />
+                                          <div className="flex gap-1">
+                                            <button
+                                              onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { mike: !ct.mike })}
+                                              className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                                                ct.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40'
+                                              }`}
+                                              title="Mike"
+                                            >
+                                              {ct.mike && <Check className="w-3 h-3 text-white" />}
+                                            </button>
+                                            <button
+                                              onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { adam: !ct.adam })}
+                                              className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                                                ct.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40'
+                                              }`}
+                                              title="Adam"
+                                            >
+                                              {ct.adam && <Check className="w-3 h-3 text-white" />}
+                                            </button>
+                                          </div>
+                                          <span className="text-white/80 text-sm flex-1">{ct.label || ct.day}</span>
+                                          <span className="text-white/60 text-xs">30+ min</span>
                                         </div>
                                       ))}
                                     </div>
@@ -4999,24 +5443,32 @@ export default function TripPlanner() {
                   {/* Total Stats */}
                   {(() => {
                     let totalRuns = 0;
-                    let completedRuns = 0;
+                    let mikeRuns = 0;
+                    let adamRuns = 0;
                     let totalCross = 0;
-                    let completedCross = 0;
-                    let totalMiles = 0;
+                    let mikeCross = 0;
+                    let adamCross = 0;
+                    let mikeMiles = 0;
+                    let adamMiles = 0;
 
                     Object.values(fitnessTrainingPlans).forEach(plan => {
                       plan.forEach(week => {
                         week.runs?.forEach(run => {
                           totalRuns++;
-                          if (run.completed) {
-                            completedRuns++;
-                            const miles = parseFloat(run.distance) || 0;
-                            totalMiles += miles;
+                          const miles = parseFloat(run.distance) || 0;
+                          if (run.mike) {
+                            mikeRuns++;
+                            mikeMiles += miles;
+                          }
+                          if (run.adam) {
+                            adamRuns++;
+                            adamMiles += miles;
                           }
                         });
                         week.crossTraining?.forEach(ct => {
                           totalCross++;
-                          if (ct.completed) completedCross++;
+                          if (ct.mike) mikeCross++;
+                          if (ct.adam) adamCross++;
                         });
                       });
                     });
@@ -5025,23 +5477,50 @@ export default function TripPlanner() {
                       <>
                         <div className="bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-2xl p-6 border border-orange-500/30">
                           <div className="text-4xl mb-2">🏃</div>
-                          <div className="text-3xl font-bold text-white">{completedRuns}</div>
-                          <div className="text-white/60">Runs Completed</div>
-                          <div className="mt-2 text-sm text-orange-300">{totalRuns - completedRuns} remaining</div>
+                          <div className="text-xl font-bold text-white mb-2">Runs Completed</div>
+                          <div className="flex justify-around">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-blue-400">{mikeRuns}</div>
+                              <div className="text-xs text-white/60">Mike</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-purple-400">{adamRuns}</div>
+                              <div className="text-xs text-white/60">Adam</div>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-sm text-orange-300 text-center">{totalRuns} total runs in plan</div>
                         </div>
 
                         <div className="bg-gradient-to-br from-red-500/20 to-pink-500/20 rounded-2xl p-6 border border-red-500/30">
                           <div className="text-4xl mb-2">💪</div>
-                          <div className="text-3xl font-bold text-white">{completedCross}</div>
-                          <div className="text-white/60">Cross Training Sessions</div>
-                          <div className="mt-2 text-sm text-red-300">{totalCross - completedCross} remaining</div>
+                          <div className="text-xl font-bold text-white mb-2">Cross Training</div>
+                          <div className="flex justify-around">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-blue-400">{mikeCross}</div>
+                              <div className="text-xs text-white/60">Mike</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-purple-400">{adamCross}</div>
+                              <div className="text-xs text-white/60">Adam</div>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-sm text-red-300 text-center">{totalCross} total sessions in plan</div>
                         </div>
 
                         <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-2xl p-6 border border-yellow-500/30">
                           <div className="text-4xl mb-2">📏</div>
-                          <div className="text-3xl font-bold text-white">{totalMiles.toFixed(1)}</div>
-                          <div className="text-white/60">Miles Logged</div>
-                          <div className="mt-2 text-sm text-yellow-300">Keep going! 🔥</div>
+                          <div className="text-xl font-bold text-white mb-2">Miles Logged</div>
+                          <div className="flex justify-around">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-blue-400">{mikeMiles.toFixed(1)}</div>
+                              <div className="text-xs text-white/60">Mike</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-purple-400">{adamMiles.toFixed(1)}</div>
+                              <div className="text-xs text-white/60">Adam</div>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-sm text-yellow-300 text-center">Keep going! 🔥</div>
                         </div>
                       </>
                     );
@@ -5056,7 +5535,8 @@ export default function TripPlanner() {
                       {fitnessEvents.map(event => {
                         const plan = fitnessTrainingPlans[event.id] || [];
                         return plan.slice(0, 12).map((week, i) => {
-                          const completed = (week.runs?.filter(r => r.completed).length || 0) + (week.crossTraining?.filter(c => c.completed).length || 0);
+                          // Count workouts where both Mike AND Adam completed
+                          const completed = (week.runs?.filter(r => r.mike && r.adam).length || 0) + (week.crossTraining?.filter(c => c.mike && c.adam).length || 0);
                           const total = (week.runs?.length || 0) + (week.crossTraining?.length || 0);
                           const percentage = total > 0 ? (completed / total) * 100 : 0;
 
