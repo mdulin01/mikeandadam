@@ -4,21 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
+    <!-- Set PWA mode FIRST before any other scripts -->
+    <script>
+      window.PWA_MODE = 'indy';
+    </script>
+
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#0f172a" />
-    <meta name="description" content="Mike & Adam's Adventure Planner - Plan your trips together!" />
+    <meta name="theme-color" content="#f97316" />
+    <meta name="description" content="Mike & Adam's Indy Half Marathon Training Plan" />
 
     <!-- iOS PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Adventures" />
+    <meta name="apple-mobile-web-app-title" content="Indy Training" />
 
     <!-- Icons -->
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/icon-indy.svg" />
+    <link rel="apple-touch-icon" href="/icon-indy-192.png" />
+    <link rel="manifest" href="/manifest-indy.json" />
 
-    <title>Mike & Adam's Adventures</title>
+    <title>Indy Half Marathon Training</title>
 
     <!-- Preconnect to external resources -->
     <link rel="preconnect" href="https://images.unsplash.com" />
@@ -28,17 +33,6 @@
     <!-- Google API Client -->
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
-    <!-- Service Worker disabled during development - uncomment when app is stable
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((reg) => console.log('Service Worker registered:', reg.scope))
-            .catch((err) => console.log('Service Worker registration failed:', err));
-        });
-      }
-    </script>
-    -->
     <!-- Unregister any existing service worker -->
     <script>
       if ('serviceWorker' in navigator) {

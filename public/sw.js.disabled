@@ -1,0 +1,103 @@
+const CACHE_NAME = 'adventures-v1';
+const STATIC_CACHE = 'static-v1';
+const DYNAMIC_CACHE = 'dynamic-v1';
+
+// Assets to cache on install
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/fitness.html',
+  '/travel.html',
+  '/manifest.json',
+  '/manifest-fitness.json',
+  '/manifest-travel.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/icon-fitness-192.png',
+  '/icon-fitness-512.png',
+  '/icon-travel-192.png',
+  '/icon-travel-512.png'
+];
+
+// Install event - cache static assets
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(STATIC_CACHE)
+      .then((cache) => {
+        console.log('Caching static assets');
+        return cache.addAll(STATIC_ASSETS);
+      })
+      .catch((err) => console.log('Cache install error:', err))
+  );
+  self.skipWaiting();
+});
+
+// Activate event - clean old caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter((key) => key !== STATIC_CACHE && key !== DYNAMIC_CACHE)
+          .map((key) => caches.delete(key))
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+// Fetch event - serve from cache, fallback to network
+self.addEventListener('fetch', (event) => {
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') return;
+
+  // Skip Chrome extension requests
+  if (event.request.url.includes('chrome-extension')) return;
+
+  // Skip Google API requests (need fresh auth)
+  if (event.request.url.includes('googleapis.com') ||
+      event.request.url.includes('accounts.google.com')) return;
+
+  // Skip Firebase requests (need real-time data)
+  if (event.request.url.includes('firebaseio.com') ||
+      event.request.url.includes('firestore.googleapis.com')) return;
+
+  event.respondWith(
+    caches.match(event.request)
+      .then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+
+        return fetch(event.request)
+          .then((response) => {
+            // Don't cache non-successful responses
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            // Clone the response
+            const responseToCache = response.clone();
+
+            caches.open(DYNAMIC_CACHE)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+
+            return response;
+          })
+          .catch(() => {
+            // Return offline page for navigation requests
+            if (event.request.mode === 'navigate') {
+              return caches.match('/');
+            }
+          });
+      })
+  );
+});
+
+// Handle messages from clients
+self.addEventListener('message', (event) => {
+  if (event.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
+});
