@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="indyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f97316"/>
+      <stop offset="100%" style="stop-color:#ef4444"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#indyGrad)"/>
+  <!-- Running figure -->
+  <g fill="white">
+    <!-- Head -->
+    <circle cx="280" cy="140" r="40"/>
+    <!-- Body -->
+    <path d="M260 180 L240 280 L200 380 L230 390 L280 300 L300 300 L340 400 L370 390 L320 280 L300 180 Z"/>
+    <!-- Arms running motion -->
+    <path d="M260 200 L180 250 L170 230 L250 180 Z"/>
+    <path d="M300 200 L380 170 L390 190 L310 230 Z"/>
+  </g>
+  <!-- Race flag/finish -->
+  <g fill="white" opacity="0.8">
+    <rect x="100" y="350" width="8" height="100"/>
+    <rect x="108" y="350" width="50" height="35"/>
+    <rect x="108" y="350" width="12.5" height="17.5" fill="#0f172a"/>
+    <rect x="133" y="350" width="12.5" height="17.5" fill="#0f172a"/>
+    <rect x="120.5" y="367.5" width="12.5" height="17.5" fill="#0f172a"/>
+    <rect x="145.5" y="367.5" width="12.5" height="17.5" fill="#0f172a"/>
+  </g>
+</svg>

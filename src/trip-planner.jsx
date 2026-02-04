@@ -1,5 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Calendar, Plane, Hotel, Music, MapPin, Plus, X, ChevronLeft, ChevronRight, Heart, Anchor, Sun, Star, Clock, Users, ExternalLink, Sparkles, Pencil, Check, MoreVertical, Trash2, Palette, Image, Link, Globe, Loader, LogIn, LogOut, User, UserPlus, Share2 } from 'lucide-react';
+import { Calendar, Plane, Hotel, Music, MapPin, Plus, X, ChevronLeft, ChevronRight, Heart, Anchor, Sun, Star, Clock, Users, ExternalLink, Sparkles, Pencil, Check, MoreVertical, Trash2, Palette, Image, Link, Globe, Loader, LogIn, LogOut, User, UserPlus, Share2, Upload, Folder, Edit3, CheckSquare } from 'lucide-react';
+
+// Import constants and utilities
+import {
+  emojiSuggestions, travelEmojis, tripColors, bougieLabels, travelQuotes,
+  achievementDefinitions, eventCategories, defaultPackingItems, experienceDatabase,
+  airlines, ownerEmails, months, days, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES
+} from './constants';
+import {
+  parseLocalDate, formatDate, validateFileSize, getEmojiSuggestion,
+  getRandomExperience, getDaysInMonth, isHeicFile, getSafeFileName,
+  getCompanionDisplayName
+} from './utils';
+
+// Component imports
+import AddModal from './components/AddModal';
+import LoginScreen from './components/LoginScreen';
 
 // Firebase imports
 import { initializeApp } from 'firebase/app';
@@ -20,6 +36,13 @@ import {
   onSnapshot,
   collection
 } from 'firebase/firestore';
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from 'firebase/storage';
+import heic2any from 'heic2any';
 
 // Import your Firebase config
 import { firebaseConfig } from './firebase-config';
@@ -28,20 +51,8 @@ import { firebaseConfig } from './firebase-config';
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 const googleProvider = new GoogleAuthProvider();
-
-// Helper to parse date strings without timezone issues
-// "2026-03-23" -> Date object for March 23, 2026 in local time
-const parseLocalDate = (dateStr) => {
-  if (!dateStr) return new Date();
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
-};
-
-// Format a date string for display
-const formatDate = (dateStr, options = { month: 'short', day: 'numeric' }) => {
-  return parseLocalDate(dateStr).toLocaleDateString('en-US', options);
-};
 
 // Rainbow gradient for pride flair
 const RainbowBar = () => (
@@ -127,6 +138,13 @@ const defaultTrips = [
     accent: 'bg-violet-400',
     special: '🎤 Harry Styles Concert!',
     isWishlist: false,
+    isPlanning: true, // Trip is in planning stage
+    theme: 'Harry Styles Concert',
+    expectedDuration: '3-4 days',
+    planningLinks: [
+      { id: 1, title: 'Harry Styles Wembley Tickets', url: 'https://www.ticketmaster.co.uk', type: 'event' },
+      { id: 2, title: 'The Londoner Hotel', url: 'https://www.thelondoner.com', type: 'hotel' },
+    ],
     coverImage: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=800&h=400&fit=crop',
     guests: [] // Just Mike & Adam
   }
@@ -163,14 +181,6 @@ const defaultCompanions = [
   { id: 'liam', firstName: 'Liam', lastName: 'Dulin', email: 'liam@example.com', phone: '', relationship: 'Son', color: 'from-cyan-400 to-teal-500' },
 ];
 
-// Helper to get display name from companion
-const getCompanionDisplayName = (companion) => {
-  if (companion.firstName && companion.lastName) {
-    return `${companion.firstName} ${companion.lastName}`;
-  }
-  return companion.firstName || companion.name || 'Unknown';
-};
-
 // Default open for travel dates
 const defaultOpenDates = [
   {
@@ -201,220 +211,6 @@ const defaultOpenDates = [
     note: 'Labor Day Weekend',
     visibleTo: ['kate', 'chris'], // Friends only
   },
-];
-
-// Emoji suggestions based on destination keywords
-const emojiSuggestions = {
-  // Cities
-  'new york': '🗽', 'nyc': '🗽', 'manhattan': '🗽',
-  'london': '🇬🇧', 'paris': '🗼', 'tokyo': '🗼', 'rome': '🏛️', 'venice': '🎭',
-  'las vegas': '🎰', 'vegas': '🎰', 'miami': '🌴', 'la': '🌴', 'los angeles': '🌴',
-  'san francisco': '🌉', 'sf': '🌉', 'chicago': '🏙️', 'seattle': '☕',
-  'amsterdam': '🌷', 'barcelona': '🏖️', 'berlin': '🎸', 'dublin': '🍀',
-  'sydney': '🦘', 'melbourne': '🦘', 'toronto': '🍁', 'vancouver': '🍁',
-
-  // Beach/Tropical
-  'beach': '🏖️', 'island': '🏝️', 'tropical': '🌴', 'caribbean': '🏝️',
-  'hawaii': '🌺', 'maui': '🌺', 'cancun': '🏖️', 'bahamas': '🏝️',
-  'provincetown': '🏖️', 'ptown': '🏖️', 'key west': '🌴',
-  'puerto vallarta': '🌴', 'cabo': '🏖️', 'mykonos': '🇬🇷', 'ibiza': '🎉',
-  'bali': '🏝️', 'maldives': '🏝️', 'fiji': '🏝️', 'tahiti': '🏝️',
-
-  // Countries
-  'mexico': '🇲🇽', 'spain': '🇪🇸', 'italy': '🇮🇹', 'france': '🇫🇷',
-  'germany': '🇩🇪', 'japan': '🇯🇵', 'greece': '🇬🇷', 'ireland': '🇮🇪',
-  'australia': '🇦🇺', 'canada': '🇨🇦', 'brazil': '🇧🇷', 'thailand': '🇹🇭',
-
-  // Activities/Themes
-  'ski': '⛷️', 'skiing': '⛷️', 'snow': '❄️', 'mountain': '🏔️', 'mountains': '🏔️',
-  'cruise': '🚢', 'disney': '🏰', 'theme park': '🎢', 'safari': '🦁',
-  'wine': '🍷', 'napa': '🍷', 'concert': '🎤', 'music': '🎵', 'festival': '🎪',
-  'camping': '🏕️', 'hiking': '🥾', 'adventure': '🧭',
-  'spa': '💆', 'wellness': '🧘', 'retreat': '🧘',
-  'wedding': '💒', 'honeymoon': '💕', 'anniversary': '💑', 'romantic': '💕',
-  'pride': '🏳️‍🌈', 'gay': '🏳️‍🌈',
-
-  // Sports/Events
-  'racing': '🏎️', 'indy': '🏎️', 'indianapolis': '🏎️', 'formula': '🏎️',
-  'golf': '⛳', 'tennis': '🎾', 'football': '🏈', 'soccer': '⚽',
-
-  // Other
-  'road trip': '🚗', 'roadtrip': '🚗', 'cabin': '🏡', 'lake': '🏞️',
-  'desert': '🏜️', 'aurora': '🌌', 'northern lights': '🌌',
-};
-
-const travelEmojis = [
-  '✈️', '🌴', '🏖️', '🏝️', '🗽', '🗼', '🏰', '🎢', '🚢', '🏔️',
-  '⛷️', '🌺', '🎭', '🎤', '🏎️', '🇬🇧', '🇫🇷', '🇮🇹', '🇪🇸', '🇬🇷',
-  '🇯🇵', '🇲🇽', '🇧🇷', '🇦🇺', '🏳️‍🌈', '💕', '🎉', '🧭', '🌈', '🦄',
-];
-
-const getEmojiSuggestion = (destination) => {
-  if (!destination) return '✈️';
-  const lower = destination.toLowerCase();
-  for (const [keyword, emoji] of Object.entries(emojiSuggestions)) {
-    if (lower.includes(keyword)) return emoji;
-  }
-  return '✈️';
-};
-
-const tripColors = [
-  { color: 'from-teal-400 to-cyan-500', accent: 'bg-teal-400' },
-  { color: 'from-violet-400 to-purple-500', accent: 'bg-violet-400' },
-  { color: 'from-indigo-400 to-blue-500', accent: 'bg-indigo-400' },
-  { color: 'from-emerald-400 to-teal-500', accent: 'bg-emerald-400' },
-  { color: 'from-cyan-400 to-sky-500', accent: 'bg-cyan-400' },
-  { color: 'from-purple-400 to-indigo-500', accent: 'bg-purple-400' },
-  { color: 'from-sky-400 to-blue-500', accent: 'bg-sky-400' },
-  { color: 'from-blue-500 to-indigo-600', accent: 'bg-blue-500' },
-  { color: 'from-fuchsia-400 to-purple-500', accent: 'bg-fuchsia-400' },
-  { color: 'from-green-400 to-emerald-500', accent: 'bg-green-400' },
-  { color: 'from-lime-400 to-green-500', accent: 'bg-lime-400' },
-  { color: 'from-purple-500 to-violet-600', accent: 'bg-purple-500' },
-  { color: 'from-indigo-500 to-purple-600', accent: 'bg-indigo-500' },
-  { color: 'from-teal-500 to-emerald-600', accent: 'bg-teal-500' },
-  { color: 'from-cyan-500 to-blue-600', accent: 'bg-cyan-500' },
-];
-
-// Bougie levels
-const bougieLabels = [
-  { level: 1, label: 'Kinda Bougie', emoji: '✨', description: 'Nice but budget-friendly' },
-  { level: 2, label: 'Bougie', emoji: '💅', description: 'Treat yourself vibes' },
-  { level: 3, label: 'Pretty Bougie', emoji: '🥂', description: 'Splurge-worthy' },
-  { level: 4, label: 'Very Bougie', emoji: '💎', description: 'Luxury experience' },
-  { level: 5, label: 'Super Bougie', emoji: '👑', description: 'Ultimate indulgence' },
-];
-
-// Random Experience Database
-const experienceDatabase = {
-  dayTrips: [
-    { destination: 'Asheville, NC', emoji: '🏔️', description: 'Artsy mountain town with breweries & galleries', distance: '1.5 hrs', vibes: ['artsy', 'glutenFree'], bougie: 2, highlights: ['River Arts District', 'Biltmore Estate', 'Downtown galleries'] },
-    { destination: 'Durham, NC', emoji: '🐂', description: 'Foodie paradise with amazing restaurants', distance: '1 hr', vibes: ['artsy', 'glutenFree'], bougie: 2, highlights: ['Durham Food Hall', 'Duke Gardens', 'American Tobacco Campus'] },
-    { destination: 'Charlotte, NC', emoji: '🏙️', description: 'Big city vibes with great food scene', distance: '1.5 hrs', vibes: ['glutenFree'], bougie: 2, highlights: ['NoDa Arts District', 'Uptown', 'Camp North End'] },
-    { destination: 'Raleigh, NC', emoji: '🌳', description: 'Museums, gardens & Southern charm', distance: '1 hr', vibes: ['artsy'], bougie: 1, highlights: ['NC Museum of Art', 'Downtown Raleigh', 'Historic Oakwood'] },
-    { destination: 'Winston-Salem, NC', emoji: '🎨', description: 'Arts & innovation hub', distance: '30 min', vibes: ['artsy'], bougie: 1, highlights: ['Reynolda House', 'Old Salem', 'Downtown Arts District'] },
-    { destination: 'Chapel Hill, NC', emoji: '🎓', description: 'College town with great food & culture', distance: '50 min', vibes: ['artsy', 'glutenFree'], bougie: 1, highlights: ['Franklin Street', 'Carolina Inn', 'Botanical Gardens'] },
-    { destination: 'Blowing Rock, NC', emoji: '🍂', description: 'Charming mountain village', distance: '2 hrs', vibes: ['artsy'], bougie: 2, highlights: ['The Blowing Rock', 'Main Street shops', 'Blue Ridge Parkway'] },
-    { destination: 'Pinehurst, NC', emoji: '⛳', description: 'Legendary golf resort & spa', distance: '1 hr', vibes: [], bougie: 4, highlights: ['Championship golf', 'Spa treatments', 'Fine dining'] },
-    { destination: 'The Umstead (Cary)', emoji: '🧖', description: 'Five-star spa day escape', distance: '1 hr', vibes: ['glutenFree'], bougie: 5, highlights: ['World-class spa', 'Herons restaurant', 'Art collection'] },
-  ],
-  trainTrips: [
-    { destination: 'Washington, DC', emoji: '🏛️', description: 'Museums, monuments & history', duration: '5 hrs via Amtrak', vibes: ['artsy', 'gay'], bougie: 2, highlights: ['Smithsonian museums', 'Dupont Circle', 'U Street'] },
-    { destination: 'New York City', emoji: '🗽', description: 'The city that never sleeps', duration: '9 hrs via Amtrak', vibes: ['artsy', 'gay', 'glutenFree'], bougie: 3, highlights: ['Broadway', 'Hell\'s Kitchen', 'Chelsea'] },
-    { destination: 'Savannah, GA', emoji: '🌴', description: 'Southern charm & historic squares', duration: '6 hrs via Amtrak', vibes: ['artsy', 'gay'], bougie: 2, highlights: ['Historic District', 'River Street', 'SCAD galleries'] },
-    { destination: 'Charleston, SC', emoji: '🏘️', description: 'Historic beauty & amazing food', duration: '4 hrs via Amtrak', vibes: ['artsy', 'glutenFree'], bougie: 3, highlights: ['Rainbow Row', 'King Street', 'Waterfront Park'] },
-    { destination: 'New Orleans', emoji: '🎺', description: 'Jazz, food & endless fun', duration: '15 hrs via Amtrak', vibes: ['artsy', 'gay', 'glutenFree'], bougie: 3, highlights: ['French Quarter', 'Marigny', 'Garden District'] },
-    { destination: 'NYC First Class', emoji: '🥂', description: 'Amtrak Acela First Class experience', duration: '8 hrs Acela First', vibes: ['artsy', 'gay', 'glutenFree'], bougie: 4, highlights: ['First class lounge', 'Complimentary dining', 'Premium seats'] },
-  ],
-  cruises: [
-    { destination: 'Caribbean Cruise', emoji: '🚢', description: 'Island hopping in paradise', duration: '7 days', vibes: ['gay'], bougie: 2, highlights: ['Beach days', 'Snorkeling', 'Island culture'], ports: ['Cozumel', 'Grand Cayman', 'Jamaica'] },
-    { destination: 'Atlantis Caribbean', emoji: '🏳️‍🌈', description: 'The ultimate gay cruise experience', duration: '7 days', vibes: ['gay'], bougie: 4, highlights: ['All-gay experience', 'World-class entertainment', 'Caribbean islands'] },
-    { destination: 'Alaska Cruise', emoji: '🐋', description: 'Glaciers, wildlife & stunning scenery', duration: '7 days', vibes: ['artsy'], bougie: 3, highlights: ['Glacier viewing', 'Whale watching', 'Juneau & Ketchikan'] },
-    { destination: 'Mediterranean Cruise', emoji: '🏛️', description: 'European history & culture', duration: '10 days', vibes: ['artsy', 'glutenFree'], bougie: 3, highlights: ['Barcelona', 'Rome', 'Greek Islands'] },
-    { destination: 'RSVP Caribbean', emoji: '🌈', description: 'All-gay cruise adventure', duration: '7 days', vibes: ['gay'], bougie: 3, highlights: ['Gay-only experience', 'Amazing parties', 'Island excursions'] },
-    { destination: 'Virgin Voyages', emoji: '🔥', description: 'Adults-only boutique cruising', duration: '5-7 days', vibes: ['gay', 'glutenFree'], bougie: 4, highlights: ['No kids', 'Tattoo parlor', 'Richard\'s Rooftop'] },
-    { destination: 'Regent Seven Seas', emoji: '👑', description: 'Ultra-luxury all-inclusive', duration: '10 days', vibes: ['glutenFree'], bougie: 5, highlights: ['All-suite ships', 'Unlimited shore excursions', 'Butler service'] },
-    { destination: 'Silversea Mediterranean', emoji: '🏆', description: 'Intimate luxury expedition', duration: '12 days', vibes: ['artsy', 'glutenFree'], bougie: 5, highlights: ['300 guests max', 'Michelin-level dining', 'All-inclusive'] },
-  ],
-  flights: [
-    { destination: 'Key West, FL', emoji: '🌺', description: 'America\'s most gay-friendly town', vibes: ['gay'], bougie: 2, highlights: ['Duval Street', 'Sunset Pier', 'Historic tours'] },
-    { destination: 'Wilton Manors, FL', emoji: '🏳️‍🌈', description: 'Gay village paradise near Fort Lauderdale', vibes: ['gay'], bougie: 2, highlights: ['Wilton Drive', 'Beach days', 'Nightlife'] },
-    { destination: 'San Diego, CA', emoji: '🌴', description: 'Perfect weather & Hillcrest gayborhood', vibes: ['gay', 'glutenFree'], bougie: 2, highlights: ['Hillcrest', 'Balboa Park', 'Gaslamp Quarter'] },
-    { destination: 'Palm Springs, CA', emoji: '🌵', description: 'Desert oasis & gay resort town', vibes: ['gay', 'glutenFree'], bougie: 3, highlights: ['Pool parties', 'Mid-century architecture', 'Joshua Tree nearby'] },
-    { destination: 'Provincetown, MA', emoji: '🏖️', description: 'Ultimate East Coast gay destination', vibes: ['gay', 'artsy'], bougie: 2, highlights: ['Commercial Street', 'Beach time', 'Whale watching'] },
-    { destination: 'Fire Island, NY', emoji: '🔥', description: 'Iconic gay beach community', vibes: ['gay'], bougie: 3, highlights: ['Cherry Grove', 'The Pines', 'Beach parties'] },
-    { destination: 'Rehoboth Beach, DE', emoji: '🏖️', description: 'Mid-Atlantic gay beach town', vibes: ['gay'], bougie: 1, highlights: ['Beach days', 'Poodle Beach', 'Downtown shops'] },
-    { destination: 'Puerto Vallarta, MX', emoji: '🇲🇽', description: 'Mexico\'s gay paradise', vibes: ['gay', 'glutenFree'], bougie: 2, highlights: ['Zona Romántica', 'Beach clubs', 'Malecón'] },
-    { destination: 'Santa Fe, NM', emoji: '🎨', description: 'Art galleries & Southwestern culture', vibes: ['artsy', 'glutenFree'], bougie: 3, highlights: ['Canyon Road', 'Georgia O\'Keeffe Museum', 'Plaza'] },
-    { destination: 'Portland, OR', emoji: '🌲', description: 'Weird, wonderful & super GF-friendly', vibes: ['artsy', 'glutenFree', 'gay'], bougie: 2, highlights: ['Food carts', 'Powell\'s Books', 'Alberta Arts District'] },
-    { destination: 'Austin, TX', emoji: '🎸', description: 'Live music capital with great food', vibes: ['artsy', 'glutenFree', 'gay'], bougie: 2, highlights: ['6th Street', 'South Congress', 'Live music venues'] },
-    { destination: 'Taos, NM', emoji: '🏜️', description: 'Artist colony in the desert', vibes: ['artsy'], bougie: 2, highlights: ['Taos Pueblo', 'Art galleries', 'Rio Grande Gorge'] },
-    { destination: 'Marfa, TX', emoji: '✨', description: 'Tiny art town in the desert', vibes: ['artsy'], bougie: 3, highlights: ['Prada Marfa', 'Chinati Foundation', 'Stargazing'] },
-    { destination: 'Ojai, CA', emoji: '🧘', description: 'Wellness retreat & artistic haven', vibes: ['artsy', 'glutenFree'], bougie: 4, highlights: ['Spas', 'Art galleries', 'Farm-to-table dining'] },
-    { destination: 'Sedona, AZ', emoji: '🔴', description: 'Red rocks & spiritual vibes', vibes: ['artsy', 'glutenFree'], bougie: 3, highlights: ['Vortex sites', 'Hiking', 'Art galleries'] },
-    { destination: 'Los Angeles, CA', emoji: '🌟', description: 'Entertainment capital with endless GF options', vibes: ['gay', 'glutenFree', 'artsy'], bougie: 3, highlights: ['WeHo', 'Venice', 'LACMA'] },
-    { destination: 'San Francisco, CA', emoji: '🌉', description: 'The Castro & amazing food scene', vibes: ['gay', 'glutenFree', 'artsy'], bougie: 3, highlights: ['The Castro', 'Mission District', 'Golden Gate Park'] },
-    { destination: 'Mykonos, Greece', emoji: '🇬🇷', description: 'Greek island gay paradise', vibes: ['gay'], bougie: 4, highlights: ['Beach clubs', 'Windmills', 'Nightlife'] },
-    { destination: 'Barcelona, Spain', emoji: '🇪🇸', description: 'Art, architecture & vibrant gay scene', vibes: ['gay', 'artsy', 'glutenFree'], bougie: 3, highlights: ['Eixample (Gayxample)', 'Gaudí architecture', 'La Rambla'] },
-    { destination: 'Berlin, Germany', emoji: '🇩🇪', description: 'Edgy art scene & legendary nightlife', vibes: ['gay', 'artsy'], bougie: 2, highlights: ['Schöneberg', 'Museum Island', 'Street art'] },
-    { destination: 'Amalfi Coast, Italy', emoji: '🍋', description: 'Stunning cliffside luxury', vibes: ['artsy', 'glutenFree'], bougie: 5, highlights: ['Positano', 'Ravello', 'Capri day trip'] },
-    { destination: 'St. Barts', emoji: '🏝️', description: 'Caribbean\'s chicest island', vibes: ['gay'], bougie: 5, highlights: ['Shell Beach', 'Designer shopping', 'Yacht culture'] },
-    { destination: 'Bora Bora', emoji: '🏝️', description: 'Overwater bungalow paradise', vibes: [], bougie: 5, highlights: ['Overwater villas', 'Crystal lagoon', 'Private beaches'] },
-    { destination: 'Tokyo, Japan', emoji: '🗼', description: 'Culture, food & Ni-chōme nightlife', vibes: ['gay', 'artsy', 'glutenFree'], bougie: 4, highlights: ['Shinjuku Ni-chōme', 'Shibuya', 'Harajuku'] },
-    { destination: 'Paris, France', emoji: '🗼', description: 'City of lights & Le Marais', vibes: ['gay', 'artsy', 'glutenFree'], bougie: 4, highlights: ['Le Marais', 'Louvre', 'Montmartre'] },
-    { destination: 'Tulum, Mexico', emoji: '🌴', description: 'Bohemian beach luxury', vibes: ['artsy', 'glutenFree', 'gay'], bougie: 4, highlights: ['Beach clubs', 'Cenotes', 'Wellness retreats'] },
-  ]
-};
-
-const getRandomExperience = (type, vibes, bougieLevel) => {
-  let pool = [];
-
-  if (type === 'any' || type === 'dayTrip') {
-    pool = [...pool, ...experienceDatabase.dayTrips.map(e => ({ ...e, type: 'dayTrip', typeLabel: '🚗 Day Trip' }))];
-  }
-  if (type === 'any' || type === 'train') {
-    pool = [...pool, ...experienceDatabase.trainTrips.map(e => ({ ...e, type: 'train', typeLabel: '🚂 Train Trip' }))];
-  }
-  if (type === 'any' || type === 'cruise') {
-    pool = [...pool, ...experienceDatabase.cruises.map(e => ({ ...e, type: 'cruise', typeLabel: '🚢 Cruise' }))];
-  }
-  if (type === 'any' || type === 'flight') {
-    pool = [...pool, ...experienceDatabase.flights.map(e => ({ ...e, type: 'flight', typeLabel: '✈️ Flight' }))];
-  }
-
-  // Filter by vibes if any selected
-  if (vibes.length > 0) {
-    pool = pool.filter(exp => vibes.some(v => exp.vibes?.includes(v)));
-  }
-
-  // Filter by bougie level if selected (allow +/- 1 level flexibility)
-  if (bougieLevel > 0) {
-    pool = pool.filter(exp => exp.bougie && Math.abs(exp.bougie - bougieLevel) <= 1);
-  }
-
-  if (pool.length === 0) return null;
-  return pool[Math.floor(Math.random() * pool.length)];
-};
-
-// Travel Quotes
-const travelQuotes = [
-  { quote: "The world is a book and those who do not travel read only one page.", author: "Saint Augustine" },
-  { quote: "Travel is the only thing you buy that makes you richer.", author: "Anonymous" },
-  { quote: "Life is short and the world is wide.", author: "Simon Raven" },
-  { quote: "Adventure is worthwhile.", author: "Aesop" },
-  { quote: "Take only memories, leave only footprints.", author: "Chief Seattle" },
-  { quote: "Travel far enough, you meet yourself.", author: "David Mitchell" },
-  { quote: "Jobs fill your pocket, but adventures fill your soul.", author: "Jaime Lyn Beatty" },
-  { quote: "Not all those who wander are lost.", author: "J.R.R. Tolkien" },
-  { quote: "To travel is to live.", author: "Hans Christian Andersen" },
-  { quote: "Collect moments, not things.", author: "Anonymous" },
-  { quote: "Oh the places you'll go!", author: "Dr. Seuss" },
-  { quote: "Happiness is planning a trip with someone you love.", author: "Anonymous" },
-];
-
-// Achievements/Badges
-const achievementDefinitions = [
-  { id: 'first_trip', name: 'First Adventure', emoji: '🎉', description: 'Plan your first trip together', condition: (trips) => trips.length >= 1 },
-  { id: 'beach_bum', name: 'Beach Bums', emoji: '🏖️', description: 'Plan 3 beach destinations', condition: (trips) => trips.filter(t => ['🏖️', '🌴', '🌺'].includes(t.emoji)).length >= 3 },
-  { id: 'city_explorer', name: 'City Explorers', emoji: '🏙️', description: 'Visit 5 major cities', condition: (trips) => trips.filter(t => ['🗽', '🏙️', '🗼', '🌉'].includes(t.emoji)).length >= 5 },
-  { id: 'international', name: 'International Travelers', emoji: '🌍', description: 'Plan an international trip', condition: (trips) => trips.some(t => ['🇬🇧', '🇲🇽', '🇬🇷', '🇪🇸', '🇩🇪', '🇯🇵', '🇫🇷', '🇮🇹'].includes(t.emoji)) },
-  { id: 'pride_travelers', name: 'Pride Travelers', emoji: '🏳️‍🌈', description: 'Visit 3 LGBTQ+ friendly destinations', condition: (trips) => trips.length >= 3 },
-  { id: 'frequent_flyers', name: 'Frequent Flyers', emoji: '✈️', description: 'Plan 10 trips', condition: (trips) => trips.length >= 10 },
-  { id: 'cruise_lovers', name: 'Cruise Lovers', emoji: '🚢', description: 'Plan a cruise', condition: (trips) => trips.some(t => t.emoji === '🚢') },
-  { id: 'road_warriors', name: 'Road Warriors', emoji: '🚗', description: 'Plan 5 road trips', condition: (trips) => trips.length >= 5 },
-  { id: 'luxury_seekers', name: 'Luxury Seekers', emoji: '👑', description: 'Plan a super bougie trip', condition: (trips) => trips.length >= 1 },
-  { id: 'memory_makers', name: 'Memory Makers', emoji: '📸', description: 'Add photos to 3 trips', condition: (trips, details) => Object.values(details).filter(d => d.photos?.length > 0).length >= 3 },
-  { id: 'planners', name: 'Master Planners', emoji: '📋', description: 'Complete a packing list', condition: (trips, details) => Object.values(details).some(d => d.packingList?.every(i => i.packed)) },
-  { id: 'bon_voyage', name: 'Bon Voyage!', emoji: '🦄', description: 'Use the app for a year', condition: () => true },
-];
-
-// Default packing list items
-const defaultPackingItems = [
-  { category: 'Essentials', items: ['Passport/ID', 'Wallet', 'Phone & Charger', 'Medications'] },
-  { category: 'Clothing', items: ['Underwear', 'Socks', 'Shirts', 'Pants/Shorts', 'Sleepwear'] },
-  { category: 'Toiletries', items: ['Toothbrush', 'Toothpaste', 'Deodorant', 'Shampoo', 'Sunscreen'] },
-  { category: 'Tech', items: ['Camera', 'Headphones', 'Portable charger', 'Adapters'] },
-  { category: 'Extras', items: ['Snacks', 'Books/Kindle', 'Travel pillow', 'Sunglasses'] },
 ];
 
 const initialTripDetails = {
@@ -575,395 +371,7 @@ const AtomicDots = () => (
 );
 
 // Login Component
-const LoginScreen = ({ onLogin, loading }) => (
-  <div className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 flex items-center justify-center p-6">
-    <div className="max-w-md w-full">
-      <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 text-center">
-        <div className="w-20 h-20 bg-gradient-to-br from-teal-400 via-purple-400 to-indigo-400 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-6">
-          <span className="text-5xl">🦄</span>
-        </div>
-        <h1 className="text-3xl font-bold text-white mb-2">Bon Voyage!</h1>
-        <p className="text-slate-400 mb-8">Mike & Adam's Adventure Planner 💕</p>
 
-        <button
-          onClick={onLogin}
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-white text-slate-800 font-semibold rounded-xl hover:bg-slate-100 transition shadow-lg disabled:opacity-50"
-        >
-          {loading ? (
-            <Loader className="w-5 h-5 animate-spin" />
-          ) : (
-            <>
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              Sign in with Google
-            </>
-          )}
-        </button>
-
-        <p className="text-slate-500 text-sm mt-6">
-          Sign in to sync your trips across devices ✨
-        </p>
-      </div>
-
-      <div className="mt-8 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500/20 via-purple-500/20 to-indigo-500/20 rounded-full border border-purple-500/30">
-          <span className="text-xl">🏳️‍🌈</span>
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-purple-300 to-indigo-300 font-medium text-sm">
-            Every adventure is better together
-          </span>
-          <span className="text-xl">💕</span>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-// AddModal Component - uses local state to prevent focus loss, syncs with parent only on submit
-const AddModal = React.memo(({ type, tripId, onClose, addItem, updateItem, editItem }) => {
-  // Local state - initialize with editItem data if editing
-  const [formData, setFormData] = useState(editItem || {});
-  const [showConfirmClose, setShowConfirmClose] = useState(false);
-  const isEditing = !!editItem;
-
-  const airlines = [
-    'American Airlines', 'Delta', 'United', 'Southwest', 'JetBlue',
-    'Alaska Airlines', 'Spirit', 'Frontier', 'Hawaiian Airlines',
-    'British Airways', 'Air France', 'Lufthansa', 'Emirates', 'Other'
-  ];
-
-  const updateField = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleBackgroundClick = (e) => {
-    if (e.target === e.currentTarget) {
-      const hasData = Object.values(formData).some(v => v && v.toString().trim());
-      if (hasData) {
-        setShowConfirmClose(true);
-      } else {
-        onClose();
-      }
-    }
-  };
-
-  const handleClose = () => {
-    const hasData = Object.values(formData).some(v => v && v.toString().trim());
-    if (hasData) {
-      setShowConfirmClose(true);
-    } else {
-      onClose();
-    }
-  };
-
-  const handleSubmit = () => {
-    addItem(tripId, type, formData);
-    onClose();
-  };
-
-  const renderFlightForm = () => (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Airline</label>
-        <select
-          value={formData.airline || ''}
-          onChange={(e) => updateField('airline', e.target.value)}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none bg-white"
-        >
-          <option value="">Select airline...</option>
-          {airlines.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Flight Number</label>
-        <input
-          type="text"
-          placeholder="e.g., AA1234"
-          value={formData.flightNo || ''}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-          onChange={(e) => updateField('flightNo', e.target.value.toUpperCase())}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Date</label>
-        <input
-          type="date"
-          value={formData.date || ''}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-          onChange={(e) => updateField('date', e.target.value)}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">Departure Time</label>
-          <input
-            type="time"
-            value={formData.departTime || ''}
-            className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-            onChange={(e) => updateField('departTime', e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">Arrival Time</label>
-          <input
-            type="time"
-            value={formData.arriveTime || ''}
-            className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-            onChange={(e) => updateField('arriveTime', e.target.value)}
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">From (Airport)</label>
-          <input
-            type="text"
-            placeholder="e.g., GSO or JFK"
-            value={formData.depart || ''}
-            className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-            onChange={(e) => updateField('depart', e.target.value.toUpperCase())}
-            maxLength={3}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">To (Airport)</label>
-          <input
-            type="text"
-            placeholder="e.g., LHR or LAX"
-            value={formData.arrive || ''}
-            className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-            onChange={(e) => updateField('arrive', e.target.value.toUpperCase())}
-            maxLength={3}
-          />
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Confirmation # (optional)</label>
-        <input
-          type="text"
-          placeholder="Booking confirmation code"
-          value={formData.confirmation || ''}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-          onChange={(e) => updateField('confirmation', e.target.value.toUpperCase())}
-        />
-      </div>
-    </div>
-  );
-
-  const renderHotelForm = () => (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Hotel Name</label>
-        <input
-          type="text"
-          placeholder="e.g., The Standard, Marriott..."
-          value={formData.name || ''}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-          onChange={(e) => updateField('name', e.target.value)}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Address (optional)</label>
-        <input
-          type="text"
-          placeholder="Hotel address"
-          value={formData.address || ''}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-          onChange={(e) => updateField('address', e.target.value)}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">Check-in Date</label>
-          <input
-            type="date"
-            value={formData.checkIn || ''}
-            className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-            onChange={(e) => updateField('checkIn', e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">Check-out Date</label>
-          <input
-            type="date"
-            value={formData.checkOut || ''}
-            className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-            onChange={(e) => updateField('checkOut', e.target.value)}
-          />
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Confirmation # (optional)</label>
-        <input
-          type="text"
-          placeholder="Booking confirmation code"
-          value={formData.confirmation || ''}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-          onChange={(e) => updateField('confirmation', e.target.value.toUpperCase())}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Notes (optional)</label>
-        <textarea
-          placeholder="Room type, special requests..."
-          value={formData.notes || ''}
-          rows={2}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none resize-none"
-          onChange={(e) => updateField('notes', e.target.value)}
-        />
-      </div>
-    </div>
-  );
-
-  const renderEventForm = () => (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Event Name</label>
-        <input
-          type="text"
-          placeholder="e.g., Harry Styles Concert, Broadway Show..."
-          value={formData.name || ''}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-          onChange={(e) => updateField('name', e.target.value)}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Venue (optional)</label>
-        <input
-          type="text"
-          placeholder="e.g., Madison Square Garden"
-          value={formData.venue || ''}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-          onChange={(e) => updateField('venue', e.target.value)}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">Date</label>
-          <input
-            type="date"
-            value={formData.date || ''}
-            className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-            onChange={(e) => updateField('date', e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">Time</label>
-          <input
-            type="time"
-            value={formData.time || ''}
-            className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-            onChange={(e) => updateField('time', e.target.value)}
-          />
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Tickets/Confirmation # (optional)</label>
-        <input
-          type="text"
-          placeholder="Ticket confirmation or order number"
-          value={formData.confirmation || ''}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none"
-          onChange={(e) => updateField('confirmation', e.target.value)}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">Notes (optional)</label>
-        <textarea
-          placeholder="Seat numbers, dress code, etc..."
-          value={formData.notes || ''}
-          rows={2}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-400 outline-none resize-none"
-          onChange={(e) => updateField('notes', e.target.value)}
-        />
-      </div>
-    </div>
-  );
-
-  const getFormContent = () => {
-    switch(type) {
-      case 'flights': return renderFlightForm();
-      case 'hotels': return renderHotelForm();
-      case 'events': return renderEventForm();
-      default: return null;
-    }
-  };
-
-  const getIcon = () => {
-    switch(type) {
-      case 'flights': return <Plane className="w-6 h-6 text-teal-500" />;
-      case 'hotels': return <Hotel className="w-6 h-6 text-purple-500" />;
-      case 'events': return <Music className="w-6 h-6 text-pink-500" />;
-      default: return null;
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={handleBackgroundClick}
-    >
-      <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-        {showConfirmClose && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-3xl">
-            <div className="bg-white rounded-2xl p-6 m-4 shadow-xl">
-              <p className="text-slate-800 font-medium mb-4">Discard your changes?</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowConfirmClose(false)}
-                  className="flex-1 py-2 px-4 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200"
-                >
-                  Keep Editing
-                </button>
-                <button
-                  onClick={() => {
-                    setFormData({});
-                    onClose();
-                  }}
-                  className="flex-1 py-2 px-4 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600"
-                >
-                  Discard
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            {getIcon()}
-            {isEditing ? 'Edit' : 'Add'} {type.slice(0, -1).charAt(0).toUpperCase() + type.slice(0, -1).slice(1)}
-          </h3>
-          <button onClick={handleClose} className="p-2 hover:bg-slate-100 rounded-full">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {getFormContent()}
-
-        <button
-          onClick={() => {
-            if (isEditing) {
-              updateItem(tripId, type, editItem.id, formData);
-            } else {
-              addItem(tripId, type, formData);
-            }
-            setFormData({});
-            onClose();
-          }}
-          className="w-full mt-6 py-3 bg-gradient-to-r from-teal-400 to-cyan-500 text-white font-bold rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2"
-        >
-          <Check className="w-5 h-5" />
-          {isEditing ? 'Save Changes' : 'Add to Trip'}
-        </button>
-      </div>
-    </div>
-  );
-});
 
 export default function TripPlanner() {
   // Auth state
@@ -971,8 +379,325 @@ export default function TripPlanner() {
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
 
+  // Toast notification state
+  const [toast, setToast] = useState(null); // { message: string, type: 'success' | 'error' | 'info' }
+
+  // Track component mount status to prevent state updates after unmount
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
+
+  // Show toast helper
+  const showToast = useCallback((message, type = 'info') => {
+    if (!isMountedRef.current) return;
+    setToast({ message, type });
+    setTimeout(() => {
+      if (isMountedRef.current) setToast(null);
+    }, 4000);
+  }, []);
+
   // Main section navigation
-  const [activeSection, setActiveSection] = useState('home'); // 'home' | 'travel' | 'fitness' | 'nutrition' | 'lifePlanning'
+  const [activeSection, setActiveSection] = useState('home'); // 'home' | 'travel' | 'fitness' | 'nutrition' | 'events' | 'lifePlanning' | 'business' | 'memories'
+  const [memoriesView, setMemoriesView] = useState('timeline'); // 'timeline' | 'events' | 'media'
+
+  // Memories state - imported from memories_data.xlsx
+  const [memories, setMemories] = useState([
+    { id: 128, category: 'concert', date: '2025-02-26', title: 'Shucked', description: 'Yea Haw!', icon: '🎭', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: false },
+    { id: 2, category: 'datenight', date: '2025-03-02', title: 'First Date', description: 'Brunch, Sage Mule ✨', icon: '🥂', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 17, category: 'karaoke', date: '2025-03-03', title: 'First Playlist', description: 'Mike made Adam a playlist with Dolly Parton 🎶', icon: '🎤', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 3, category: 'datenight', date: '2025-03-12', title: 'First Sleepover', description: 'Second date magic 💫', icon: '🌙', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 24, category: 'datenight', date: '2025-03-12', title: 'Second Date', description: 'Lucky 32', icon: '🥂', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 23, category: 'datenight', date: '2025-03-15', title: 'Third Date', description: 'Arcade, Funny Business', icon: '🎆', location: 'Winston-Salem, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 6, category: 'travel', date: '2025-04-11', title: 'Travel to Ashville', description: 'Hot Tub, Firestarter', icon: '🗽', location: 'Ashville, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 125, category: 'datenight', date: '2025-04-19', title: 'Friendly Nails', description: 'Mani/Pedi', icon: '🏳️‍🌈', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: false },
+    { id: 4, category: 'datenight', date: '2025-05-17', title: 'Becoming Official', description: 'Champagne, flowers, and a big question 💐', icon: '❤️', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 8, category: 'datenight', date: '2025-05-21', title: 'Greenvally Grill', description: 'Fancy Dinner', icon: '🌴', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 9, category: 'datenight', date: '2025-06-02', title: 'White and Wood', description: 'First Downtown Datenight', icon: '🌊', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: false },
+    { id: 7, category: 'travel', date: '2025-06-12', title: 'Meeting the Family', description: "Trip to NY to meet Adam's family and new nephew", icon: '👨‍👩‍👦', location: 'New York', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 13, category: 'concert', date: '2025-06-14', title: 'Boop', description: 'Broadway magic in NYC', icon: '🎭', location: 'New York City', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 129, category: 'travel', date: '2025-06-16', title: 'Mercer Labs', description: "Ball pit for adults? I'm in!", icon: '🗽', location: 'New York City', image: '', link: '', comment: '', isFirstTime: false },
+    { id: 5, category: 'datenight', date: '2025-06-29', title: 'I Love You', description: 'Some Like It Hot', icon: '❤️', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 14, category: 'datenight', date: '2025-07-15', title: 'Lucky 32', description: 'Funky Music and GF Meatloaf', icon: '🎬', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: false },
+    { id: 18, category: 'travel', date: '2025-07-19', title: "Mike's First Cruise", description: 'Disney Caribbean Cruise', icon: '🚢', location: 'Ft. Lauderdale', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 12, category: 'fitness', date: '2025-07-21', title: 'Adam Graduates!', description: 'Sonography school complete! 🎓', icon: '🎓', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 127, category: 'concert', date: '2025-07-31', title: 'Dolly Nashville Show', description: 'Where was the real Dolly?', icon: '🎭', location: 'Nashville, TN', image: '', link: '', comment: '', isFirstTime: false },
+    { id: 11, category: 'travel', date: '2025-08-01', title: 'Ptown (Triple Trip), Nashville, Boston', description: 'Seasick Together', icon: '🎆', location: 'Provincetown, MA', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 15, category: 'datenight', date: '2025-08-04', title: 'Printworks', description: 'Fancy Dinner', icon: '🎵', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 16, category: 'pride', date: '2025-09-20', title: 'Greensboro Pride Festival', description: 'Rainbow flags and community love, train trip to Raleigh 🏳️‍🌈', icon: '🏳️‍🌈', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 19, category: 'concert', date: '2025-09-25', title: 'Beauty and The Beast', description: 'Tanger Center Season Tickets', icon: '🎭', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 20, category: 'travel', date: '2025-10-03', title: 'Anaheim and Vegas Road Trip', description: "Don't Let it Rain on your parade", icon: '🏳️‍🌈', location: 'Anaheim, CA', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 21, category: 'travel', date: '2025-10-16', title: 'DC for Work/Fun', description: 'DC Gay Bars', icon: '🏳️‍🌈', location: 'Washington DC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 22, category: 'concert', date: '2025-10-29', title: 'Depeche Mode Movie', description: 'First Movie', icon: '🎬', location: 'High Point, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 130, category: 'concert', date: '2025-10-30', title: 'The Wiz', description: 'Tanger Center', icon: '🎭', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 10, category: 'travel', date: '2025-11-12', title: 'Miami Cruise Trip', description: 'Yacht Club Caribbean', icon: '🚢', location: 'Miami, FL', image: '', link: '', comment: '', isFirstTime: true },
+    { id: 25, category: 'datenight', date: '2025-12-11', title: 'The Outsiders', description: 'Tanger Center Season Tickets', icon: '🎵', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: false },
+    { id: 126, category: 'concert', date: '2025-12-17', title: 'Dolly Christmas Show', description: 'Looking good in the new Christmas shirt', icon: '🎵', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: false },
+  ]);
+  const [editingMemory, setEditingMemory] = useState(null); // memory object being edited
+  const [showAddMemoryModal, setShowAddMemoryModal] = useState(null); // category for new memory
+  const [newMemoryData, setNewMemoryData] = useState({
+    title: '', date: '', location: '', description: '', image: '', images: [], link: '', comment: ''
+  });
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingToMemoryId, setUploadingToMemoryId] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [dragOverMemoryId, setDragOverMemoryId] = useState(null);
+  const [heroPhotoIndex, setHeroPhotoIndex] = useState(0);
+  const [dismissedEmojis, setDismissedEmojis] = useState(new Set());
+
+  // Get all images for a memory (backward compatible with old 'image' field)
+  const getMemoryImages = (memory) => {
+    const images = memory.images || [];
+    if (memory.image && !images.includes(memory.image)) {
+      return [memory.image, ...images];
+    }
+    return images;
+  };
+
+  // Get a random image for display (deterministic based on memory id + date for consistency)
+  const getRandomMemoryImage = (memory) => {
+    const images = getMemoryImages(memory);
+    if (images.length === 0) return null;
+    if (images.length === 1) return images[0];
+    // Use memory id as seed for consistent random selection per render
+    const seed = memory.id + new Date().toDateString();
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    return images[Math.abs(hash) % images.length];
+  };
+
+  // Get all photos from all memories for hero carousel
+  const getAllMemoryPhotos = useCallback(() => {
+    return memories.flatMap(memory => getMemoryImages(memory)).filter(Boolean);
+  }, [memories]);
+
+  // Hero photo carousel effect
+  useEffect(() => {
+    const photos = getAllMemoryPhotos();
+    if (photos.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setHeroPhotoIndex(prev => (prev + 1) % photos.length);
+    }, 5000); // Change photo every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [getAllMemoryPhotos]);
+
+  // Handle drag and drop for photo upload in modals
+  const handleDrop = (e, isEdit = false) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      uploadMemoryPhoto(file, isEdit);
+    }
+  };
+
+  // Handle drop directly on a memory card
+  const handleCardDrop = async (e, memoryId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverMemoryId(null);
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      await uploadPhotoToMemory(file, memoryId);
+    }
+  };
+
+  // Upload photo and add to a specific memory's images array
+  const uploadPhotoToMemory = async (file, memoryId) => {
+    if (!file) return;
+
+    // Validate file size
+    const sizeError = validateFileSize(file);
+    if (sizeError) {
+      showToast(sizeError, 'error');
+      return;
+    }
+
+    setUploadingToMemoryId(memoryId);
+    try {
+      let fileToUpload = file;
+      let fileName = file.name;
+
+      // Convert HEIC/HEIF to JPEG
+      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
+                     file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+      if (isHeic) {
+        const convertedBlob = await heic2any({
+          blob: file,
+          toType: 'image/jpeg',
+          quality: 0.9
+        });
+        fileToUpload = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
+        fileName = fileToUpload.name;
+      }
+
+      const timestamp = Date.now();
+      const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const storageRef = ref(storage, `memories/${timestamp}_${safeName}`);
+      await uploadBytes(storageRef, fileToUpload);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Add to memory's images array (check if still mounted)
+      if (!isMountedRef.current) return;
+      setMemories(prev => prev.map(m => {
+        if (m.id === memoryId) {
+          const currentImages = m.images || [];
+          // Also migrate old 'image' field if present
+          if (m.image && !currentImages.includes(m.image)) {
+            return { ...m, images: [m.image, ...currentImages, downloadURL], image: '' };
+          }
+          return { ...m, images: [...currentImages, downloadURL] };
+        }
+        return m;
+      }));
+    } catch (error) {
+      console.error('Upload failed:', error);
+      if (isMountedRef.current) showToast('Photo upload failed. Please try again.', 'error');
+    } finally {
+      if (isMountedRef.current) setUploadingToMemoryId(null);
+    }
+  };
+
+  // Upload photo to a party event (with HEIC conversion)
+  const uploadPhotoToEvent = async (file, eventId) => {
+    if (!file) return;
+
+    // Validate file size
+    const sizeError = validateFileSize(file);
+    if (sizeError) {
+      showToast(sizeError, 'error');
+      return;
+    }
+
+    setUploadingToEventId(eventId);
+    try {
+      let fileToUpload = file;
+      let fileName = file.name;
+
+      // Convert HEIC/HEIF to JPEG
+      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
+                     file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+      if (isHeic) {
+        const convertedBlob = await heic2any({
+          blob: file,
+          toType: 'image/jpeg',
+          quality: 0.9
+        });
+        fileToUpload = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
+        fileName = fileToUpload.name;
+      }
+
+      const timestamp = Date.now();
+      const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const storageRef = ref(storage, `events/${timestamp}_${safeName}`);
+      await uploadBytes(storageRef, fileToUpload);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Check if still mounted before updating state
+      if (!isMountedRef.current) return;
+
+      // Add to event's images array
+      const newEvents = partyEvents.map(e => {
+        if (e.id === eventId) {
+          const currentImages = e.images || [];
+          return { ...e, images: [...currentImages, downloadURL] };
+        }
+        return e;
+      });
+      setPartyEvents(newEvents);
+
+      // Update selected event if viewing it
+      if (selectedPartyEvent?.id === eventId) {
+        setSelectedPartyEvent(newEvents.find(e => e.id === eventId));
+      }
+
+      savePartyEventsToFirestore(newEvents);
+    } catch (error) {
+      console.error('Event photo upload failed:', error);
+      if (isMountedRef.current) showToast('Event photo upload failed. Please try again.', 'error');
+    } finally {
+      if (isMountedRef.current) setUploadingToEventId(null);
+    }
+  };
+
+  // Handle drop on event card
+  const handleEventCardDrop = async (e, eventId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverEventId(null);
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      await uploadPhotoToEvent(file, eventId);
+    }
+  };
+
+  // Upload photo to Firebase Storage (with HEIC conversion) - for modals
+  const uploadMemoryPhoto = async (file, isEdit = false) => {
+    if (!file) return;
+
+    // Validate file size
+    const sizeError = validateFileSize(file);
+    if (sizeError) {
+      showToast(sizeError, 'error');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      let fileToUpload = file;
+      let fileName = file.name;
+
+      // Convert HEIC/HEIF to JPEG
+      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
+                     file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+      if (isHeic) {
+        const convertedBlob = await heic2any({
+          blob: file,
+          toType: 'image/jpeg',
+          quality: 0.9
+        });
+        fileToUpload = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
+        fileName = fileToUpload.name;
+      }
+
+      const timestamp = Date.now();
+      const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const storageRef = ref(storage, `memories/${timestamp}_${safeName}`);
+      await uploadBytes(storageRef, fileToUpload);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Check if still mounted before updating state
+      if (!isMountedRef.current) return;
+
+      if (isEdit) {
+        // Add to images array instead of replacing
+        setEditingMemory(prev => {
+          const currentImages = prev.images || [];
+          const allImages = prev.image && !currentImages.includes(prev.image)
+            ? [prev.image, ...currentImages]
+            : currentImages;
+          return { ...prev, images: [...allImages, downloadURL], image: '' };
+        });
+      } else {
+        setNewMemoryData(prev => {
+          const currentImages = prev.images || [];
+          return { ...prev, images: [...currentImages, downloadURL] };
+        });
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+      if (isMountedRef.current) showToast('Photo upload failed. Please try again.', 'error');
+    } finally {
+      if (isMountedRef.current) setUploadingPhoto(false);
+    }
+  };
 
   // App state
   const [trips, setTrips] = useState(defaultTrips);
@@ -1006,8 +731,44 @@ export default function TripPlanner() {
   const [experienceFilters, setExperienceFilters] = useState({ type: 'any', vibes: [] });
   const [currentCompanion, setCurrentCompanion] = useState(null); // logged-in companion object
   const [showMyProfileModal, setShowMyProfileModal] = useState(false); // companion profile editor
+  const [editingTrainingWeek, setEditingTrainingWeek] = useState(null); // { eventId, week } for editing training week
   const [isOwner, setIsOwner] = useState(false); // true if Mike or Adam
   const [bouncingEmoji, setBouncingEmoji] = useState(null); // { emoji, x, y, dx, dy } for bouncing animation
+
+  // Guest state - for users invited to specific trips
+  const [isGuest, setIsGuest] = useState(false); // true if user is a trip guest (not owner or companion)
+  const [guestTripIds, setGuestTripIds] = useState([]); // array of trip IDs this guest has access to
+  const [guestPermissions, setGuestPermissions] = useState({}); // { tripId: 'edit' | 'view' }
+
+  // ========== CELEBRATION STATE ==========
+  const [confetti, setConfetti] = useState(null); // { type: 'run' | 'week', x?, y? }
+  const [weekCelebration, setWeekCelebration] = useState(null); // { weekNumber, eventName }
+
+  // Vibration helper - works on mobile devices
+  const vibrate = (pattern) => {
+    if ('vibrate' in navigator) {
+      navigator.vibrate(pattern);
+    }
+  };
+
+  // Trigger run completion celebration (both completed together)
+  const celebrateRunTogether = () => {
+    vibrate(200); // Short buzz
+    setConfetti({ type: 'run' });
+    showToast('High Five! 🙌 You both crushed it!', 'success');
+    setTimeout(() => setConfetti(null), 2000);
+  };
+
+  // Trigger week completion celebration (both completed all runs)
+  const celebrateWeekComplete = (weekNumber, eventName) => {
+    vibrate([200, 100, 200, 100, 400]); // Pattern: buzz-pause-buzz-pause-long buzz
+    setConfetti({ type: 'week' });
+    setWeekCelebration({ weekNumber, eventName });
+    setTimeout(() => {
+      setConfetti(null);
+      setWeekCelebration(null);
+    }, 4000);
+  };
 
   // ========== FITNESS SECTION STATE ==========
   // Default fitness events
@@ -1033,134 +794,346 @@ export default function TripPlanner() {
   // Hardcoded Indy Half Marathon Training Plan - "Salad, Run, Salad"
   const indyHalfTrainingPlan = [
     { weekNumber: 1, startDate: '2026-01-11', endDate: '2026-01-17', runs: [
-      { id: 1, label: 'Run #1', distance: '2', mike: true, adam: true, notes: '' },
-      { id: 2, label: 'Run #2', distance: '3', mike: true, adam: true, notes: '' },
-      { id: 3, label: 'Run #3', distance: '4', mike: true, adam: true, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3', mike: true, adam: true, notes: '' },
+      { id: 3, label: 'Long Run', distance: '4', mike: true, adam: true, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: true, adam: true, notes: '' },
-      { id: 2, label: 'Cross #2', mike: true, adam: true, notes: '' }
+      { id: 1, label: 'Cross Train #1', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: true, adam: true, notes: '' }
     ], totalMiles: 9, weekNotes: '' },
     { weekNumber: 2, startDate: '2026-01-18', endDate: '2026-01-24', runs: [
-      { id: 1, label: 'Run #1', distance: '2', mike: true, adam: true, notes: '' },
-      { id: 2, label: 'Run #2', distance: '3', mike: true, adam: true, notes: '' },
-      { id: 3, label: 'Run #3', distance: '4', mike: true, adam: true, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3', mike: true, adam: true, notes: '' },
+      { id: 3, label: 'Long Run', distance: '4', mike: true, adam: true, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: true, adam: true, notes: '' },
-      { id: 2, label: 'Cross #2', mike: true, adam: true, notes: '' }
+      { id: 1, label: 'Cross Train #1', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: true, adam: true, notes: '' }
     ], totalMiles: 9, weekNotes: '' },
     { weekNumber: 3, startDate: '2026-01-25', endDate: '2026-01-31', runs: [
-      { id: 1, label: 'Run #1', distance: '2', mike: true, adam: true, notes: '' },
-      { id: 2, label: 'Run #2', distance: '3', mike: true, adam: true, notes: '' },
-      { id: 3, label: 'Run #3', distance: '5', mike: true, adam: true, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3', mike: true, adam: true, notes: '' },
+      { id: 3, label: 'Long Run', distance: '5', mike: true, adam: true, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: true, adam: true, notes: '' },
-      { id: 2, label: 'Cross #2', mike: true, adam: true, notes: '' }
+      { id: 1, label: 'Cross Train #1', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: true, adam: true, notes: '' }
     ], totalMiles: 10, weekNotes: '' },
     { weekNumber: 4, startDate: '2026-02-01', endDate: '2026-02-07', runs: [
-      { id: 1, label: 'Run #1', distance: '2', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '6', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '6', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 11, weekNotes: 'SOBER!! 🎯' },
     { weekNumber: 5, startDate: '2026-02-08', endDate: '2026-02-14', runs: [
-      { id: 1, label: 'Run #1', distance: '2', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '4', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '6', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '6', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 12, weekNotes: '' },
     { weekNumber: 6, startDate: '2026-02-15', endDate: '2026-02-21', runs: [
-      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '4', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '6', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '6', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 13, weekNotes: '' },
     { weekNumber: 7, startDate: '2026-02-22', endDate: '2026-02-28', runs: [
-      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '4', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '7', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '8', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 14, weekNotes: '' },
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 15, weekNotes: '' },
     { weekNumber: 8, startDate: '2026-03-01', endDate: '2026-03-07', runs: [
-      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '4', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '8', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '8', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 15, weekNotes: '✈️ Mike in Spain (Fri-Sat)' },
     { weekNumber: 9, startDate: '2026-03-08', endDate: '2026-03-14', runs: [
-      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '8', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '4', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '8', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 16, weekNotes: '✈️ Mike in Spain (all week)' },
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 17, weekNotes: '✈️ Mike in Spain (all week)' },
     { weekNumber: 10, startDate: '2026-03-15', endDate: '2026-03-21', runs: [
-      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '9', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '9', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 17, weekNotes: '🗽 Adam and Mike in NYC (Thurs-Sat)' },
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 17, weekNotes: '🗽 Mike & Adam in NYC (Thurs-Sat)' },
     { weekNumber: 11, startDate: '2026-03-22', endDate: '2026-03-28', runs: [
-      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '10', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '10', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 18, weekNotes: '🗽 Adam and Mike in NYC (Sun-Mon)' },
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 18, weekNotes: '🗽 Mike & Adam in NYC (Sun-Mon)' },
     { weekNumber: 12, startDate: '2026-03-29', endDate: '2026-04-04', runs: [
-      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '11', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '11', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 19, weekNotes: '' },
     { weekNumber: 13, startDate: '2026-04-05', endDate: '2026-04-11', runs: [
-      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '6', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '12', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '5.5', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '12', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 21, weekNotes: '🏛️ Adam and Mike in DC (Thurs-Sat)' },
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 22.5, weekNotes: '🏛️ Mike & Adam in DC (Thurs-Sat)' },
     { weekNumber: 14, startDate: '2026-04-12', endDate: '2026-04-18', runs: [
-      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '14', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '14', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 22, weekNotes: '🏛️ Adam and Mike in DC (Sun-Mon)' },
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 24, weekNotes: '🏛️ Mike & Adam in DC (Sun-Mon)' },
     { weekNumber: 15, startDate: '2026-04-19', endDate: '2026-04-25', runs: [
-      { id: 1, label: 'Run #1', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '4', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '8', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '8', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 15, weekNotes: '📉 Taper Week - Rest up!' },
     { weekNumber: 16, startDate: '2026-04-26', endDate: '2026-05-02', runs: [
-      { id: 1, label: 'Run #1', distance: '2', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Run #2', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Run #3', distance: '13.1', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '13.1', mike: false, adam: false, notes: '' }
     ], crossTraining: [
-      { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 18.1, weekNotes: '🏁 RACE WEEK! You got this! 🎉', isRaceWeek: true }
   ].map(week => ({ ...week, id: `indy-half-2026-week-${week.weekNumber}` }));
+
+  // Hardcoded Triathlon Training Plan - Mike only
+  // Pre-season (Feb-May): Swimming cross-training while doing Half Marathon runs
+  // Main training (May onwards): Full swim/bike/run/bricks
+  const triathlonTrainingPlan = [
+    // === PRE-SEASON: Swimming Cross-Training (Feb 2 - May 9) ===
+    // During this phase, runs are tracked in Half Marathon plan
+    { weekNumber: 1, startDate: '2026-02-02', endDate: '2026-02-08', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '400m', mike: false, notes: 'Easy pace, focus on form' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '🏊 Pre-Season Week 1 - Getting in the water!' },
+    { weekNumber: 2, startDate: '2026-02-09', endDate: '2026-02-15', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '450m', mike: false, notes: 'Freestyle drills' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 3, startDate: '2026-02-16', endDate: '2026-02-22', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '500m', mike: false, notes: '' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 4, startDate: '2026-02-23', endDate: '2026-03-01', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '550m', mike: false, notes: '' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 5, startDate: '2026-03-02', endDate: '2026-03-08', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '600m', mike: false, notes: '' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '🏊 Building endurance!' },
+    { weekNumber: 6, startDate: '2026-03-09', endDate: '2026-03-15', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '650m', mike: false, notes: '' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 7, startDate: '2026-03-16', endDate: '2026-03-22', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '700m', mike: false, notes: '' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 8, startDate: '2026-03-23', endDate: '2026-03-29', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '750m', mike: false, notes: '' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 9, startDate: '2026-03-30', endDate: '2026-04-05', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '800m', mike: false, notes: '' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '🏊 Halfway to race swim distance!' },
+    { weekNumber: 10, startDate: '2026-04-06', endDate: '2026-04-12', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '850m', mike: false, notes: '' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 11, startDate: '2026-04-13', endDate: '2026-04-19', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '900m', mike: false, notes: '' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 12, startDate: '2026-04-20', endDate: '2026-04-26', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '950m', mike: false, notes: '' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 13, startDate: '2026-04-27', endDate: '2026-05-03', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '1000m', mike: false, notes: 'Race distance achieved!' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '🏃 Half Marathon Week! Focus on race.' },
+    { weekNumber: 14, startDate: '2026-05-04', endDate: '2026-05-09', phase: 'pre-season', runs: [
+      { id: 1, label: '🏊 Swim', distance: '600m', mike: false, notes: 'Recovery swim' }
+    ], crossTraining: [], totalMiles: 0, weekNotes: '🔄 Transition week - recover from Half!' },
+
+    // === MAIN TRAINING: Full Triathlon (May 10 onwards) ===
+    { weekNumber: 15, startDate: '2026-05-10', endDate: '2026-05-16', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '500m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '10 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '2', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '🚴 Full tri training begins!' },
+    { weekNumber: 16, startDate: '2026-05-17', endDate: '2026-05-23', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '600m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '12 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '2.5', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 17, startDate: '2026-05-24', endDate: '2026-05-30', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '700m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '14 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '3', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 18, startDate: '2026-05-31', endDate: '2026-06-06', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '800m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '15 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '3', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 19, startDate: '2026-06-07', endDate: '2026-06-13', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '900m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '16 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '3.5', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 20, startDate: '2026-06-14', endDate: '2026-06-20', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1000m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '18 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '4', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 21, startDate: '2026-06-21', endDate: '2026-06-27', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1000m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '20 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '4', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 22, startDate: '2026-06-28', endDate: '2026-07-04', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1100m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '22 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '4.5', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '🎆 4th of July Week!' },
+    { weekNumber: 23, startDate: '2026-07-05', endDate: '2026-07-11', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1200m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '24 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '5', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 24, startDate: '2026-07-12', endDate: '2026-07-18', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1300m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '26 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '5', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 25, startDate: '2026-07-19', endDate: '2026-07-25', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1400m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '28 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '5.5', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 26, startDate: '2026-07-26', endDate: '2026-08-01', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1500m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '30 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '6', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '🏊 Peak Swim Week!' },
+    { weekNumber: 27, startDate: '2026-08-02', endDate: '2026-08-08', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1500m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '30 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '6', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 28, startDate: '2026-08-09', endDate: '2026-08-15', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1500m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '28 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '5.5', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 29, startDate: '2026-08-16', endDate: '2026-08-22', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1400m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '26 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '5', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 30, startDate: '2026-08-23', endDate: '2026-08-29', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1300m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '24 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '5', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '' },
+    { weekNumber: 31, startDate: '2026-08-30', endDate: '2026-09-05', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1200m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '22 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '4', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '📉 Taper begins!' },
+    { weekNumber: 32, startDate: '2026-09-06', endDate: '2026-09-12', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '1000m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '18 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '3', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '📉 Taper Week 2' },
+    { weekNumber: 33, startDate: '2026-09-13', endDate: '2026-09-19', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '800m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '14 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '2.5', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
+      { id: 2, label: 'Strength', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '📉 Taper Week 3 - Rest up!' },
+    { weekNumber: 34, startDate: '2026-09-20', endDate: '2026-09-26', phase: 'main', runs: [
+      { id: 1, label: 'Swim', distance: '500m', mike: false, notes: '' },
+      { id: 2, label: 'Bike', distance: '10 mi', mike: false, notes: '' },
+      { id: 3, label: 'Run', distance: '6.2', mike: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Race Day Prep', mike: false, notes: '' },
+      { id: 2, label: 'Rest', mike: false, notes: '' }
+    ], totalMiles: 0, weekNotes: '🏁 RACE WEEK! Sprint Tri - You got this! 🎉', isRaceWeek: true }
+  ].map(week => ({ ...week, id: `triathlon-2026-week-${week.weekNumber}` }));
 
   // Generate generic training weeks for other events
   const generateTrainingWeeks = (startDate, eventDate, eventId) => {
@@ -1185,13 +1158,13 @@ export default function TripPlanner() {
         startDate: weekStart.toISOString().split('T')[0],
         endDate: weekEnd.toISOString().split('T')[0],
         runs: [
-          { id: 1, label: 'Run #1', distance: '', mike: false, adam: false, notes: '' },
-          { id: 2, label: 'Run #2', distance: '', mike: false, adam: false, notes: '' },
-          { id: 3, label: 'Run #3', distance: '', mike: false, adam: false, notes: '' }
+          { id: 1, label: 'Short Run', distance: '', mike: false, adam: false, notes: '' },
+          { id: 2, label: 'Medium Run', distance: '', mike: false, adam: false, notes: '' },
+          { id: 3, label: 'Long Run', distance: '', mike: false, adam: false, notes: '' }
         ],
         crossTraining: [
-          { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' },
-          { id: 2, label: 'Cross #2', mike: false, adam: false, notes: '' }
+          { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+          { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
         ],
         weekNotes: ''
       });
@@ -1213,11 +1186,11 @@ export default function TripPlanner() {
         endDate: weekEnd.toISOString().split('T')[0],
         isRecovery: true,
         runs: [
-          { id: 1, label: 'Run #1', distance: '', mike: false, adam: false, notes: '' },
-          { id: 2, label: 'Run #2', distance: '', mike: false, adam: false, notes: '' }
+          { id: 1, label: 'Short Run', distance: '', mike: false, adam: false, notes: '' },
+          { id: 2, label: 'Medium Run', distance: '', mike: false, adam: false, notes: '' }
         ],
         crossTraining: [
-          { id: 1, label: 'Cross #1', mike: false, adam: false, notes: '' }
+          { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' }
         ],
         weekNotes: 'Recovery Week - Take it easy! 🌟'
       });
@@ -1235,12 +1208,35 @@ export default function TripPlanner() {
   const [fitnessViewMode, setFitnessViewMode] = useState('events'); // 'events' | 'training' | 'stats'
   // ========== END FITNESS SECTION STATE ==========
 
-  // Owner emails - Mike and Adam are the owners
-  const ownerEmails = ['mdulin@gmail.com', 'adamjosephbritten@gmail.com'];
+  // ========== EVENTS/PARTY SECTION STATE ==========
+  const [partyEvents, setPartyEvents] = useState([]);
+  const [selectedPartyEvent, setSelectedPartyEvent] = useState(null);
+  const [showAddEventModal, setShowAddEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [eventViewMode, setEventViewMode] = useState('upcoming');
+  const [newEventData, setNewEventData] = useState({
+    name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
+    location: '', entryCode: '', description: '', color: 'from-purple-400 to-pink-500'
+  });
+  const [eventGuestEmail, setEventGuestEmail] = useState('');
+  const [eventGuestPermission, setEventGuestPermission] = useState('edit');
+  const [newTaskText, setNewTaskText] = useState('');
+  const [newTaskAssignee, setNewTaskAssignee] = useState('');
+  const [uploadingToEventId, setUploadingToEventId] = useState(null);
+  const [dragOverEventId, setDragOverEventId] = useState(null);
+  // ========== END EVENTS/PARTY SECTION STATE ==========
 
-  // Auth effect - listen for auth state changes
+  // Use refs for companions and trips to avoid recreating auth listener when they change
+  const companionsRef = useRef(companions);
+  companionsRef.current = companions;
+  const tripsRef = useRef(trips);
+  tripsRef.current = trips;
+
+  // Auth effect - listen for auth state changes (runs once, uses ref for companions)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!isMountedRef.current) return;
+
       if (firebaseUser) {
         setUser(firebaseUser);
         const userEmail = firebaseUser.email?.toLowerCase();
@@ -1254,31 +1250,100 @@ export default function TripPlanner() {
           const displayName = userEmail?.includes('mdulin') ? 'Mike' : 'Adam';
           setCurrentUser(displayName);
           setCurrentCompanion(null);
+          setIsGuest(false);
+          setGuestTripIds([]);
+          setGuestPermissions({});
         } else {
-          // Check if user is a companion
-          const matchedCompanion = companions.find(c =>
+          // Check if user is a companion (use ref to get latest companions)
+          const matchedCompanion = companionsRef.current.find(c =>
             c.email?.toLowerCase() === userEmail
           );
 
           if (matchedCompanion) {
             setCurrentCompanion(matchedCompanion);
             setCurrentUser(matchedCompanion.firstName || matchedCompanion.name);
+            setIsGuest(false);
+            setGuestTripIds([]);
+            setGuestPermissions({});
           } else {
-            // Unknown user - treat as guest
-            setCurrentUser(firebaseUser.displayName || 'Guest');
-            setCurrentCompanion(null);
+            // Check if user is a trip guest (invited to specific trips)
+            const currentTrips = tripsRef.current;
+            const invitedTrips = [];
+            const permissions = {};
+
+            currentTrips.forEach(trip => {
+              const guestMatch = (trip.guests || []).find(g =>
+                g.email?.toLowerCase() === userEmail
+              );
+              if (guestMatch) {
+                invitedTrips.push(trip.id);
+                permissions[trip.id] = guestMatch.permission || 'view';
+              }
+            });
+
+            if (invitedTrips.length > 0) {
+              // User is a guest on one or more trips
+              setIsGuest(true);
+              setGuestTripIds(invitedTrips);
+              setGuestPermissions(permissions);
+              setCurrentUser(firebaseUser.displayName || 'Guest');
+              setCurrentCompanion(null);
+            } else {
+              // Unknown user - no access
+              setCurrentUser(firebaseUser.displayName || 'Guest');
+              setCurrentCompanion(null);
+              setIsGuest(false);
+              setGuestTripIds([]);
+              setGuestPermissions({});
+            }
           }
         }
       } else {
         setUser(null);
         setCurrentCompanion(null);
         setIsOwner(false);
+        setIsGuest(false);
+        setGuestTripIds([]);
+        setGuestPermissions({});
       }
-      setAuthLoading(false);
+      if (isMountedRef.current) setAuthLoading(false);
     });
 
     return () => unsubscribe();
-  }, [companions]);
+  }, []); // Empty dependency - listener created once, uses refs for current data
+
+  // Re-check guest status when trips change (handles Firestore data loading after initial auth)
+  useEffect(() => {
+    if (!user || isOwner || currentCompanion) return; // Only check for non-owner, non-companion users
+
+    const userEmail = user.email?.toLowerCase();
+    if (!userEmail) return;
+
+    const invitedTrips = [];
+    const permissions = {};
+
+    trips.forEach(trip => {
+      const guestMatch = (trip.guests || []).find(g =>
+        g.email?.toLowerCase() === userEmail
+      );
+      if (guestMatch) {
+        invitedTrips.push(trip.id);
+        permissions[trip.id] = guestMatch.permission || 'view';
+      }
+    });
+
+    // Update guest status if it changed
+    if (invitedTrips.length > 0) {
+      setIsGuest(true);
+      setGuestTripIds(invitedTrips);
+      setGuestPermissions(permissions);
+    } else if (isGuest) {
+      // Was a guest but no longer invited to any trips
+      setIsGuest(false);
+      setGuestTripIds([]);
+      setGuestPermissions({});
+    }
+  }, [trips, user, isOwner, currentCompanion, isGuest]);
 
   // Rotate travel quotes every 10 seconds
   useEffect(() => {
@@ -1288,7 +1353,10 @@ export default function TripPlanner() {
     return () => clearInterval(interval);
   }, []);
 
-  // Bouncing emoji animation
+  // Bouncing emoji animation - use ref to avoid recreating interval on every state change
+  const bouncingEmojiRef = useRef(bouncingEmoji);
+  bouncingEmojiRef.current = bouncingEmoji;
+
   useEffect(() => {
     if (!bouncingEmoji) return;
 
@@ -1315,7 +1383,7 @@ export default function TripPlanner() {
 
     const interval = setInterval(animate, 16); // ~60fps
     return () => clearInterval(interval);
-  }, [bouncingEmoji]);
+  }, [bouncingEmoji ? 'active' : 'inactive']); // Only restart when emoji becomes active/inactive
 
   const startBouncingEmoji = (emoji, startX, startY) => {
     // Random direction
@@ -1346,6 +1414,7 @@ export default function TripPlanner() {
           if (data.trips) setTrips(data.trips);
           if (data.wishlist) setWishlist(data.wishlist);
           if (data.tripDetails) setTripDetails(data.tripDetails);
+          if (data.memories) setMemories(data.memories);
         }
         setDataLoading(false);
       },
@@ -1370,9 +1439,24 @@ export default function TripPlanner() {
       }
     );
 
+    // Subscribe to party events collection
+    const partyEventsUnsubscribe = onSnapshot(
+      doc(db, 'tripData', 'partyEvents'),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.events) setPartyEvents(data.events);
+        }
+      },
+      (error) => {
+        console.error('Error loading party events:', error);
+      }
+    );
+
     return () => {
       tripsUnsubscribe();
       fitnessUnsubscribe();
+      partyEventsUnsubscribe();
     };
   }, [user]);
 
@@ -1384,8 +1468,28 @@ export default function TripPlanner() {
         (currentCompanion && od.visibleTo.includes(currentCompanion.id))
       );
 
+  // Compute visible trips based on user role
+  const visibleTrips = isOwner || currentCompanion
+    ? trips // Owners and companions see all trips
+    : isGuest
+      ? trips.filter(trip => guestTripIds.includes(trip.id)) // Guests see only invited trips
+      : []; // Unknown users see nothing
+
+  // Helper to check if current user can edit a specific trip
+  const canEditTrip = (tripId) => {
+    if (isOwner) return true;
+    if (currentCompanion) return false; // Companions are view-only for now
+    if (isGuest) return guestPermissions[tripId] === 'edit';
+    return false;
+  };
+
+  // Helper to check if current user can delete a trip (owners only)
+  const canDeleteTrip = (tripId) => {
+    return isOwner;
+  };
+
   // Save to Firestore whenever data changes
-  const saveToFirestore = async (newTrips, newWishlist, newTripDetails) => {
+  const saveToFirestore = async (newTrips, newWishlist, newTripDetails, newMemories) => {
     if (!user) return;
 
     try {
@@ -1393,11 +1497,32 @@ export default function TripPlanner() {
         trips: newTrips || trips,
         wishlist: newWishlist || wishlist,
         tripDetails: newTripDetails || tripDetails,
+        memories: newMemories || memories,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: currentUser
+      });
+      showToast('Changes saved', 'success');
+    } catch (error) {
+      console.error('Error saving to Firestore:', error);
+      showToast('Failed to save changes. Please try again.', 'error');
+    }
+  };
+
+  // Save memories to Firestore
+  const saveMemoriesToFirestore = async (newMemories) => {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, 'tripData', 'shared'), {
+        trips,
+        wishlist,
+        tripDetails,
+        memories: newMemories,
         lastUpdated: new Date().toISOString(),
         updatedBy: currentUser
       });
     } catch (error) {
-      console.error('Error saving to Firestore:', error);
+      console.error('Error saving memories to Firestore:', error);
+      showToast('Failed to save memory. Please try again.', 'error');
     }
   };
 
@@ -1414,6 +1539,23 @@ export default function TripPlanner() {
       });
     } catch (error) {
       console.error('Error saving fitness to Firestore:', error);
+      showToast('Failed to save fitness data. Please try again.', 'error');
+    }
+  };
+
+  // Save party/social events to Firestore
+  const savePartyEventsToFirestore = async (newEvents) => {
+    if (!user) return;
+
+    try {
+      await setDoc(doc(db, 'tripData', 'partyEvents'), {
+        events: newEvents || partyEvents,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: currentUser
+      });
+    } catch (error) {
+      console.error('Error saving party events to Firestore:', error);
+      showToast('Failed to save event. Please try again.', 'error');
     }
   };
 
@@ -1442,6 +1584,14 @@ export default function TripPlanner() {
     const newPlans = { ...fitnessTrainingPlans };
     if (!newPlans[eventId]) return;
 
+    // Get current workout state before update
+    const currentWeek = newPlans[eventId].find(w => w.id === weekId);
+    const currentWorkout = currentWeek?.[workoutType]?.find(w => w.id === workoutId);
+    const wasCompletedTogether = currentWorkout?.mike && currentWorkout?.adam;
+
+    // Check if all runs were complete before this update
+    const wereAllRunsComplete = currentWeek?.runs?.every(r => r.mike && r.adam);
+
     newPlans[eventId] = newPlans[eventId].map(week => {
       if (week.id !== weekId) return week;
 
@@ -1452,8 +1602,28 @@ export default function TripPlanner() {
       return { ...week, [workoutType]: updatedWorkouts };
     });
 
+    // Get updated state
+    const updatedWeek = newPlans[eventId].find(w => w.id === weekId);
+    const updatedWorkout = updatedWeek?.[workoutType]?.find(w => w.id === workoutId);
+    const isNowCompletedTogether = updatedWorkout?.mike && updatedWorkout?.adam;
+
+    // Check if all runs are now complete
+    const areAllRunsNowComplete = updatedWeek?.runs?.every(r => r.mike && r.adam);
+
     setFitnessTrainingPlans(newPlans);
     await saveFitnessToFirestore(null, newPlans);
+
+    // Trigger celebrations (only for runs, not cross-training)
+    if (workoutType === 'runs') {
+      // Week completion takes priority over single run
+      if (!wereAllRunsComplete && areAllRunsNowComplete) {
+        const event = fitnessEvents.find(e => e.id === eventId);
+        celebrateWeekComplete(updatedWeek.weekNumber, event?.name || 'Training');
+      } else if (!wasCompletedTogether && isNowCompletedTogether) {
+        // Single run completed together
+        celebrateRunTogether();
+      }
+    }
   };
 
   // Initialize training plan for an event
@@ -1475,19 +1645,57 @@ export default function TripPlanner() {
     await saveFitnessToFirestore(null, newPlans);
   };
 
+  // Get the active training plan for an event - always uses hardcoded plans
+  // but merges completion status from Firebase
+  const getActiveTrainingPlan = (eventId) => {
+    // Helper to merge Firebase completion status into hardcoded plan
+    const mergeWithFirebase = (hardcodedPlan) => {
+      const firebasePlan = fitnessTrainingPlans[eventId];
+      if (!firebasePlan) return hardcodedPlan;
+
+      return hardcodedPlan.map(week => {
+        const fbWeek = firebasePlan.find(w => w.weekNumber === week.weekNumber);
+        if (!fbWeek) return week;
+
+        return {
+          ...week,
+          runs: week.runs.map((run, idx) => ({
+            ...run,
+            mike: fbWeek.runs?.[idx]?.mike ?? run.mike,
+            adam: fbWeek.runs?.[idx]?.adam ?? run.adam
+          })),
+          crossTraining: week.crossTraining.map((ct, idx) => ({
+            ...ct,
+            mike: fbWeek.crossTraining?.[idx]?.mike ?? ct.mike,
+            adam: fbWeek.crossTraining?.[idx]?.adam ?? ct.adam
+          })),
+          weekNotes: fbWeek.weekNotes || week.weekNotes
+        };
+      });
+    };
+
+    if (eventId === 'indy-half-2026') {
+      return mergeWithFirebase(indyHalfTrainingPlan);
+    }
+    if (eventId === 'triathlon-2026') {
+      return mergeWithFirebase(triathlonTrainingPlan);
+    }
+    return fitnessTrainingPlans[eventId] || [];
+  };
+
   // Handle redirect result on page load (for Safari/iOS compatibility)
   useEffect(() => {
     getRedirectResult(auth)
       .then((result) => {
         if (result) {
-          // User signed in successfully via redirect
-          console.log('Redirect sign-in successful');
+          showToast('Signed in successfully!', 'success');
         }
       })
       .catch((error) => {
         console.error('Redirect result error:', error);
+        showToast('Sign in failed. Please try again.', 'error');
       });
-  }, []);
+  }, [showToast]);
 
   // Auth handlers - try popup first, fall back to redirect for Safari/iOS
   const handleLogin = async () => {
@@ -1495,18 +1703,20 @@ export default function TripPlanner() {
     try {
       // Try popup first (works on most browsers)
       await signInWithPopup(auth, googleProvider);
+      showToast('Signed in successfully!', 'success');
     } catch (error) {
-      console.log('Popup blocked or failed, trying redirect...', error.code);
       // If popup fails (Safari blocks it), use redirect
       if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
         try {
           await signInWithRedirect(auth, googleProvider);
         } catch (redirectError) {
           console.error('Redirect login error:', redirectError);
+          showToast('Sign in failed. Please try again.', 'error');
           setAuthLoading(false);
         }
       } else {
         console.error('Login error:', error);
+        showToast('Sign in failed. Please try again.', 'error');
         setAuthLoading(false);
       }
     }
@@ -1520,25 +1730,21 @@ export default function TripPlanner() {
     }
   };
 
-  // Sort trips by start date
-  const sortedTrips = [...trips].sort((a, b) =>
-    parseLocalDate(a.dates.start) - parseLocalDate(b.dates.start)
-  );
+  // Sort trips by start date (with null safety) - uses visibleTrips for role-based filtering
+  const sortedTrips = [...(visibleTrips || [])].sort((a, b) => {
+    const aStart = a?.dates?.start ? parseLocalDate(a.dates.start) : new Date();
+    const bStart = b?.dates?.start ? parseLocalDate(b.dates.start) : new Date();
+    return aStart - bStart;
+  });
 
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  const getDaysInMonth = (date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    return { firstDay, daysInMonth };
-  };
+  // Separate confirmed adventures from trips in planning
+  const confirmedTrips = sortedTrips.filter(t => !t?.isPlanning);
+  const planningTrips = sortedTrips.filter(t => t?.isPlanning);
 
   const isDateInTrip = (day) => {
     const checkDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    return trips.find(trip => {
+    return (visibleTrips || []).find(trip => {
+      if (!trip?.dates?.start || !trip?.dates?.end) return false;
       const start = parseLocalDate(trip.dates.start);
       const end = parseLocalDate(trip.dates.end);
       return checkDate >= start && checkDate <= end;
@@ -1548,6 +1754,11 @@ export default function TripPlanner() {
   const { firstDay, daysInMonth } = getDaysInMonth(currentMonth);
 
   const addItem = (tripId, type, item) => {
+    // Check edit permission
+    if (!canEditTrip(tripId)) {
+      showToast('You don\'t have permission to edit this trip', 'error');
+      return;
+    }
     const newTripDetails = {
       ...tripDetails,
       [tripId]: {
@@ -1561,6 +1772,11 @@ export default function TripPlanner() {
   };
 
   const removeItem = (tripId, type, itemId) => {
+    // Check edit permission
+    if (!canEditTrip(tripId)) {
+      showToast('You don\'t have permission to edit this trip', 'error');
+      return;
+    }
     const newTripDetails = {
       ...tripDetails,
       [tripId]: {
@@ -1573,6 +1789,11 @@ export default function TripPlanner() {
   };
 
   const updateItem = (tripId, type, itemId, updatedData) => {
+    // Check edit permission
+    if (!canEditTrip(tripId)) {
+      showToast('You don\'t have permission to edit this trip', 'error');
+      return;
+    }
     const newTripDetails = {
       ...tripDetails,
       [tripId]: {
@@ -1636,6 +1857,11 @@ export default function TripPlanner() {
   };
 
   const deleteTrip = (tripId) => {
+    // Only owners can delete trips
+    if (!canDeleteTrip(tripId)) {
+      showToast('Only trip owners can delete trips', 'error');
+      return;
+    }
     const newTrips = trips.filter(trip => trip.id !== tripId);
     setTrips(newTrips);
     saveToFirestore(newTrips, null, null);
@@ -1679,6 +1905,19 @@ export default function TripPlanner() {
   };
 
   const addLink = (tripId, linkData) => {
+    // Check if this is a planning trip - if so, add to trip's planningLinks
+    const trip = trips.find(t => t.id === tripId);
+    if (trip?.isPlanning) {
+      const newLink = { id: Date.now(), title: linkData.title, url: linkData.url, type: linkData.category };
+      setTrips(prev => prev.map(t =>
+        t.id === tripId
+          ? { ...t, planningLinks: [...(t.planningLinks || []), newLink] }
+          : t
+      ));
+      return;
+    }
+
+    // Otherwise add to tripDetails.links
     const newTripDetails = {
       ...tripDetails,
       [tripId]: {
@@ -2306,20 +2545,22 @@ export default function TripPlanner() {
     );
   };
 
+  // Guest Modal State (lifted out to prevent re-render issues)
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestPermission, setGuestPermission] = useState('edit');
+
   // Guest Modal Component
   const GuestModal = ({ trip, onClose }) => {
-    const [guestData, setGuestData] = useState({ name: '', email: '', relationship: '' });
     const tripGuests = trip.guests || [];
 
     const handleAddGuest = () => {
-      if (guestData.name && guestData.email) {
+      if (guestEmail && guestEmail.includes('@')) {
         const newGuest = {
           id: Date.now(),
-          name: guestData.name,
-          email: guestData.email,
-          relationship: guestData.relationship || 'Friend',
-          role: 'guest',
-          addedBy: 'Mike' // In production, this would be the current user
+          email: guestEmail,
+          permission: guestPermission,
+          addedBy: currentUser,
+          addedAt: new Date().toISOString()
         };
 
         // Update the trip with new guest
@@ -2329,7 +2570,8 @@ export default function TripPlanner() {
             : t
         ));
 
-        setGuestData({ name: '', email: '', relationship: '' });
+        setGuestEmail('');
+        setGuestPermission('edit');
       }
     };
 
@@ -2341,7 +2583,17 @@ export default function TripPlanner() {
       ));
     };
 
-    const relationshipOptions = ['Son', 'Daughter', 'Friend', 'Family', 'Partner', 'Colleague'];
+    const handleTogglePermission = (guestId) => {
+      setTrips(prevTrips => prevTrips.map(t =>
+        t.id === trip.id
+          ? { ...t, guests: (t.guests || []).map(g =>
+              g.id === guestId
+                ? { ...g, permission: g.permission === 'edit' ? 'view' : 'edit' }
+                : g
+            )}
+          : t
+      ));
+    };
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -2359,7 +2611,7 @@ export default function TripPlanner() {
           {/* Owners Section */}
           <div className="mb-6">
             <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">✨ Trip Owners</h4>
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
               <div className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-pink-100 px-4 py-2 rounded-full">
                 <div className="w-8 h-8 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center text-white font-bold text-sm">M</div>
                 <span className="font-medium text-slate-700">Mike</span>
@@ -2382,20 +2634,33 @@ export default function TripPlanner() {
                   <div key={guest.id} className="flex items-center justify-between bg-slate-50 px-4 py-3 rounded-xl">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gradient-to-r from-amber-300 to-orange-400 rounded-full flex items-center justify-center text-white font-bold">
-                        {guest.name.charAt(0)}
+                        {(guest.email || guest.name || '?').charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div className="font-medium text-slate-800">{guest.name}</div>
-                        <div className="text-sm text-slate-500">{guest.relationship || 'Guest'} • Added by {guest.addedBy}</div>
+                        <div className="font-medium text-slate-800">{guest.email || guest.name}</div>
+                        <div className="text-sm text-slate-500">Added by {guest.addedBy}</div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleRemoveGuest(guest.id)}
-                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"
-                      title="Remove guest"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleTogglePermission(guest.id)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition ${
+                          (guest.permission || 'edit') === 'edit'
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        }`}
+                        title="Click to toggle permission"
+                      >
+                        {(guest.permission || 'edit') === 'edit' ? '✏️ Can Edit' : '👁️ View Only'}
+                      </button>
+                      <button
+                        onClick={() => handleRemoveGuest(guest.id)}
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"
+                        title="Remove guest"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2407,53 +2672,57 @@ export default function TripPlanner() {
             <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">➕ Invite Someone</h4>
             <div className="space-y-3">
               <input
-                type="text"
-                placeholder="Name"
-                value={guestData.name}
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-400 outline-none"
-                onChange={(e) => setGuestData({ ...guestData, name: e.target.value })}
-              />
-              <input
                 type="email"
-                placeholder="Email"
-                value={guestData.email}
+                placeholder="Email address"
+                value={guestEmail}
                 className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-400 outline-none"
-                onChange={(e) => setGuestData({ ...guestData, email: e.target.value })}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddGuest()}
               />
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-2">Relationship</label>
-                <div className="flex flex-wrap gap-2">
-                  {relationshipOptions.map(rel => (
-                    <button
-                      key={rel}
-                      type="button"
-                      onClick={() => setGuestData({ ...guestData, relationship: rel })}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
-                        guestData.relationship === rel
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      {rel}
-                    </button>
-                  ))}
+                <label className="block text-sm font-medium text-slate-600 mb-2">Permission Level</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGuestPermission('edit')}
+                    className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition ${
+                      guestPermission === 'edit'
+                        ? 'bg-green-500 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    ✏️ Can Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGuestPermission('view')}
+                    className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition ${
+                      guestPermission === 'view'
+                        ? 'bg-slate-500 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    👁️ View Only
+                  </button>
                 </div>
               </div>
               <button
                 onClick={handleAddGuest}
-                disabled={!guestData.name || !guestData.email}
+                disabled={!guestEmail || !guestEmail.includes('@')}
                 className="w-full py-3 bg-gradient-to-r from-purple-400 to-indigo-500 text-white font-bold rounded-xl hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <UserPlus className="w-5 h-5" />
-                Add Guest to Trip
+                Add Guest
               </button>
             </div>
           </div>
 
           {/* Info Note */}
-          <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-200">
-            <p className="text-sm text-amber-800">
-              <strong>Note:</strong> Only Mike & Adam can add/remove guests. Guests can view trip details but cannot make changes.
+          <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+            <p className="text-sm text-blue-800">
+              <strong>Edit:</strong> Can add flights, reservations, links, and notes.
+              <br />
+              <strong>View:</strong> Can see trip details but not make changes.
             </p>
           </div>
         </div>
@@ -2531,7 +2800,7 @@ export default function TripPlanner() {
                       </div>
                       {date.note && <div className="text-sm text-slate-500">{date.note}</div>}
                       <div className="text-xs text-green-600 mt-1">
-                        👁️ {date.visibleTo.includes('all') ? 'Everyone' : date.visibleTo.map(id => companions.find(c => c.id === id)?.firstName || companions.find(c => c.id === id)?.name).filter(Boolean).join(', ')}
+                        👁️ {date.visibleTo.includes('all') ? 'Everyone' : date.visibleTo.map(id => (companions || []).find(c => c.id === id)?.firstName || (companions || []).find(c => c.id === id)?.name).filter(Boolean).join(', ')}
                       </div>
                     </div>
                     <div className="flex gap-1">
@@ -2606,7 +2875,7 @@ export default function TripPlanner() {
                   >
                     👥 Everyone
                   </button>
-                  {companions.map(companion => (
+                  {(companions || []).map(companion => (
                     <button
                       key={companion.id}
                       type="button"
@@ -2743,11 +3012,11 @@ export default function TripPlanner() {
           </p>
 
           {/* Current Companions */}
-          {companions.length > 0 && (
+          {companions?.length > 0 && (
             <div className="mb-6">
               <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">👥 Your Travel Circle ({companions.length})</h4>
               <div className="space-y-2">
-                {companions.map(companion => (
+                {(companions || []).map(companion => (
                   <div key={companion.id} className="bg-slate-50 rounded-xl overflow-hidden">
                     {/* Companion Header - Always Visible */}
                     <div
@@ -3028,6 +3297,24 @@ export default function TripPlanner() {
   // Trip Detail View
   const TripDetail = ({ trip }) => {
     const details = tripDetails[trip.id] || { flights: [], hotels: [], events: [], links: [] };
+    const userCanEdit = canEditTrip(trip.id);
+    const userPermission = isGuest ? (guestPermissions[trip.id] || 'view') : (isOwner ? 'owner' : 'companion');
+
+    // Add trip to Google Calendar
+    const addTripToCalendar = () => {
+      if (!trip.dates?.start || !trip.dates?.end) return;
+
+      const startDate = trip.dates.start.replace(/-/g, '');
+      const endDate = trip.dates.end.replace(/-/g, '');
+      const title = encodeURIComponent(`${trip.emoji} ${trip.destination}`);
+      const description = encodeURIComponent(
+        `Trip to ${trip.destination}${trip.special ? `\n${trip.special}` : ''}\n\nAdded from Mike & Adam's Adventures 🦄`
+      );
+
+      const calendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${description}`;
+      window.open(calendarUrl, '_blank');
+      showToast('Opening Google Calendar...', 'info');
+    };
 
     // Use parent-level state for date editing to prevent reset on re-renders
     const isEditingDates = editingTripDates?.tripId === trip.id;
@@ -3058,6 +3345,13 @@ export default function TripPlanner() {
             <div className={`bg-gradient-to-r ${trip.color} rounded-3xl p-6 md:p-8 text-white relative overflow-hidden mb-6`}>
               <AtomicDots />
               <div className="absolute top-4 right-4 flex gap-2">
+                <button
+                  onClick={addTripToCalendar}
+                  className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition"
+                  title="Add to Google Calendar"
+                >
+                  <Calendar className="w-5 h-5" />
+                </button>
                 {isOwner && (
                   <>
                     <button
@@ -3161,6 +3455,33 @@ export default function TripPlanner() {
               <Starburst className="absolute -right-10 -bottom-10 w-40 h-40 text-white/20" />
             </div>
 
+            {/* Guest Info Banner */}
+            {isGuest && (
+              <div className={`mb-6 p-4 rounded-xl border ${userCanEdit ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <p className={`text-sm ${userCanEdit ? 'text-green-800' : 'text-blue-800'}`}>
+                      <strong>You're invited!</strong> {userCanEdit
+                        ? 'You can view and edit trip details (flights, hotels, events).'
+                        : 'You can view trip details. Contact the trip owner to request edit access.'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={addTripToCalendar}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      <Calendar className="w-4 h-4" />
+                      Add to Calendar
+                    </button>
+                    <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${userCanEdit ? 'bg-green-200 text-green-700' : 'bg-blue-200 text-blue-700'}`}>
+                      {userCanEdit ? '✏️ Can Edit' : '👁️ View Only'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Sections */}
             {['flights', 'hotels', 'events'].map(type => (
               <div key={type} className="bg-white rounded-3xl p-6 mb-6 shadow-lg">
@@ -3171,12 +3492,14 @@ export default function TripPlanner() {
                     {type === 'events' && <Music className="w-6 h-6 text-purple-500" />}
                     <h3 className="text-2xl font-bold text-slate-800 capitalize">{type}</h3>
                   </div>
-                  <button
-                    onClick={() => setShowAddModal({ type, tripId: trip.id })}
-                    className={`p-2 rounded-full ${trip.accent} text-white hover:opacity-80 transition`}
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
+                  {canEditTrip(trip.id) && (
+                    <button
+                      onClick={() => setShowAddModal({ type, tripId: trip.id })}
+                      className={`p-2 rounded-full ${trip.accent} text-white hover:opacity-80 transition`}
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
 
                 {details[type].length === 0 ? (
@@ -3221,20 +3544,22 @@ export default function TripPlanner() {
                             <Users className="w-3 h-3" /> Added by {item.addedBy}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                          <button
-                            onClick={() => setShowAddModal({ type, tripId: trip.id, editItem: item })}
-                            className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => removeItem(trip.id, type, item.id)}
-                            className="p-2 text-red-400 hover:bg-red-50 rounded-full transition"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {canEditTrip(trip.id) && (
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                            <button
+                              onClick={() => setShowAddModal({ type, tripId: trip.id, editItem: item })}
+                              className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => removeItem(trip.id, type, item.id)}
+                              className="p-2 text-red-400 hover:bg-red-50 rounded-full transition"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -3610,6 +3935,81 @@ export default function TripPlanner() {
       {/* Rainbow top bar */}
       <div className="h-1.5 w-full bg-gradient-to-r from-red-500 via-orange-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500" />
 
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-pulse transition-all ${
+          toast.type === 'error' ? 'bg-red-500 text-white' :
+          toast.type === 'success' ? 'bg-green-500 text-white' :
+          'bg-slate-700 text-white'
+        }`}>
+          {toast.type === 'error' && <X className="w-4 h-4" />}
+          {toast.type === 'success' && <Check className="w-4 h-4" />}
+          <span className="text-sm font-medium">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-70">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Confetti Animation */}
+      {confetti && (
+        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+          <style>{`
+            @keyframes confetti-fall {
+              0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+              100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+            }
+            @keyframes confetti-fall-slow {
+              0% { transform: translateY(-100vh) rotate(0deg) scale(1); opacity: 1; }
+              100% { transform: translateY(100vh) rotate(1080deg) scale(0.5); opacity: 0; }
+            }
+          `}</style>
+          {[...Array(confetti.type === 'week' ? 60 : 25)].map((_, i) => {
+            const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
+            const color = colors[i % colors.length];
+            const left = Math.random() * 100;
+            const delay = Math.random() * (confetti.type === 'week' ? 1 : 0.5);
+            const duration = confetti.type === 'week' ? 3 + Math.random() * 2 : 1.5 + Math.random();
+            const size = confetti.type === 'week' ? 10 + Math.random() * 10 : 6 + Math.random() * 6;
+            return (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute',
+                  left: `${left}%`,
+                  top: 0,
+                  width: size,
+                  height: size,
+                  backgroundColor: color,
+                  borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                  animation: `${confetti.type === 'week' ? 'confetti-fall-slow' : 'confetti-fall'} ${duration}s ease-out ${delay}s forwards`,
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Week Completion Celebration Overlay */}
+      {weekCelebration && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-pulse" style={{ animationDuration: '2s' }}>
+          <div className="text-center p-8 bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 rounded-3xl shadow-2xl transform animate-bounce" style={{ animationDuration: '0.5s' }}>
+            <div className="text-6xl mb-4">🎉🏃‍♂️🏃‍♂️🎉</div>
+            <h2 className="text-4xl font-bold text-white mb-2">Week {weekCelebration.weekNumber} Complete!</h2>
+            <p className="text-xl text-white/90 mb-4">{weekCelebration.eventName}</p>
+            <div className="flex justify-center gap-4">
+              <div className="bg-white/20 px-4 py-2 rounded-full">
+                <span className="text-white font-bold">Mike ✓</span>
+              </div>
+              <div className="bg-white/20 px-4 py-2 rounded-full">
+                <span className="text-white font-bold">Adam ✓</span>
+              </div>
+            </div>
+            <p className="text-white/80 mt-4 text-lg">You both crushed it! 💪</p>
+          </div>
+        </div>
+      )}
+
       {/* Decorative Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Animated gradient orbs */}
@@ -3619,12 +4019,7 @@ export default function TripPlanner() {
         <div className="absolute top-1/3 right-1/4 w-60 h-60 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '7s' }} />
         <div className="absolute top-3/4 left-1/4 w-48 h-48 bg-pink-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '5.5s' }} />
 
-        {/* Starbursts */}
-        <Starburst className="absolute top-10 right-20 w-24 h-24 text-cyan-400" animated={true} />
-        <Starburst className="absolute bottom-40 left-20 w-16 h-16 text-teal-400/30" />
-        <Starburst className="absolute top-2/3 right-1/3 w-20 h-20 text-purple-400/20" animated={true} />
-        <Sun className="absolute bottom-20 left-40 w-16 h-16 text-purple-400/10" />
-
+        
         {/* Floating travel emojis with animations */}
         <style>{`
           @keyframes float {
@@ -3643,26 +4038,51 @@ export default function TripPlanner() {
             0% { transform: translateX(0) translateY(0) rotate(-45deg); opacity: 1; }
             100% { transform: translateX(200px) translateY(200px) rotate(-45deg); opacity: 0; }
           }
+          @keyframes borderCircle {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+          @keyframes glowPulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(236, 72, 153, 0.5), 0 0 10px rgba(236, 72, 153, 0.3), 0 0 15px rgba(236, 72, 153, 0.2); }
+            50% { box-shadow: 0 0 10px rgba(236, 72, 153, 0.8), 0 0 20px rgba(236, 72, 153, 0.5), 0 0 30px rgba(236, 72, 153, 0.3); }
+          }
+          .special-memory-card {
+            position: relative;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            overflow: visible;
+          }
+          .special-memory-card::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            background: linear-gradient(90deg, #ec4899, #f97316, #eab308, #22c55e, #3b82f6, #8b5cf6, #ec4899);
+            background-size: 300% 300%;
+            border-radius: 1.2rem;
+            z-index: -1;
+            animation: borderCircle 3s linear infinite;
+          }
+          .special-memory-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgb(30 41 59);
+            border-radius: 1rem;
+            z-index: -1;
+          }
           .float { animation: float 6s ease-in-out infinite; }
           .float-slow { animation: floatSlow 8s ease-in-out infinite; }
           .twinkle { animation: twinkle 3s ease-in-out infinite; }
         `}</style>
 
-        <span className="absolute top-32 left-1/4 text-4xl opacity-10 float">🦄</span>
-        <span className="absolute bottom-48 right-1/3 text-3xl opacity-10 float-slow" style={{ animationDelay: '1s' }}>🌈</span>
-        <span className="absolute top-1/2 right-20 text-2xl twinkle">✨</span>
-        <span className="absolute top-20 left-1/2 text-2xl opacity-10 float" style={{ animationDelay: '2s' }}>✈️</span>
-        <span className="absolute bottom-32 left-1/3 text-3xl opacity-10 float-slow" style={{ animationDelay: '0.5s' }}>🌴</span>
-        <span className="absolute top-1/3 left-16 text-2xl twinkle" style={{ animationDelay: '1.5s' }}>⭐</span>
-        <span className="absolute bottom-1/4 right-1/4 text-2xl opacity-10 float" style={{ animationDelay: '3s' }}>🗺️</span>
-        <span className="absolute top-3/4 right-16 text-xl twinkle" style={{ animationDelay: '2.5s' }}>💫</span>
-        <span className="absolute top-16 right-1/3 text-2xl opacity-10 float-slow" style={{ animationDelay: '1s' }}>🏖️</span>
-
-        {/* Shooting star (occasional) */}
-        <div className="absolute top-10 left-10">
-          <span className="text-xl" style={{ animation: 'shooting 4s ease-out infinite', animationDelay: '5s' }}>💫</span>
-        </div>
-
+        
         {/* Hidden Mickey silhouette - visible when Disney magic is activated */}
         {showDisneyMagic && (
           <div className="absolute bottom-10 right-10 opacity-20 transition-opacity duration-1000">
@@ -3711,16 +4131,21 @@ export default function TripPlanner() {
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => setActiveSection('home')}
-                className="w-14 h-14 bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg transition-transform hover:scale-110"
-                title="Home"
-              >
-                <span className="text-2xl">🏳️‍🌈</span>
-              </button>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-                  Mike & Adam
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                  <button
+                    onClick={() => isOwner && setCurrentUser('Mike')}
+                    className={`${currentUser === 'Mike' ? 'text-teal-400' : 'text-white'} ${isOwner ? 'hover:opacity-80 cursor-pointer' : ''} transition`}
+                  >
+                    Mike
+                  </button>
+                  <span className="text-white"> & </span>
+                  <button
+                    onClick={() => isOwner && setCurrentUser('Adam')}
+                    className={`${currentUser === 'Adam' ? 'text-purple-400' : 'text-white'} ${isOwner ? 'hover:opacity-80 cursor-pointer' : ''} transition`}
+                  >
+                    Adam
+                  </button>
                 </h1>
                 <p className="text-slate-400 flex items-center gap-2">
                   Living our best life together
@@ -3755,30 +4180,12 @@ export default function TripPlanner() {
                 )}
                 <button
                   onClick={handleLogout}
-                  className="ml-1 p-1 text-white/50 hover:text-white transition"
-                  title="Sign out"
+                  className="ml-2 text-xs text-white/50 hover:text-white transition underline"
                 >
-                  <LogOut className="w-4 h-4" />
+                  log out
                 </button>
               </div>
 
-              {/* User Toggle - Only for owners (Mike & Adam) */}
-              {isOwner && (
-                <div className="flex items-center bg-white/10 rounded-full p-1">
-                  <button
-                    onClick={() => setCurrentUser('Mike')}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition ${currentUser === 'Mike' ? 'bg-teal-400 text-white' : 'text-white/70 hover:text-white'}`}
-                  >
-                    Mike
-                  </button>
-                  <button
-                    onClick={() => setCurrentUser('Adam')}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition ${currentUser === 'Adam' ? 'bg-purple-400 text-white' : 'text-white/70 hover:text-white'}`}
-                  >
-                    Adam
-                  </button>
-                </div>
-              )}
 
               {/* Companion badge */}
               {currentCompanion && !isOwner && (
@@ -3787,14 +4194,6 @@ export default function TripPlanner() {
                 </div>
               )}
 
-              {/* Google Calendar Connect */}
-              <button
-                onClick={() => setCalendarConnected(!calendarConnected)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition ${calendarConnected ? 'bg-green-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
-              >
-                <Calendar className="w-4 h-4" />
-                {calendarConnected ? 'Calendar Synced ✓' : 'Connect Google Calendar'}
-              </button>
             </div>
           </div>
 
@@ -3813,7 +4212,10 @@ export default function TripPlanner() {
               { id: 'travel', label: 'Travel', emoji: '✈️', gradient: 'from-teal-400 to-cyan-500' },
               { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
               { id: 'nutrition', label: 'Nutrition', emoji: '🥗', gradient: 'from-green-400 to-emerald-500' },
+              { id: 'events', label: 'Events', emoji: '🎉', gradient: 'from-amber-400 to-orange-500' },
               { id: 'lifePlanning', label: 'Life Planning', emoji: '🎯', gradient: 'from-purple-400 to-indigo-500' },
+              { id: 'business', label: 'Business', emoji: '💼', gradient: 'from-slate-400 to-zinc-500' },
+              { id: 'memories', label: 'Memories', emoji: '💝', gradient: 'from-rose-400 to-pink-500' },
             ].map(section => (
               <button
                 key={section.id}
@@ -3844,6 +4246,12 @@ export default function TripPlanner() {
                   New Adventure
                 </button>
                 <button
+                  onClick={() => setShowRandomExperience(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 text-white font-semibold rounded-full hover:opacity-90 transition shadow-lg"
+                >
+                  🎲 Random Adventure
+                </button>
+                <button
                   onClick={() => setShowNewTripModal('wishlist')}
                   className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-400 via-purple-400 to-indigo-400 text-white font-semibold rounded-full hover:opacity-90 transition shadow-lg"
                 >
@@ -3852,12 +4260,6 @@ export default function TripPlanner() {
                 </button>
               </>
             )}
-            <button
-              onClick={() => setShowRandomExperience(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white font-semibold rounded-full hover:opacity-90 transition shadow-lg animate-pulse hover:animate-none"
-            >
-              🎲 Random Experience
-            </button>
             {/* Owner-only management buttons */}
             {isOwner && (
               <>
@@ -3897,71 +4299,201 @@ export default function TripPlanner() {
           {/* ========== HOME SECTION ========== */}
           {activeSection === 'home' && (
             <div className="mt-8">
-              {/* Photo Gallery Hero */}
-              {(() => {
-                // Gallery images - replace URLs with your hosted images
-                const galleryImages = [
-                  { id: 1, url: '/gallery/pier-painting.jpg', caption: 'Provincetown vibes 🌊' },
-                  { id: 2, url: '/gallery/pool-party.jpg', caption: 'Living our best life 🌴' },
-                  { id: 3, url: '/gallery/romantic-night.jpg', caption: 'Under the stars ✨' },
-                  { id: 4, url: '/gallery/holding-hands.jpg', caption: 'Together always 💕' },
-                  { id: 5, url: '/gallery/pride-party.jpg', caption: 'Pride & mimosas 🥂' },
-                ];
-                const [currentImg, setCurrentImg] = React.useState(0);
+              {/* Photo Carousel Hero with Dramatic Floating Animations */}
+              <div className="mb-12 relative">
+                {/* Enhanced CSS animations */}
+                <style>{`
+                  @keyframes floatDramatic {
+                    0% { transform: translateY(0px) translateX(0px) rotate(0deg) scale(1); }
+                    25% { transform: translateY(-30px) translateX(20px) rotate(10deg) scale(1.1); }
+                    50% { transform: translateY(-15px) translateX(-15px) rotate(-5deg) scale(0.95); }
+                    75% { transform: translateY(-40px) translateX(10px) rotate(8deg) scale(1.05); }
+                    100% { transform: translateY(0px) translateX(0px) rotate(0deg) scale(1); }
+                  }
+                  @keyframes driftAcross {
+                    0% { transform: translateX(-100px) translateY(0px) rotate(-10deg); opacity: 0; }
+                    10% { opacity: 1; }
+                    90% { opacity: 1; }
+                    100% { transform: translateX(100vw) translateY(-50px) rotate(20deg); opacity: 0; }
+                  }
+                  @keyframes heartbeat {
+                    0%, 100% { transform: scale(1); }
+                    15% { transform: scale(1.3); }
+                    30% { transform: scale(1); }
+                    45% { transform: scale(1.2); }
+                    60% { transform: scale(1); }
+                  }
+                  @keyframes rainbowPulse {
+                    0%, 100% { transform: scale(1) rotate(0deg); filter: hue-rotate(0deg); }
+                    50% { transform: scale(1.2) rotate(10deg); filter: hue-rotate(30deg); }
+                  }
+                  @keyframes sparkleFloat {
+                    0%, 100% { transform: translateY(0) rotate(0deg) scale(1); opacity: 0.7; }
+                    25% { transform: translateY(-20px) rotate(90deg) scale(1.3); opacity: 1; }
+                    50% { transform: translateY(-10px) rotate(180deg) scale(0.8); opacity: 0.5; }
+                    75% { transform: translateY(-35px) rotate(270deg) scale(1.2); opacity: 1; }
+                  }
+                  @keyframes orbitSlow {
+                    0% { transform: rotate(0deg) translateX(30px) rotate(0deg); }
+                    100% { transform: rotate(360deg) translateX(30px) rotate(-360deg); }
+                  }
+                  @keyframes bounceHigh {
+                    0%, 100% { transform: translateY(0) scale(1); }
+                    50% { transform: translateY(-50px) scale(1.15); }
+                  }
+                  @keyframes zipOff {
+                    0% { transform: scale(1) rotate(0deg); opacity: 1; }
+                    30% { transform: scale(1.3) rotate(15deg); opacity: 1; }
+                    100% { transform: scale(0) rotate(720deg) translateY(-200px); opacity: 0; }
+                  }
+                  @keyframes fadeCarousel {
+                    0% { opacity: 0; transform: scale(1.05); }
+                    10% { opacity: 1; transform: scale(1); }
+                    90% { opacity: 1; transform: scale(1); }
+                    100% { opacity: 0; transform: scale(0.95); }
+                  }
+                `}</style>
 
-                React.useEffect(() => {
-                  const timer = setInterval(() => {
-                    setCurrentImg(prev => (prev + 1) % galleryImages.length);
-                  }, 5000);
-                  return () => clearInterval(timer);
-                }, []);
+                {/* Floating emojis container - behind photo, clickable */}
+                <div className="absolute inset-0 overflow-hidden">
+                  {(() => {
+                    // Randomized emoji animations
+                    const animations = [
+                      'heartbeat 1.5s ease-in-out infinite',
+                      'bounceHigh 2s ease-in-out infinite',
+                      'floatDramatic 5s ease-in-out infinite',
+                      'sparkleFloat 4s ease-in-out infinite',
+                      'rainbowPulse 3s ease-in-out infinite',
+                      'driftAcross 12s linear infinite',
+                    ];
+                    const getRandomAnimation = (seed) => {
+                      const idx = Math.abs(seed.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % animations.length;
+                      return animations[idx];
+                    };
+                    const emojis = [
+                      { emoji: '💕', left: '3%', top: '15%', size: 'text-4xl' },
+                      { emoji: '❤️', left: '12%', top: '65%', size: 'text-3xl' },
+                      { emoji: '💖', right: '5%', top: '25%', size: 'text-4xl' },
+                      { emoji: '💗', right: '15%', top: '75%', size: 'text-3xl' },
+                      { emoji: '💝', left: '50%', top: '5%', size: 'text-5xl' },
+                      { emoji: '🌈', left: '0%', top: '35%', size: 'text-5xl' },
+                      { emoji: '🌈', right: '0%', top: '10%', size: 'text-4xl' },
+                      { emoji: '🏳️‍🌈', right: '10%', bottom: '15%', size: 'text-3xl' },
+                      { emoji: '🕊️', left: '5%', top: '8%', size: 'text-3xl' },
+                      { emoji: '🐦', right: '15%', top: '5%', size: 'text-2xl' },
+                      { emoji: '✈️', left: '25%', top: '12%', size: 'text-3xl' },
+                      { emoji: '🍊', left: '5%', bottom: '10%', size: 'text-3xl' },
+                      { emoji: '🍋', right: '3%', bottom: '25%', size: 'text-2xl' },
+                      { emoji: '🍇', left: '18%', bottom: '20%', size: 'text-3xl' },
+                      { emoji: '🍑', right: '20%', top: '45%', size: 'text-2xl' },
+                      { emoji: '✨', left: '2%', bottom: '45%', size: 'text-3xl' },
+                      { emoji: '⭐', right: '2%', top: '50%', size: 'text-2xl' },
+                      { emoji: '💫', left: '8%', top: '40%', size: 'text-3xl' },
+                      { emoji: '🌟', right: '8%', bottom: '40%', size: 'text-2xl' },
+                      { emoji: '🦋', left: '25%', top: '30%', size: 'text-2xl' },
+                      { emoji: '🌸', right: '25%', bottom: '30%', size: 'text-2xl' },
+                      { emoji: '🦄', left: '40%', bottom: '5%', size: 'text-4xl' },
+                      { emoji: '🌺', right: '35%', top: '3%', size: 'text-3xl' },
+                    ];
+                    return emojis.map((e, idx) => {
+                      const emojiKey = `emoji-${idx}`;
+                      const isDismissed = dismissedEmojis.has(emojiKey);
+                      if (isDismissed) return null;
+                      return (
+                        <span
+                          key={idx}
+                          className={`absolute ${e.size} cursor-pointer hover:scale-125 transition-transform`}
+                          style={{
+                            left: e.left,
+                            right: e.right,
+                            top: e.top,
+                            bottom: e.bottom,
+                            animation: getRandomAnimation(e.emoji + idx + new Date().toDateString()),
+                            animationDelay: `${(idx * 0.3) % 3}s`,
+                          }}
+                          onClick={() => {
+                            // Add zip-off animation then dismiss
+                            const el = document.getElementById(emojiKey);
+                            if (el) {
+                              el.style.animation = 'zipOff 0.5s ease-out forwards';
+                              setTimeout(() => {
+                                setDismissedEmojis(prev => new Set([...prev, emojiKey]));
+                              }, 500);
+                            } else {
+                              setDismissedEmojis(prev => new Set([...prev, emojiKey]));
+                            }
+                          }}
+                          id={emojiKey}
+                        >
+                          {e.emoji}
+                        </span>
+                      );
+                    });
+                  })()}
+                </div>
 
-                return (
-                  <div className="mb-12">
-                    <div className="relative rounded-3xl overflow-hidden shadow-2xl mb-4" style={{ height: '400px' }}>
-                      <div className="absolute inset-0 bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center">
-                        <div className="text-center text-white">
-                          <span className="text-8xl block mb-4">🏳️‍🌈</span>
-                          <h2 className="text-4xl font-bold">Mike & Adam</h2>
-                          <p className="text-white/80 mt-2">{galleryImages[currentImg].caption}</p>
-                        </div>
-                      </div>
-                      <img
-                        src={galleryImages[currentImg].url}
-                        alt="Mike and Adam"
-                        className="absolute inset-0 w-full h-full object-cover"
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6">
-                        <p className="text-white text-xl font-medium">{galleryImages[currentImg].caption}</p>
-                      </div>
-                      <button
-                        onClick={() => setCurrentImg(prev => (prev - 1 + galleryImages.length) % galleryImages.length)}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center text-white transition"
-                      >
-                        <ChevronLeft className="w-6 h-6" />
-                      </button>
-                      <button
-                        onClick={() => setCurrentImg(prev => (prev + 1) % galleryImages.length)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center text-white transition"
-                      >
-                        <ChevronRight className="w-6 h-6" />
-                      </button>
-                    </div>
-                    <div className="flex justify-center gap-2">
-                      {galleryImages.map((img, idx) => (
-                        <button
-                          key={img.id}
-                          onClick={() => setCurrentImg(idx)}
-                          className={`w-3 h-3 rounded-full transition ${
-                            idx === currentImg ? 'bg-purple-400 scale-125' : 'bg-white/40 hover:bg-white/60'
-                          }`}
-                        />
-                      ))}
-                    </div>
+                {/* Photo Carousel - above emojis */}
+                <div className="flex justify-center relative z-10">
+                  <div className="relative rounded-3xl overflow-hidden shadow-2xl w-full max-w-xl h-96">
+                    {(() => {
+                      const allPhotos = getAllMemoryPhotos();
+                      if (allPhotos.length === 0) {
+                        return (
+                          <>
+                            <img
+                              src="/gallery/pier-painting.jpg"
+                              alt="Provincetown Pier Painting"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                              <p className="text-white text-lg font-medium text-center">Add photos to memories to see them here! 📷</p>
+                            </div>
+                          </>
+                        );
+                      }
+                      const currentPhoto = allPhotos[heroPhotoIndex % allPhotos.length];
+                      const currentMemory = memories.find(m => getMemoryImages(m).includes(currentPhoto));
+                      return (
+                        <>
+                          {allPhotos.map((photo, idx) => (
+                            <img
+                              key={idx}
+                              src={photo}
+                              alt={currentMemory?.title || 'Memory'}
+                              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
+                                idx === heroPhotoIndex % allPhotos.length ? 'opacity-100' : 'opacity-0'
+                              }`}
+                            />
+                          ))}
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 z-10">
+                            <p className="text-white text-lg font-medium text-center">
+                              {currentMemory?.title || 'Our Memories'} 💕
+                            </p>
+                            <p className="text-white/70 text-sm text-center">{currentMemory?.date}</p>
+                          </div>
+                          {/* Photo indicators */}
+                          <div className="absolute bottom-16 left-0 right-0 flex justify-center gap-2 z-10">
+                            {allPhotos.slice(0, 10).map((_, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => setHeroPhotoIndex(idx)}
+                                className={`w-2 h-2 rounded-full transition-all ${
+                                  idx === heroPhotoIndex % allPhotos.length
+                                    ? 'bg-white w-4'
+                                    : 'bg-white/50 hover:bg-white/70'
+                                }`}
+                              />
+                            ))}
+                            {allPhotos.length > 10 && (
+                              <span className="text-white/50 text-xs ml-1">+{allPhotos.length - 10}</span>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
-                );
-              })()}
+                </div>
+              </div>
 
               {/* Welcome Text */}
               <div className="text-center mb-12">
@@ -3974,7 +4506,7 @@ export default function TripPlanner() {
               </div>
 
               {/* Values Cards */}
-              <div className="grid md:grid-cols-3 gap-6 mb-12">
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
                 {/* Travel Value */}
                 <div
                   onClick={() => setActiveSection('travel')}
@@ -4019,6 +4551,22 @@ export default function TripPlanner() {
                     <span>💕</span>
                   </div>
                 </div>
+
+                {/* Entertaining Value */}
+                <div
+                  onClick={() => setActiveSection('events')}
+                  className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-3xl p-8 border border-amber-500/30 hover:border-amber-500/60 transition cursor-pointer group"
+                >
+                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">🎉</div>
+                  <h3 className="text-2xl font-bold text-white mb-3">Effortless Entertaining</h3>
+                  <p className="text-slate-300">
+                    Hosting friends, throwing parties, and creating memorable moments in our home together.
+                  </p>
+                  <div className="mt-4 flex items-center gap-2 text-amber-400 font-medium">
+                    <span>Plan events</span>
+                    <span>→</span>
+                  </div>
+                </div>
               </div>
 
               {/* Quick Stats */}
@@ -4061,43 +4609,6 @@ export default function TripPlanner() {
           {/* ========== TRAVEL SECTION ========== */}
           {activeSection === 'travel' && (
           <>
-          {/* Travel Section Header */}
-          <div className="flex items-center gap-4 mb-6">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const newClicks = easterEggClicks + 1;
-                setEasterEggClicks(newClicks);
-                if (newClicks >= 7) {
-                  setShowDisneyMagic(true);
-                  setEasterEggClicks(0);
-                  setTimeout(() => setShowDisneyMagic(false), 10000);
-                }
-              }}
-              className={`w-16 h-16 bg-gradient-to-br from-teal-400 via-purple-400 to-indigo-400 rounded-2xl flex items-center justify-center shadow-lg relative transition-transform hover:scale-110 ${showDisneyMagic ? 'animate-bounce' : ''}`}
-              title={easterEggClicks > 2 ? `${7 - easterEggClicks} more...` : 'Trip Planner'}
-            >
-              <span className="text-3xl">{showDisneyMagic ? '🏰' : '🦄'}</span>
-              {showDisneyMagic && (
-                <span className="absolute -top-1 -right-1 text-lg animate-ping">✨</span>
-              )}
-            </button>
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-                {showDisneyMagic ? (
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-500">
-                    ✨ Where Dreams Come True ✨
-                  </span>
-                ) : (
-                  <>
-                    Bon Voyage! <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-purple-400">✈️</span>
-                  </>
-                )}
-              </h2>
-              <p className="text-slate-400">Our adventures around the world</p>
-            </div>
-          </div>
-
           {/* Countdown Banner for Next Trip */}
           {(() => {
             const today = new Date();
@@ -4234,14 +4745,14 @@ export default function TripPlanner() {
             );
           })()}
 
-          {/* Trip Cards */}
+          {/* Trip Cards - Confirmed Adventures */}
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
               <Star className="w-6 h-6 text-cyan-400" />
               Our Adventures
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {sortedTrips.map(trip => (
+              {confirmedTrips.map(trip => (
                 <div
                   key={trip.id}
                   className={`bg-gradient-to-br ${trip.color} rounded-3xl text-white text-left relative overflow-hidden group hover:scale-105 transition-transform duration-300 shadow-xl`}
@@ -4331,18 +4842,20 @@ export default function TripPlanner() {
                             </span>
                           )}
                         </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm(`Delete trip to ${trip.destination}?`)) {
-                              deleteTrip(trip.id);
-                            }
-                          }}
-                          className="w-full px-4 py-3 text-left text-red-500 hover:bg-red-50 flex items-center gap-2 text-sm border-t"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Delete Trip
-                        </button>
+                        {canDeleteTrip(trip.id) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Delete trip to ${trip.destination}?`)) {
+                                deleteTrip(trip.id);
+                              }
+                            }}
+                            className="w-full px-4 py-3 text-left text-red-500 hover:bg-red-50 flex items-center gap-2 text-sm border-t"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete Trip
+                          </button>
+                        )}
                       </div>
                     )}
 
@@ -4486,6 +4999,78 @@ export default function TripPlanner() {
             </div>
           </section>
 
+          {/* In the Works - Planning Section */}
+          {planningTrips.length > 0 && (
+            <section className="mb-12">
+              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                <span className="text-2xl">🔨</span>
+                In the Works
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {planningTrips.map(trip => (
+                  <div
+                    key={trip.id}
+                    onClick={() => setSelectedTrip(trip)}
+                    className={`bg-gradient-to-br ${trip.color} rounded-3xl text-white text-left relative overflow-hidden group hover:scale-105 transition-transform duration-300 shadow-xl border-2 border-dashed border-white/40 cursor-pointer`}
+                  >
+                    {/* Stripe pattern overlay */}
+                    <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
+                      backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.3) 10px, rgba(255,255,255,0.3) 20px)'
+                    }} />
+
+                    {/* Cover Image */}
+                    {trip.coverImage && (
+                      <div className="h-28 w-full overflow-hidden">
+                        <img
+                          src={trip.coverImage}
+                          alt={trip.destination}
+                          className="w-full h-full object-cover opacity-80"
+                        />
+                        <div className="absolute inset-0 h-28 bg-gradient-to-b from-black/20 to-transparent" />
+                      </div>
+                    )}
+
+                    <div className={`p-6 ${trip.coverImage ? 'pt-4' : ''} relative z-10`}>
+                      {/* Planning Badge */}
+                      <div className="absolute top-3 right-3">
+                        <span className="px-2 py-1 bg-yellow-500/40 text-yellow-200 text-xs font-bold rounded-full">
+                          🔨 Planning
+                        </span>
+                      </div>
+
+                      <div className="text-4xl mb-3">{trip.emoji}</div>
+                      <h3 className="text-xl font-bold leading-tight mb-1">{trip.destination}</h3>
+                      <p className="text-white/70 text-sm mb-2">
+                        {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
+                      </p>
+
+                      {/* Theme */}
+                      {trip.theme && (
+                        <div className="text-sm bg-white/20 px-2 py-1 rounded-lg inline-flex items-center gap-1 mb-3">
+                          🎯 {trip.theme}
+                        </div>
+                      )}
+
+                      {/* Planning Links Count */}
+                      {trip.planningLinks && trip.planningLinks.length > 0 && (
+                        <div className="text-xs text-white/60 flex items-center gap-1">
+                          <Link className="w-3 h-3" />
+                          {trip.planningLinks.length} planning link{trip.planningLinks.length !== 1 ? 's' : ''}
+                        </div>
+                      )}
+
+                      {/* Click to view */}
+                      <div className="mt-3 flex items-center justify-between text-sm">
+                        <span className="text-white/60">Click to plan</span>
+                        <ChevronRight className="w-4 h-4 text-white/60 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Calendar Section */}
           <section className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/10">
             <div className="flex items-center justify-between mb-6">
@@ -4536,19 +5121,29 @@ export default function TripPlanner() {
                       <div
                         key={trip.id}
                         onClick={() => setSelectedTrip(trip)}
-                        className={`bg-gradient-to-r ${trip.color} rounded-xl p-3 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform`}
+                        className={`bg-gradient-to-r ${trip.color} ${trip.isPlanning ? 'opacity-70 border-2 border-dashed border-white/40' : ''} rounded-xl p-3 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform relative overflow-hidden`}
                       >
-                        <div className="flex items-center gap-3">
+                        {trip.isPlanning && (
+                          <div className="absolute inset-0 opacity-20" style={{
+                            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.3) 5px, rgba(255,255,255,0.3) 10px)'
+                          }} />
+                        )}
+                        <div className="flex items-center gap-3 relative z-10">
                           <span className="text-2xl">{trip.emoji}</span>
                           <div className="text-white">
-                            <div className="font-bold">{trip.destination}</div>
+                            <div className="font-bold flex items-center gap-2">
+                              {trip.destination}
+                              {trip.isPlanning && <span className="text-xs bg-yellow-500/30 text-yellow-200 px-2 py-0.5 rounded-full">Planning</span>}
+                            </div>
                             <div className="text-sm opacity-80">
                               {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
                             </div>
                           </div>
                         </div>
-                        <div className="text-white text-right">
-                          {isPast ? (
+                        <div className="text-white text-right relative z-10">
+                          {trip.isPlanning ? (
+                            <span className="text-sm opacity-80">🔨 In the works</span>
+                          ) : isPast ? (
                             <span className="text-sm opacity-70">Memories made! 💕</span>
                           ) : isOngoing ? (
                             <span className="bg-white/30 px-3 py-1 rounded-full text-sm font-bold animate-pulse">🎉 You're there!</span>
@@ -4627,14 +5222,28 @@ export default function TripPlanner() {
 
                     {/* Trip content */}
                     {tripOnDate && (
-                      <div className={`bg-gradient-to-br ${tripOnDate.color} rounded-lg p-1.5 h-[calc(100%-20px)] flex flex-col justify-between overflow-hidden shadow-md hover:shadow-lg transition-shadow`}>
-                        <div className="flex items-center gap-1">
+                      <div className={`${tripOnDate.isPlanning
+                        ? 'bg-gradient-to-br ' + tripOnDate.color + ' opacity-60 border-2 border-dashed border-white/50'
+                        : 'bg-gradient-to-br ' + tripOnDate.color + ' shadow-md hover:shadow-lg'
+                      } rounded-lg p-1.5 h-[calc(100%-20px)] flex flex-col justify-between overflow-hidden transition-shadow relative`}>
+                        {/* Planning stripe pattern overlay */}
+                        {tripOnDate.isPlanning && (
+                          <div className="absolute inset-0 opacity-20" style={{
+                            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.3) 5px, rgba(255,255,255,0.3) 10px)'
+                          }} />
+                        )}
+                        <div className="flex items-center gap-1 relative z-10">
                           <span className="text-sm md:text-base">{tripOnDate.emoji}</span>
                           <span className="text-xs font-semibold text-white truncate hidden md:block">
                             {tripOnDate.destination}
                           </span>
                         </div>
-                        {tripOnDate.special && isStartDay && (
+                        {tripOnDate.isPlanning && isStartDay && (
+                          <div className="text-xs text-white/90 truncate hidden md:block relative z-10">
+                            🔨 Planning
+                          </div>
+                        )}
+                        {!tripOnDate.isPlanning && tripOnDate.special && isStartDay && (
                           <div className="text-xs text-white/80 truncate hidden md:block">
                             {tripOnDate.special}
                           </div>
@@ -4662,7 +5271,12 @@ export default function TripPlanner() {
                     {/* Hover Preview Card */}
                     {tripOnDate && (
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-30 scale-95 group-hover:scale-100">
-                        <div className={`bg-gradient-to-br ${tripOnDate.color} rounded-xl p-3 shadow-2xl min-w-[200px] text-white`}>
+                        <div className={`bg-gradient-to-br ${tripOnDate.color} ${tripOnDate.isPlanning ? 'border-2 border-dashed border-white/50' : ''} rounded-xl p-3 shadow-2xl min-w-[200px] text-white`}>
+                          {tripOnDate.isPlanning && (
+                            <div className="mb-2 text-xs bg-yellow-500/30 text-yellow-200 px-2 py-1 rounded-full inline-flex items-center gap-1">
+                              🔨 Planning
+                            </div>
+                          )}
                           {tripOnDate.coverImage && (
                             <img src={tripOnDate.coverImage} alt="" className="w-full h-20 object-cover rounded-lg mb-2" />
                           )}
@@ -4673,7 +5287,12 @@ export default function TripPlanner() {
                           <div className="text-sm opacity-90">
                             {formatDate(tripOnDate.dates.start, { weekday: 'short', month: 'short', day: 'numeric' })} - {formatDate(tripOnDate.dates.end, { weekday: 'short', month: 'short', day: 'numeric' })}
                           </div>
-                          {tripOnDate.special && (
+                          {tripOnDate.theme && tripOnDate.isPlanning && (
+                            <div className="mt-2 text-sm bg-white/20 inline-block px-2 py-1 rounded-full">
+                              🎯 {tripOnDate.theme}
+                            </div>
+                          )}
+                          {tripOnDate.special && !tripOnDate.isPlanning && (
                             <div className="mt-2 text-sm bg-white/20 inline-block px-2 py-1 rounded-full">
                               {tripOnDate.special}
                             </div>
@@ -4756,7 +5375,7 @@ export default function TripPlanner() {
                       {od.note && <span className="text-green-400 ml-1">({od.note})</span>}
                       {isOwner && !od.visibleTo.includes('all') && (
                         <span className="ml-1 text-xs text-green-400/70">
-                          👁️ {od.visibleTo.map(id => companions.find(c => c.id === id)?.firstName || companions.find(c => c.id === id)?.name).filter(Boolean).join(', ')}
+                          👁️ {od.visibleTo.map(id => (companions || []).find(c => c.id === id)?.firstName || (companions || []).find(c => c.id === id)?.name).filter(Boolean).join(', ')}
                         </span>
                       )}
                     </div>
@@ -4952,10 +5571,10 @@ export default function TripPlanner() {
                     const daysUntil = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
                     const weeksUntil = Math.ceil(daysUntil / 7);
                     const isPast = daysUntil < 0;
-                    const trainingPlan = fitnessTrainingPlans[event.id] || [];
+                    const trainingPlan = getActiveTrainingPlan(event.id);
                     const completedWorkouts = trainingPlan.reduce((acc, week) => {
-                      const runsDone = week.runs?.filter(r => r.completed).length || 0;
-                      const crossDone = week.crossTraining?.filter(c => c.completed).length || 0;
+                      const runsDone = week.runs?.filter(r => r.mike && r.adam).length || 0;
+                      const crossDone = week.crossTraining?.filter(c => c.mike && c.adam).length || 0;
                       return acc + runsDone + crossDone;
                     }, 0);
                     const totalWorkouts = trainingPlan.reduce((acc, week) => {
@@ -4968,9 +5587,6 @@ export default function TripPlanner() {
                         className={`bg-gradient-to-br ${event.color} rounded-3xl p-6 shadow-xl relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform`}
                         onClick={() => {
                           setSelectedFitnessEvent(event);
-                          if (!fitnessTrainingPlans[event.id]) {
-                            initializeTrainingPlan(event.id);
-                          }
                           setFitnessViewMode('training');
                         }}
                       >
@@ -5045,9 +5661,6 @@ export default function TripPlanner() {
                         key={event.id}
                         onClick={() => {
                           setSelectedFitnessEvent(event);
-                          if (!fitnessTrainingPlans[event.id]) {
-                            initializeTrainingPlan(event.id);
-                          }
                         }}
                         className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${
                           selectedFitnessEvent?.id === event.id
@@ -5061,11 +5674,11 @@ export default function TripPlanner() {
                     ))}
                   </div>
 
-                  {selectedFitnessEvent && fitnessTrainingPlans[selectedFitnessEvent.id] && (
+                  {selectedFitnessEvent && getActiveTrainingPlan(selectedFitnessEvent.id) && (
                     <div className="space-y-4">
                       {/* Stats and Encouragement */}
                       {(() => {
-                        const plan = fitnessTrainingPlans[selectedFitnessEvent.id];
+                        const plan = getActiveTrainingPlan(selectedFitnessEvent.id);
                         // A week is "done" if both Mike and Adam completed all workouts
                         const completedWeeks = plan.filter(w =>
                           w.runs?.every(r => r.mike && r.adam) && w.crossTraining?.every(c => c.mike && c.adam)
@@ -5155,10 +5768,10 @@ export default function TripPlanner() {
                       {(() => {
                         const today = new Date();
                         const todayStr = today.toISOString().split('T')[0];
-                        const currentWeek = fitnessTrainingPlans[selectedFitnessEvent.id].find(
+                        const currentWeek = getActiveTrainingPlan(selectedFitnessEvent.id).find(
                           week => week.startDate <= todayStr && week.endDate >= todayStr
                         );
-                        const currentWeekIndex = fitnessTrainingPlans[selectedFitnessEvent.id].findIndex(
+                        const currentWeekIndex = getActiveTrainingPlan(selectedFitnessEvent.id).findIndex(
                           week => week.startDate <= todayStr && week.endDate >= todayStr
                         );
 
@@ -5172,6 +5785,13 @@ export default function TripPlanner() {
                                 {currentWeek.totalMiles && (
                                   <span className="px-3 py-1 bg-white/20 text-white text-sm rounded-full">{currentWeek.totalMiles} mi goal</span>
                                 )}
+                                <button
+                                  onClick={() => setEditingTrainingWeek({ eventId: selectedFitnessEvent.id, week: { ...currentWeek } })}
+                                  className="ml-auto p-2 text-white/60 hover:text-white hover:bg-white/20 rounded-lg transition"
+                                  title="Edit week"
+                                >
+                                  <Pencil className="w-5 h-5" />
+                                </button>
                               </div>
                               {currentWeek.weekNotes && (
                                 <div className="mb-4 px-4 py-2 bg-white/10 rounded-lg text-white/90">{currentWeek.weekNotes}</div>
@@ -5187,7 +5807,11 @@ export default function TripPlanner() {
                                     {currentWeek.runs?.map(run => (
                                       <div
                                         key={run.id}
-                                        className={`flex items-center gap-3 p-3 rounded-lg ${(run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5'}`}
+                                        className={`flex items-center gap-3 p-3 rounded-lg ${
+                                          ('adam' in run)
+                                            ? ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
+                                            : (run.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                        }`}
                                       >
                                         <div className="flex gap-2">
                                           <button
@@ -5199,25 +5823,33 @@ export default function TripPlanner() {
                                           >
                                             {run.mike && <Check className="w-4 h-4 text-white" />}
                                           </button>
-                                          <button
-                                            onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { adam: !run.adam })}
-                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
-                                              run.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'
-                                            }`}
-                                            title="Adam"
-                                          >
-                                            {run.adam && <Check className="w-4 h-4 text-white" />}
-                                          </button>
+                                          {'adam' in run && (
+                                            <button
+                                              onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { adam: !run.adam })}
+                                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
+                                                run.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'
+                                              }`}
+                                              title="Adam"
+                                            >
+                                              {run.adam && <Check className="w-4 h-4 text-white" />}
+                                            </button>
+                                          )}
                                         </div>
                                         <div className="flex-1">
                                           <div className="text-white font-medium">{run.label || run.day}</div>
                                           <div className="text-xs text-white/50">
-                                            <span className={run.mike ? 'text-blue-400' : 'text-white/30'}>M</span>
-                                            {' / '}
-                                            <span className={run.adam ? 'text-purple-400' : 'text-white/30'}>A</span>
+                                            {'adam' in run ? (
+                                              <>
+                                                <span className={run.mike ? 'text-blue-400' : 'text-white/30'}>M</span>
+                                                {' / '}
+                                                <span className={run.adam ? 'text-purple-400' : 'text-white/30'}>A</span>
+                                              </>
+                                            ) : (
+                                              <span className={run.mike ? 'text-blue-400' : 'text-white/30'}>Mike</span>
+                                            )}
                                           </div>
                                         </div>
-                                        <div className="text-white font-bold">{run.distance} mi</div>
+                                        <div className="text-white font-bold">{run.distance}</div>
                                       </div>
                                     ))}
                                   </div>
@@ -5232,7 +5864,11 @@ export default function TripPlanner() {
                                     {currentWeek.crossTraining?.map(ct => (
                                       <div
                                         key={ct.id}
-                                        className={`flex items-center gap-3 p-3 rounded-lg ${(ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5'}`}
+                                        className={`flex items-center gap-3 p-3 rounded-lg ${
+                                          ('adam' in ct)
+                                            ? ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
+                                            : (ct.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                        }`}
                                       >
                                         <div className="flex gap-2">
                                           <button
@@ -5244,22 +5880,30 @@ export default function TripPlanner() {
                                           >
                                             {ct.mike && <Check className="w-4 h-4 text-white" />}
                                           </button>
-                                          <button
-                                            onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { adam: !ct.adam })}
-                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
-                                              ct.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'
-                                            }`}
-                                            title="Adam"
-                                          >
-                                            {ct.adam && <Check className="w-4 h-4 text-white" />}
-                                          </button>
+                                          {'adam' in ct && (
+                                            <button
+                                              onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { adam: !ct.adam })}
+                                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
+                                                ct.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'
+                                              }`}
+                                              title="Adam"
+                                            >
+                                              {ct.adam && <Check className="w-4 h-4 text-white" />}
+                                            </button>
+                                          )}
                                         </div>
                                         <div className="flex-1">
                                           <div className="text-white font-medium">{ct.label || ct.day}</div>
                                           <div className="text-xs text-white/50">
-                                            <span className={ct.mike ? 'text-blue-400' : 'text-white/30'}>M</span>
-                                            {' / '}
-                                            <span className={ct.adam ? 'text-purple-400' : 'text-white/30'}>A</span>
+                                            {'adam' in ct ? (
+                                              <>
+                                                <span className={ct.mike ? 'text-blue-400' : 'text-white/30'}>M</span>
+                                                {' / '}
+                                                <span className={ct.adam ? 'text-purple-400' : 'text-white/30'}>A</span>
+                                              </>
+                                            ) : (
+                                              <span className={ct.mike ? 'text-blue-400' : 'text-white/30'}>Mike</span>
+                                            )}
                                           </div>
                                         </div>
                                         <span className="text-white/60 text-sm">30+ min</span>
@@ -5287,12 +5931,12 @@ export default function TripPlanner() {
 
                       {/* All Weeks Accordion */}
                       <div className="space-y-2">
-                        {fitnessTrainingPlans[selectedFitnessEvent.id].map((week, index) => {
+                        {getActiveTrainingPlan(selectedFitnessEvent.id).map((week, index) => {
                           const today = new Date();
                           const todayStr = today.toISOString().split('T')[0];
                           const isCurrent = week.startDate <= todayStr && week.endDate >= todayStr;
                           const isPast = week.endDate < todayStr;
-                          const completedCount = (week.runs?.filter(r => r.completed).length || 0) + (week.crossTraining?.filter(c => c.completed).length || 0);
+                          const completedCount = (week.runs?.filter(r => r.mike && r.adam).length || 0) + (week.crossTraining?.filter(c => c.mike && c.adam).length || 0);
                           const totalCount = (week.runs?.length || 0) + (week.crossTraining?.length || 0);
 
                           return (
@@ -5331,6 +5975,17 @@ export default function TripPlanner() {
                                       style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
                                     />
                                   </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setEditingTrainingWeek({ eventId: selectedFitnessEvent.id, week: { ...week } });
+                                    }}
+                                    className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition"
+                                    title="Edit week"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
                                   <ChevronRight className="w-5 h-5 text-white/40 transition-transform group-open:rotate-90" />
                                 </div>
                               </summary>
@@ -5344,7 +5999,11 @@ export default function TripPlanner() {
                                       {week.runs?.map(run => (
                                         <div
                                           key={run.id}
-                                          className={`flex items-center gap-2 p-2 rounded ${(run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5'}`}
+                                          className={`flex items-center gap-2 p-2 rounded ${
+                                            ('adam' in run)
+                                              ? ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
+                                              : (run.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                          }`}
                                         >
                                           <div className="flex gap-1">
                                             <button
@@ -5356,18 +6015,20 @@ export default function TripPlanner() {
                                             >
                                               {run.mike && <Check className="w-3 h-3 text-white" />}
                                             </button>
-                                            <button
-                                              onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { adam: !run.adam })}
-                                              className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                                run.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40'
-                                              }`}
-                                              title="Adam"
-                                            >
-                                              {run.adam && <Check className="w-3 h-3 text-white" />}
-                                            </button>
+                                            {'adam' in run && (
+                                              <button
+                                                onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { adam: !run.adam })}
+                                                className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                                                  run.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40'
+                                                }`}
+                                                title="Adam"
+                                              >
+                                                {run.adam && <Check className="w-3 h-3 text-white" />}
+                                              </button>
+                                            )}
                                           </div>
                                           <span className="text-white/80 text-sm flex-1">{run.label || run.day}</span>
-                                          <span className="text-white font-medium text-sm">{run.distance} mi</span>
+                                          <span className="text-white font-medium text-sm">{run.distance}</span>
                                         </div>
                                       ))}
                                     </div>
@@ -5380,7 +6041,11 @@ export default function TripPlanner() {
                                       {week.crossTraining?.map(ct => (
                                         <div
                                           key={ct.id}
-                                          className={`flex items-center gap-2 p-2 rounded ${(ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5'}`}
+                                          className={`flex items-center gap-2 p-2 rounded ${
+                                            ('adam' in ct)
+                                              ? ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
+                                              : (ct.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                          }`}
                                         >
                                           <div className="flex gap-1">
                                             <button
@@ -5392,15 +6057,17 @@ export default function TripPlanner() {
                                             >
                                               {ct.mike && <Check className="w-3 h-3 text-white" />}
                                             </button>
-                                            <button
-                                              onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { adam: !ct.adam })}
-                                              className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                                ct.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40'
-                                              }`}
-                                              title="Adam"
-                                            >
-                                              {ct.adam && <Check className="w-3 h-3 text-white" />}
-                                            </button>
+                                            {'adam' in ct && (
+                                              <button
+                                                onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { adam: !ct.adam })}
+                                                className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                                                  ct.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40'
+                                                }`}
+                                                title="Adam"
+                                              >
+                                                {ct.adam && <Check className="w-3 h-3 text-white" />}
+                                              </button>
+                                            )}
                                           </div>
                                           <span className="text-white/80 text-sm flex-1">{ct.label || ct.day}</span>
                                           <span className="text-white/60 text-xs">30+ min</span>
@@ -5533,7 +6200,7 @@ export default function TripPlanner() {
                     </h3>
                     <div className="flex gap-2 flex-wrap">
                       {fitnessEvents.map(event => {
-                        const plan = fitnessTrainingPlans[event.id] || [];
+                        const plan = getActiveTrainingPlan(event.id);
                         return plan.slice(0, 12).map((week, i) => {
                           // Count workouts where both Mike AND Adam completed
                           const completed = (week.runs?.filter(r => r.mike && r.adam).length || 0) + (week.crossTraining?.filter(c => c.mike && c.adam).length || 0);
@@ -5622,6 +6289,934 @@ export default function TripPlanner() {
           )}
           {/* ========== END NUTRITION SECTION ========== */}
 
+          {/* ========== EVENTS SECTION ========== */}
+          {activeSection === 'events' && (
+            <div className="mt-8">
+              {/* Event Detail View */}
+              {selectedPartyEvent ? (
+                <div>
+                  {/* Back Button & Header */}
+                  <div className="flex items-center gap-4 mb-6">
+                    <button
+                      onClick={() => setSelectedPartyEvent(null)}
+                      className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"
+                    >
+                      <ChevronLeft className="w-6 h-6 text-white" />
+                    </button>
+                    <div className="flex-1">
+                      <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <span className="text-4xl">{selectedPartyEvent.emoji}</span>
+                        {selectedPartyEvent.name}
+                      </h2>
+                      <p className="text-slate-400">
+                        {formatDate(selectedPartyEvent.date, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                        {selectedPartyEvent.time && ` at ${selectedPartyEvent.time}`}
+                        {selectedPartyEvent.endTime && ` - ${selectedPartyEvent.endTime}`}
+                      </p>
+                    </div>
+                    {isOwner && (
+                      <button
+                        onClick={() => setEditingEvent(selectedPartyEvent)}
+                        className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"
+                        title="Edit event"
+                      >
+                        <Edit3 className="w-5 h-5 text-white" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Event Info Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    {/* Location Card */}
+                    <div className="bg-white/10 rounded-2xl p-4 border border-white/20">
+                      <div className="flex items-center gap-2 text-amber-400 mb-2">
+                        <MapPin className="w-5 h-5" />
+                        <span className="font-semibold">Location</span>
+                      </div>
+                      <p className="text-white">{selectedPartyEvent.location || 'TBD'}</p>
+                      {selectedPartyEvent.entryCode && (
+                        <p className="text-slate-400 text-sm mt-1">
+                          🔑 {selectedPartyEvent.entryCode}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Time Card */}
+                    <div className="bg-white/10 rounded-2xl p-4 border border-white/20">
+                      <div className="flex items-center gap-2 text-purple-400 mb-2">
+                        <Clock className="w-5 h-5" />
+                        <span className="font-semibold">Time</span>
+                      </div>
+                      <p className="text-white">
+                        {selectedPartyEvent.time || 'TBD'}
+                        {selectedPartyEvent.endTime && ` - ${selectedPartyEvent.endTime}`}
+                      </p>
+                      <p className="text-slate-400 text-sm mt-1">
+                        {formatDate(selectedPartyEvent.date, { weekday: 'long', month: 'short', day: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {selectedPartyEvent.description && (
+                    <div className="bg-white/10 rounded-2xl p-4 border border-white/20 mb-6">
+                      <h3 className="text-white font-semibold mb-2">📝 Details</h3>
+                      <p className="text-slate-300">{selectedPartyEvent.description}</p>
+                    </div>
+                  )}
+
+                  {/* Event Photos */}
+                  <div
+                    className={`bg-white/10 rounded-2xl p-4 border border-white/20 mb-6 transition ${
+                      dragOverEventId === selectedPartyEvent.id ? 'border-purple-500 bg-purple-500/10' : ''
+                    }`}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverEventId(selectedPartyEvent.id); }}
+                    onDragLeave={() => setDragOverEventId(null)}
+                    onDrop={(e) => handleEventCardDrop(e, selectedPartyEvent.id)}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-white font-semibold flex items-center gap-2">
+                        <Image className="w-5 h-5 text-purple-400" />
+                        Photos ({(selectedPartyEvent.images || []).length})
+                      </h3>
+                      {uploadingToEventId === selectedPartyEvent.id && (
+                        <div className="flex items-center gap-2 text-purple-400">
+                          <Loader className="w-4 h-4 animate-spin" />
+                          <span className="text-sm">Uploading...</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Photo Grid */}
+                    {(selectedPartyEvent.images || []).length > 0 ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+                        {(selectedPartyEvent.images || []).map((img, idx) => (
+                          <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden">
+                            <img src={img} alt={`Event photo ${idx + 1}`} className="w-full h-full object-cover" />
+                            {isOwner && (
+                              <button
+                                onClick={() => {
+                                  const newEvents = partyEvents.map(e =>
+                                    e.id === selectedPartyEvent.id
+                                      ? { ...e, images: e.images.filter((_, i) => i !== idx) }
+                                      : e
+                                  );
+                                  setPartyEvents(newEvents);
+                                  setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                                  savePartyEventsToFirestore(newEvents);
+                                }}
+                                className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-slate-500 text-center py-4 mb-4">No photos yet - drop images here or use the button below</p>
+                    )}
+
+                    {/* Upload Button */}
+                    {(isOwner || (selectedPartyEvent.guests || []).some(g => g.email === user?.email && g.permission === 'edit')) && (
+                      <label className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl cursor-pointer transition border-2 border-dashed ${
+                        uploadingToEventId === selectedPartyEvent.id
+                          ? 'bg-white/5 text-white/40 border-white/10'
+                          : 'bg-white/5 hover:bg-white/10 text-white/70 border-white/20 hover:border-purple-500'
+                      }`}>
+                        {uploadingToEventId === selectedPartyEvent.id ? (
+                          <Loader className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Upload className="w-5 h-5" />
+                        )}
+                        <span>{uploadingToEventId === selectedPartyEvent.id ? 'Uploading...' : 'Add Photos'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          disabled={uploadingToEventId === selectedPartyEvent.id}
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            files.forEach(file => {
+                              if (file.type.startsWith('image/')) {
+                                uploadPhotoToEvent(file, selectedPartyEvent.id);
+                              }
+                            });
+                          }}
+                        />
+                      </label>
+                    )}
+
+                    {dragOverEventId === selectedPartyEvent.id && (
+                      <div className="text-center text-purple-400 mt-2 text-sm">Drop images here to add</div>
+                    )}
+                  </div>
+
+                  {/* Guest List with RSVP */}
+                  <div className="bg-white/10 rounded-2xl p-4 border border-white/20 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-white font-semibold flex items-center gap-2">
+                        <Users className="w-5 h-5 text-pink-400" />
+                        Guest List ({(selectedPartyEvent.guests || []).length + 2})
+                      </h3>
+                      {isOwner && (
+                        <div className="text-sm text-slate-400">
+                          ✅ {(selectedPartyEvent.guests || []).filter(g => g.rsvp === 'yes').length + 2} confirmed
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Hosts */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <div className="flex items-center gap-2 bg-gradient-to-r from-purple-500/30 to-pink-500/30 px-3 py-2 rounded-full border border-purple-500/30">
+                        <div className="w-8 h-8 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center text-white font-bold text-sm">M</div>
+                        <span className="text-white text-sm">Mike</span>
+                        <span className="text-xs bg-purple-500/50 text-purple-100 px-2 py-0.5 rounded-full">Host</span>
+                      </div>
+                      <div className="flex items-center gap-2 bg-gradient-to-r from-blue-500/30 to-cyan-500/30 px-3 py-2 rounded-full border border-blue-500/30">
+                        <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full flex items-center justify-center text-white font-bold text-sm">A</div>
+                        <span className="text-white text-sm">Adam</span>
+                        <span className="text-xs bg-blue-500/50 text-blue-100 px-2 py-0.5 rounded-full">Host</span>
+                      </div>
+                    </div>
+
+                    {/* Invited Guests */}
+                    {(selectedPartyEvent.guests || []).length > 0 && (
+                      <div className="space-y-2 mb-4">
+                        {(selectedPartyEvent.guests || []).map(guest => (
+                          <div key={guest.id} className="flex items-center justify-between bg-white/5 px-3 py-2 rounded-xl">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                {(guest.email || '?').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="text-white text-sm">{guest.email}</div>
+                                <div className="text-slate-500 text-xs">
+                                  {guest.permission === 'edit' ? '✏️ Can edit' : '👁️ View only'}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {/* RSVP Status */}
+                              <select
+                                value={guest.rsvp || 'pending'}
+                                onChange={(e) => {
+                                  const newEvents = partyEvents.map(ev =>
+                                    ev.id === selectedPartyEvent.id
+                                      ? {
+                                          ...ev,
+                                          guests: ev.guests.map(g =>
+                                            g.id === guest.id ? { ...g, rsvp: e.target.value } : g
+                                          )
+                                        }
+                                      : ev
+                                  );
+                                  setPartyEvents(newEvents);
+                                  setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                                  savePartyEventsToFirestore(newEvents);
+                                }}
+                                className={`text-xs px-2 py-1 rounded-full border-0 cursor-pointer ${
+                                  guest.rsvp === 'yes' ? 'bg-green-500/30 text-green-300' :
+                                  guest.rsvp === 'no' ? 'bg-red-500/30 text-red-300' :
+                                  guest.rsvp === 'maybe' ? 'bg-yellow-500/30 text-yellow-300' :
+                                  'bg-slate-500/30 text-slate-300'
+                                }`}
+                              >
+                                <option value="pending">⏳ Pending</option>
+                                <option value="yes">✅ Going</option>
+                                <option value="no">❌ Not Going</option>
+                                <option value="maybe">🤔 Maybe</option>
+                              </select>
+                              {isOwner && (
+                                <button
+                                  onClick={() => {
+                                    const newEvents = partyEvents.map(ev =>
+                                      ev.id === selectedPartyEvent.id
+                                        ? { ...ev, guests: ev.guests.filter(g => g.id !== guest.id) }
+                                        : ev
+                                    );
+                                    setPartyEvents(newEvents);
+                                    setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                                    savePartyEventsToFirestore(newEvents);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-red-400 transition"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add Guest */}
+                    {isOwner && (
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          placeholder="Add guest email..."
+                          value={eventGuestEmail}
+                          onChange={(e) => setEventGuestEmail(e.target.value)}
+                          className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && eventGuestEmail.includes('@')) {
+                              const newGuest = {
+                                id: Date.now(),
+                                email: eventGuestEmail,
+                                permission: eventGuestPermission,
+                                rsvp: 'pending',
+                                addedBy: currentUser,
+                                addedAt: new Date().toISOString()
+                              };
+                              const newEvents = partyEvents.map(ev =>
+                                ev.id === selectedPartyEvent.id
+                                  ? { ...ev, guests: [...(ev.guests || []), newGuest] }
+                                  : ev
+                              );
+                              setPartyEvents(newEvents);
+                              setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                              savePartyEventsToFirestore(newEvents);
+                              setEventGuestEmail('');
+                            }
+                          }}
+                        />
+                        <select
+                          value={eventGuestPermission}
+                          onChange={(e) => setEventGuestPermission(e.target.value)}
+                          className="px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-sm focus:outline-none"
+                        >
+                          <option value="edit">✏️ Edit</option>
+                          <option value="view">👁️ View</option>
+                        </select>
+                        <button
+                          onClick={() => {
+                            if (eventGuestEmail.includes('@')) {
+                              const newGuest = {
+                                id: Date.now(),
+                                email: eventGuestEmail,
+                                permission: eventGuestPermission,
+                                rsvp: 'pending',
+                                addedBy: currentUser,
+                                addedAt: new Date().toISOString()
+                              };
+                              const newEvents = partyEvents.map(ev =>
+                                ev.id === selectedPartyEvent.id
+                                  ? { ...ev, guests: [...(ev.guests || []), newGuest] }
+                                  : ev
+                              );
+                              setPartyEvents(newEvents);
+                              setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                              savePartyEventsToFirestore(newEvents);
+                              setEventGuestEmail('');
+                            }
+                          }}
+                          disabled={!eventGuestEmail.includes('@')}
+                          className="px-4 py-2 bg-purple-500 text-white rounded-xl hover:bg-purple-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <UserPlus className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Task List */}
+                  <div className="bg-white/10 rounded-2xl p-4 border border-white/20">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-white font-semibold flex items-center gap-2">
+                        <CheckSquare className="w-5 h-5 text-green-400" />
+                        To-Do List
+                      </h3>
+                      <div className="text-sm text-slate-400">
+                        {(selectedPartyEvent.tasks || []).filter(t => t.completed).length}/{(selectedPartyEvent.tasks || []).length} done
+                      </div>
+                    </div>
+
+                    {/* Task Items */}
+                    <div className="space-y-2 mb-4">
+                      {(selectedPartyEvent.tasks || []).map(task => (
+                        <div key={task.id} className={`flex items-center gap-3 p-3 rounded-xl transition ${task.completed ? 'bg-green-500/10' : 'bg-white/5'}`}>
+                          <button
+                            onClick={() => {
+                              const newEvents = partyEvents.map(ev =>
+                                ev.id === selectedPartyEvent.id
+                                  ? {
+                                      ...ev,
+                                      tasks: ev.tasks.map(t =>
+                                        t.id === task.id ? { ...t, completed: !t.completed } : t
+                                      )
+                                    }
+                                  : ev
+                              );
+                              setPartyEvents(newEvents);
+                              setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                              savePartyEventsToFirestore(newEvents);
+                            }}
+                            className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition ${
+                              task.completed
+                                ? 'bg-green-500 border-green-500 text-white'
+                                : 'border-slate-500 hover:border-green-500'
+                            }`}
+                          >
+                            {task.completed && <Check className="w-4 h-4" />}
+                          </button>
+                          <div className="flex-1">
+                            <span className={`text-white ${task.completed ? 'line-through opacity-60' : ''}`}>
+                              {task.text}
+                            </span>
+                            {task.assignee && (
+                              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                                task.assignee === 'Mike' ? 'bg-purple-500/30 text-purple-300' :
+                                task.assignee === 'Adam' ? 'bg-blue-500/30 text-blue-300' :
+                                'bg-amber-500/30 text-amber-300'
+                              }`}>
+                                {task.assignee}
+                              </span>
+                            )}
+                          </div>
+                          {isOwner && (
+                            <button
+                              onClick={() => {
+                                const newEvents = partyEvents.map(ev =>
+                                  ev.id === selectedPartyEvent.id
+                                    ? { ...ev, tasks: ev.tasks.filter(t => t.id !== task.id) }
+                                    : ev
+                                );
+                                setPartyEvents(newEvents);
+                                setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                                savePartyEventsToFirestore(newEvents);
+                              }}
+                              className="p-1 text-slate-400 hover:text-red-400 transition"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {(selectedPartyEvent.tasks || []).length === 0 && (
+                        <p className="text-slate-500 text-center py-4">No tasks yet</p>
+                      )}
+                    </div>
+
+                    {/* Add Task */}
+                    {(isOwner || (selectedPartyEvent.guests || []).some(g => g.email === user?.email && g.permission === 'edit')) && (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Add a task..."
+                          value={newTaskText}
+                          onChange={(e) => setNewTaskText(e.target.value)}
+                          className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-green-500"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newTaskText.trim()) {
+                              const newTask = {
+                                id: Date.now(),
+                                text: newTaskText.trim(),
+                                assignee: newTaskAssignee || null,
+                                completed: false,
+                                createdBy: currentUser,
+                                createdAt: new Date().toISOString()
+                              };
+                              const newEvents = partyEvents.map(ev =>
+                                ev.id === selectedPartyEvent.id
+                                  ? { ...ev, tasks: [...(ev.tasks || []), newTask] }
+                                  : ev
+                              );
+                              setPartyEvents(newEvents);
+                              setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                              savePartyEventsToFirestore(newEvents);
+                              setNewTaskText('');
+                              setNewTaskAssignee('');
+                            }
+                          }}
+                        />
+                        <select
+                          value={newTaskAssignee}
+                          onChange={(e) => setNewTaskAssignee(e.target.value)}
+                          className="px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-sm focus:outline-none"
+                        >
+                          <option value="">Unassigned</option>
+                          <option value="Mike">Mike</option>
+                          <option value="Adam">Adam</option>
+                          {(selectedPartyEvent.guests || []).map(g => (
+                            <option key={g.id} value={g.email}>{g.email.split('@')[0]}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => {
+                            if (newTaskText.trim()) {
+                              const newTask = {
+                                id: Date.now(),
+                                text: newTaskText.trim(),
+                                assignee: newTaskAssignee || null,
+                                completed: false,
+                                createdBy: currentUser,
+                                createdAt: new Date().toISOString()
+                              };
+                              const newEvents = partyEvents.map(ev =>
+                                ev.id === selectedPartyEvent.id
+                                  ? { ...ev, tasks: [...(ev.tasks || []), newTask] }
+                                  : ev
+                              );
+                              setPartyEvents(newEvents);
+                              setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                              savePartyEventsToFirestore(newEvents);
+                              setNewTaskText('');
+                              setNewTaskAssignee('');
+                            }
+                          }}
+                          disabled={!newTaskText.trim()}
+                          className="px-4 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Plus className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Events List View */}
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-3xl font-bold text-white">🎉 Events</h2>
+                      <p className="text-slate-400">Plan parties and gather friends</p>
+                    </div>
+                    {isOwner && (
+                      <button
+                        onClick={() => setShowAddEventModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 transition"
+                      >
+                        <Plus className="w-5 h-5" />
+                        New Event
+                      </button>
+                    )}
+                  </div>
+
+                  {/* View Mode Toggle */}
+                  <div className="flex gap-2 mb-6">
+                    {['upcoming', 'past', 'all'].map(mode => (
+                      <button
+                        key={mode}
+                        onClick={() => setEventViewMode(mode)}
+                        className={`px-4 py-2 rounded-xl font-medium transition ${
+                          eventViewMode === mode
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                        }`}
+                      >
+                        {mode === 'upcoming' ? '📅 Upcoming' : mode === 'past' ? '📜 Past' : '📋 All'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Events Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {partyEvents
+                      .filter(event => {
+                        const eventDate = parseLocalDate(event.date);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        if (eventViewMode === 'upcoming') return eventDate >= today;
+                        if (eventViewMode === 'past') return eventDate < today;
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        const dateA = parseLocalDate(a.date);
+                        const dateB = parseLocalDate(b.date);
+                        return eventViewMode === 'past' ? dateB - dateA : dateA - dateB;
+                      })
+                      .map(event => {
+                        const eventDate = parseLocalDate(event.date);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const daysUntil = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
+                        const isPast = eventDate < today;
+                        const isToday = daysUntil === 0;
+
+                        return (
+                          <div
+                            key={event.id}
+                            onClick={() => setSelectedPartyEvent(event)}
+                            onDragOver={(e) => { e.preventDefault(); setDragOverEventId(event.id); }}
+                            onDragLeave={() => setDragOverEventId(null)}
+                            onDrop={(e) => { e.stopPropagation(); handleEventCardDrop(e, event.id); }}
+                            className={`relative bg-gradient-to-br ${event.color || 'from-purple-500/30 to-pink-500/30'} rounded-2xl p-5 border cursor-pointer hover:scale-[1.02] transition-all ${isPast ? 'opacity-60' : ''} ${
+                              dragOverEventId === event.id ? 'border-purple-500 scale-105' : 'border-white/20'
+                            }`}
+                          >
+                            {/* Upload indicator */}
+                            {uploadingToEventId === event.id && (
+                              <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center z-10">
+                                <Loader className="w-8 h-8 text-purple-500 animate-spin" />
+                              </div>
+                            )}
+                            {/* Drop indicator */}
+                            {dragOverEventId === event.id && (
+                              <div className="absolute inset-0 bg-purple-500/30 rounded-2xl flex items-center justify-center z-10 pointer-events-none">
+                                <div className="text-white font-semibold">📷 Drop to add photo</div>
+                              </div>
+                            )}
+                            {/* Photo preview if event has images */}
+                            {(event.images || []).length > 0 && (
+                              <div className="absolute top-2 right-2 flex -space-x-2">
+                                {(event.images || []).slice(0, 3).map((img, i) => (
+                                  <div key={i} className="w-8 h-8 rounded-full border-2 border-white/50 overflow-hidden">
+                                    <img src={img} alt="" className="w-full h-full object-cover" />
+                                  </div>
+                                ))}
+                                {(event.images || []).length > 3 && (
+                                  <div className="w-8 h-8 rounded-full border-2 border-white/50 bg-black/50 flex items-center justify-center text-white text-xs font-bold">
+                                    +{(event.images || []).length - 3}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <div className="flex items-start justify-between mb-3">
+                              <span className="text-4xl">{event.emoji}</span>
+                              {!isPast && !(event.images || []).length && (
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                  isToday ? 'bg-green-500 text-white' :
+                                  daysUntil <= 7 ? 'bg-amber-500 text-white' :
+                                  'bg-white/20 text-white'
+                                }`}>
+                                  {isToday ? '🎉 Today!' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
+                                </span>
+                              )}
+                              {isPast && !(event.images || []).length && (
+                                <span className="px-3 py-1 rounded-full text-sm font-medium bg-slate-500/50 text-slate-300">
+                                  Past
+                                </span>
+                              )}
+                            </div>
+                            <h3 className="text-xl font-bold text-white mb-1">{event.name}</h3>
+                            <p className="text-white/80 text-sm mb-3">
+                              {formatDate(event.date, { weekday: 'short', month: 'short', day: 'numeric' })}
+                              {event.time && ` • ${event.time}`}
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1 text-white/70 text-sm">
+                                <Users className="w-4 h-4" />
+                                <span>{(event.guests || []).length + 2}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-white/70 text-sm">
+                                <Image className="w-4 h-4" />
+                                <span>{(event.images || []).length}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-white/70 text-sm">
+                                <CheckSquare className="w-4 h-4" />
+                                <span>{(event.tasks || []).filter(t => t.completed).length}/{(event.tasks || []).length}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                    {/* Empty State */}
+                    {partyEvents.filter(event => {
+                      const eventDate = parseLocalDate(event.date);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      if (eventViewMode === 'upcoming') return eventDate >= today;
+                      if (eventViewMode === 'past') return eventDate < today;
+                      return true;
+                    }).length === 0 && (
+                      <div className="col-span-full text-center py-12">
+                        <div className="text-6xl mb-4">🎈</div>
+                        <h3 className="text-xl font-bold text-white mb-2">
+                          {eventViewMode === 'upcoming' ? 'No upcoming events' :
+                           eventViewMode === 'past' ? 'No past events' : 'No events yet'}
+                        </h3>
+                        <p className="text-slate-400 mb-4">
+                          {isOwner ? 'Create your first event to get started!' : 'Check back soon for new events!'}
+                        </p>
+                        {isOwner && (
+                          <button
+                            onClick={() => setShowAddEventModal(true)}
+                            className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 transition"
+                          >
+                            Create Event
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Add/Edit Event Modal */}
+              {(showAddEventModal || editingEvent) && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto border border-white/20">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-2xl font-bold text-white">
+                        {editingEvent ? 'Edit Event' : 'New Event'}
+                      </h3>
+                      <button
+                        onClick={() => {
+                          setShowAddEventModal(false);
+                          setEditingEvent(null);
+                          setNewEventData({
+                            name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
+                            location: '', entryCode: '', description: '', color: 'from-purple-400 to-pink-500'
+                          });
+                        }}
+                        className="p-2 hover:bg-white/10 rounded-full transition"
+                      >
+                        <X className="w-5 h-5 text-white" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Event Name & Emoji */}
+                      <div className="flex gap-3">
+                        <div className="relative">
+                          <button
+                            type="button"
+                            className="w-16 h-16 bg-white/10 rounded-xl flex items-center justify-center text-3xl hover:bg-white/20 transition border border-white/20"
+                            onClick={() => {
+                              const allEmojis = Object.values(eventCategories).flat();
+                              const currentIdx = allEmojis.indexOf(editingEvent ? editingEvent.emoji : newEventData.emoji);
+                              const nextIdx = (currentIdx + 1) % allEmojis.length;
+                              if (editingEvent) {
+                                setEditingEvent({ ...editingEvent, emoji: allEmojis[nextIdx] });
+                              } else {
+                                setNewEventData({ ...newEventData, emoji: allEmojis[nextIdx] });
+                              }
+                            }}
+                          >
+                            {editingEvent ? editingEvent.emoji : newEventData.emoji}
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Event name"
+                          value={editingEvent ? editingEvent.name : newEventData.name}
+                          onChange={(e) => {
+                            if (editingEvent) {
+                              setEditingEvent({ ...editingEvent, name: e.target.value });
+                            } else {
+                              setNewEventData({ ...newEventData, name: e.target.value });
+                            }
+                          }}
+                          className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      {/* Date & Time */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-sm text-slate-400 mb-1">Date</label>
+                          <input
+                            type="date"
+                            value={editingEvent ? editingEvent.date : newEventData.date}
+                            onChange={(e) => {
+                              if (editingEvent) {
+                                setEditingEvent({ ...editingEvent, date: e.target.value });
+                              } else {
+                                setNewEventData({ ...newEventData, date: e.target.value });
+                              }
+                            }}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-slate-400 mb-1">Start Time</label>
+                          <input
+                            type="time"
+                            value={editingEvent ? editingEvent.time : newEventData.time}
+                            onChange={(e) => {
+                              if (editingEvent) {
+                                setEditingEvent({ ...editingEvent, time: e.target.value });
+                              } else {
+                                setNewEventData({ ...newEventData, time: e.target.value });
+                              }
+                            }}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-slate-400 mb-1">End Time</label>
+                          <input
+                            type="time"
+                            value={editingEvent ? editingEvent.endTime : newEventData.endTime}
+                            onChange={(e) => {
+                              if (editingEvent) {
+                                setEditingEvent({ ...editingEvent, endTime: e.target.value });
+                              } else {
+                                setNewEventData({ ...newEventData, endTime: e.target.value });
+                              }
+                            }}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Location */}
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-1">Location</label>
+                        <input
+                          type="text"
+                          placeholder="Address or location name"
+                          value={editingEvent ? editingEvent.location : newEventData.location}
+                          onChange={(e) => {
+                            if (editingEvent) {
+                              setEditingEvent({ ...editingEvent, location: e.target.value });
+                            } else {
+                              setNewEventData({ ...newEventData, location: e.target.value });
+                            }
+                          }}
+                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      {/* Entry Code */}
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-1">Entry Instructions (optional)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Buzzer #4B, Gate code 1234"
+                          value={editingEvent ? editingEvent.entryCode : newEventData.entryCode}
+                          onChange={(e) => {
+                            if (editingEvent) {
+                              setEditingEvent({ ...editingEvent, entryCode: e.target.value });
+                            } else {
+                              setNewEventData({ ...newEventData, entryCode: e.target.value });
+                            }
+                          }}
+                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      {/* Description */}
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-1">Description</label>
+                        <textarea
+                          placeholder="What's this event about?"
+                          value={editingEvent ? editingEvent.description : newEventData.description}
+                          onChange={(e) => {
+                            if (editingEvent) {
+                              setEditingEvent({ ...editingEvent, description: e.target.value });
+                            } else {
+                              setNewEventData({ ...newEventData, description: e.target.value });
+                            }
+                          }}
+                          rows={3}
+                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 resize-none"
+                        />
+                      </div>
+
+                      {/* Color Picker */}
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-2">Theme Color</label>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            'from-purple-400 to-pink-500',
+                            'from-blue-400 to-cyan-500',
+                            'from-green-400 to-emerald-500',
+                            'from-amber-400 to-orange-500',
+                            'from-red-400 to-pink-500',
+                            'from-indigo-400 to-purple-500',
+                            'from-teal-400 to-blue-500',
+                            'from-yellow-400 to-amber-500',
+                          ].map(color => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => {
+                                if (editingEvent) {
+                                  setEditingEvent({ ...editingEvent, color });
+                                } else {
+                                  setNewEventData({ ...newEventData, color });
+                                }
+                              }}
+                              className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} border-2 transition ${
+                                (editingEvent ? editingEvent.color : newEventData.color) === color
+                                  ? 'border-white scale-110'
+                                  : 'border-transparent hover:border-white/50'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-3 pt-4">
+                        {editingEvent && (
+                          <button
+                            onClick={() => {
+                              if (confirm('Delete this event?')) {
+                                const newEvents = partyEvents.filter(e => e.id !== editingEvent.id);
+                                setPartyEvents(newEvents);
+                                savePartyEventsToFirestore(newEvents);
+                                setEditingEvent(null);
+                                setSelectedPartyEvent(null);
+                              }
+                            }}
+                            className="px-4 py-3 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition"
+                          >
+                            Delete
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setShowAddEventModal(false);
+                            setEditingEvent(null);
+                            setNewEventData({
+                              name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
+                              location: '', entryCode: '', description: '', color: 'from-purple-400 to-pink-500'
+                            });
+                          }}
+                          className="flex-1 px-4 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20 transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (editingEvent) {
+                              // Update existing event
+                              const newEvents = partyEvents.map(e =>
+                                e.id === editingEvent.id ? { ...editingEvent, updatedAt: new Date().toISOString() } : e
+                              );
+                              setPartyEvents(newEvents);
+                              setSelectedPartyEvent(newEvents.find(e => e.id === editingEvent.id));
+                              savePartyEventsToFirestore(newEvents);
+                              setEditingEvent(null);
+                            } else {
+                              // Create new event
+                              const newEvent = {
+                                ...newEventData,
+                                id: `event-${Date.now()}`,
+                                guests: [],
+                                tasks: [],
+                                createdBy: currentUser,
+                                createdAt: new Date().toISOString()
+                              };
+                              const newEvents = [...partyEvents, newEvent];
+                              setPartyEvents(newEvents);
+                              savePartyEventsToFirestore(newEvents);
+                              setShowAddEventModal(false);
+                              setNewEventData({
+                                name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
+                                location: '', entryCode: '', description: '', color: 'from-purple-400 to-pink-500'
+                              });
+                            }
+                          }}
+                          disabled={!(editingEvent ? editingEvent.name && editingEvent.date : newEventData.name && newEventData.date)}
+                          className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {editingEvent ? 'Save Changes' : 'Create Event'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {/* ========== END EVENTS SECTION ========== */}
+
           {/* ========== LIFE PLANNING SECTION ========== */}
           {activeSection === 'lifePlanning' && (
             <div className="mt-8">
@@ -5650,6 +7245,632 @@ export default function TripPlanner() {
             </div>
           )}
           {/* ========== END LIFE PLANNING SECTION ========== */}
+
+          {/* ========== BUSINESS SECTION ========== */}
+          {activeSection === 'business' && (
+            <div className="mt-8">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-white mb-2">💼 Business</h2>
+                <p className="text-slate-400">Build and grow together</p>
+              </div>
+
+              {/* Coming Soon Placeholder */}
+              <div className="bg-gradient-to-r from-slate-500/20 to-zinc-500/20 rounded-3xl p-8 text-center border border-slate-500/30">
+                <div className="text-6xl mb-4">🚀</div>
+                <h3 className="text-2xl font-bold text-white mb-2">Business Section Coming Soon!</h3>
+                <p className="text-slate-300 mb-4">Track your business ventures:</p>
+                <div className="flex justify-center gap-4 flex-wrap">
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-slate-300">
+                    📊 Projects
+                  </div>
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-slate-300">
+                    💰 Finances
+                  </div>
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-slate-300">
+                    📈 Goals
+                  </div>
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-slate-300">
+                    🤝 Partnerships
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* ========== END BUSINESS SECTION ========== */}
+
+          {/* ========== MEMORIES SECTION ========== */}
+          {activeSection === 'memories' && (
+            <div className="mt-8">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-white mb-2">💝 Our Memories</h2>
+                <p className="text-slate-400">The story of us, one moment at a time</p>
+              </div>
+
+              {/* View Switcher */}
+              <div className="flex justify-center gap-2 mb-8">
+                {[
+                  { id: 'timeline', label: 'Timeline', emoji: '📅' },
+                  { id: 'events', label: 'Events', emoji: '🎭' },
+                  { id: 'media', label: 'Media', emoji: '📸' },
+                ].map(view => (
+                  <button
+                    key={view.id}
+                    onClick={() => setMemoriesView(view.id)}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition ${
+                      memoriesView === view.id
+                        ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg'
+                        : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+                    }`}
+                  >
+                    <span>{view.emoji}</span>
+                    {view.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Timeline View */}
+              {memoriesView === 'timeline' && (
+                <div className="relative">
+                  {/* Timeline line */}
+                  <div className="absolute left-1/2 transform -translate-x-1/2 w-1 bg-gradient-to-b from-rose-500 via-pink-500 to-purple-500 h-full rounded-full" />
+
+                  {/* Timeline events - dynamically built */}
+                  <div className="space-y-12">
+                    {(() => {
+                      const today = new Date();
+                      const timelineEvents = [];
+
+                      // Add all memories from state to timeline
+                      const categoryIcons = {
+                        milestone: '✨',
+                        datenight: '🥂',
+                        travel: '✈️',
+                        fitness: '🏆',
+                        concert: '🎵',
+                        pride: '🏳️‍🌈',
+                        karaoke: '🎤'
+                      };
+                      memories.forEach(memory => {
+                        const memDate = parseLocalDate(memory.date);
+                        timelineEvents.push({
+                          id: memory.id,
+                          isMemory: true,
+                          date: memDate,
+                          year: memDate.getFullYear().toString(),
+                          month: memDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
+                          title: memory.title,
+                          description: memory.description,
+                          icon: memory.icon || categoryIcons[memory.category] || '✨',
+                          location: memory.location,
+                          image: memory.image,
+                          link: memory.link,
+                          comment: memory.comment,
+                          category: memory.category,
+                          memory: memory
+                        });
+                      });
+
+                      // Add past trips to timeline
+                      trips.filter(trip => {
+                        if (!trip.dates?.end) return false;
+                        const endDate = parseLocalDate(trip.dates.end);
+                        return endDate < today;
+                      }).forEach(trip => {
+                        const tripDate = parseLocalDate(trip.dates.start);
+                        timelineEvents.push({
+                          id: `trip-${trip.id}`,
+                          isTrip: true,
+                          date: tripDate,
+                          year: tripDate.getFullYear().toString(),
+                          month: tripDate.toLocaleDateString('en-US', { month: 'long' }),
+                          title: `${trip.emoji} ${trip.destination}`,
+                          description: `Our adventure to ${trip.destination}`,
+                          icon: trip.emoji,
+                          image: trip.coverImage
+                        });
+                      });
+
+                      // Add completed fitness events to timeline
+                      const fitnessEvents = [
+                        { id: 'indy-half-2026', name: 'Indy Half Marathon', date: '2026-05-02', emoji: '🏃' },
+                        { id: 'triathlon-2026', name: 'Triathlon', date: '2026-09-20', emoji: '🏊' },
+                      ];
+                      fitnessEvents.forEach(event => {
+                        const eventDate = parseLocalDate(event.date);
+                        if (eventDate < today) {
+                          timelineEvents.push({
+                            id: `fitness-${event.id}`,
+                            isFitness: true,
+                            date: eventDate,
+                            year: eventDate.getFullYear().toString(),
+                            month: eventDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
+                            title: `${event.emoji} ${event.name}`,
+                            description: 'We did it together!',
+                            icon: '🏆'
+                          });
+                        }
+                      });
+
+                      // Add "present" marker
+                      timelineEvents.push({
+                        id: 'present',
+                        isPresent: true,
+                        date: today,
+                        year: today.getFullYear().toString(),
+                        month: 'Present',
+                        title: 'Building Our Story 🌈',
+                        description: 'And the adventure continues...',
+                        icon: '🚀'
+                      });
+
+                      // Sort by date and alternate sides
+                      return timelineEvents
+                        .sort((a, b) => a.date - b.date)
+                        .map((event, idx) => ({ ...event, side: idx % 2 === 0 ? 'left' : 'right' }));
+                    })().map((event, idx) => (
+                      <div key={event.id} className={`flex items-center gap-8 ${event.side === 'right' ? 'flex-row-reverse' : ''}`}>
+                        <div className={`w-5/12 ${event.side === 'right' ? 'text-left' : 'text-right'}`}>
+                          <div
+                            onClick={() => event.isMemory && setEditingMemory(event.memory)}
+                            onDragOver={(e) => { if (event.isMemory) { e.preventDefault(); setDragOverMemoryId(event.memory?.id); }}}
+                            onDragLeave={() => setDragOverMemoryId(null)}
+                            onDrop={(e) => event.isMemory && handleCardDrop(e, event.memory?.id)}
+                            className={`backdrop-blur-sm rounded-2xl p-6 transition group relative ${event.isMemory ? 'cursor-pointer' : ''} ${
+                              event.memory?.isSpecial || event.memory?.isFirstTime
+                                ? 'special-memory-card'
+                                : 'bg-white/10 border-2 border-white/20 hover:border-rose-400/50'
+                            } ${dragOverMemoryId === event.memory?.id ? 'ring-4 ring-orange-500 ring-opacity-50' : ''}`}
+                          >
+                            {/* Upload indicator */}
+                            {uploadingToMemoryId === event.memory?.id && (
+                              <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center z-10">
+                                <Loader className="w-8 h-8 text-orange-500 animate-spin" />
+                              </div>
+                            )}
+                            {/* Drop indicator */}
+                            {dragOverMemoryId === event.memory?.id && (
+                              <div className="absolute inset-0 bg-orange-500/20 rounded-2xl flex items-center justify-center z-10 pointer-events-none">
+                                <div className="text-orange-400 font-semibold">Drop photo here</div>
+                              </div>
+                            )}
+                            {/* Memory highlight indicators */}
+                            {event.memory?.isFirstTime && (
+                              <div className="absolute -top-2 -right-2 text-2xl">🎉</div>
+                            )}
+                            {event.memory?.isSpecial && !event.memory?.isFirstTime && (
+                              <div className="absolute -top-2 -right-2 text-2xl">🌈</div>
+                            )}
+                            {/* Edit button for memories */}
+                            {event.isMemory && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingMemory(event.memory); }}
+                                className={`absolute ${event.side === 'right' ? 'right-3' : 'left-3'} top-3 p-1.5 bg-white/10 hover:bg-white/20 rounded-lg opacity-0 group-hover:opacity-100 transition`}
+                              >
+                                <Pencil className="w-4 h-4 text-white/70" />
+                              </button>
+                            )}
+                            {/* Image if exists (random from images array, or from link field if it's an image URL) */}
+                            {(() => {
+                              const isLinkImage = event.link && /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(event.link);
+                              const imageUrl = (event.memory ? getRandomMemoryImage(event.memory) : event.image) || (isLinkImage ? event.link : null);
+                              return imageUrl ? (
+                                <div className="mb-3 -mx-2 -mt-2">
+                                  <img src={imageUrl} alt="" className="w-full h-32 object-cover rounded-lg" />
+                                </div>
+                              ) : null;
+                            })()}
+                            <div className="text-4xl mb-3">{event.icon}</div>
+                            <div className="text-rose-400 text-sm font-medium mb-1">{event.month} {event.year}</div>
+                            <h3 className="text-xl font-bold text-white mb-2">{event.title}</h3>
+                            <p className="text-slate-300">{event.description}</p>
+                            {event.location && (
+                              <p className="text-slate-400 text-sm mt-2 flex items-center gap-1 justify-center">
+                                <MapPin className="w-3 h-3" /> {event.location}
+                              </p>
+                            )}
+                            {event.comment && (
+                              <p className="text-slate-400 text-sm mt-2 italic">"{event.comment}"</p>
+                            )}
+                            {event.link && !/\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(event.link) && (
+                              <a href={event.link} target="_blank" rel="noopener noreferrer" className="text-rose-400 text-sm mt-2 flex items-center gap-1 hover:underline justify-center">
+                                <ExternalLink className="w-3 h-3" /> View more
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                        <div className="w-2/12 flex justify-center">
+                          <div className="w-6 h-6 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full border-4 border-slate-900 z-10 shadow-lg" />
+                        </div>
+                        <div className="w-5/12" />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add Memory Button */}
+                  <div className="mt-12 text-center">
+                    <button
+                      onClick={() => setShowAddMemoryModal('milestone')}
+                      className="flex items-center gap-2 mx-auto px-6 py-3 bg-gradient-to-r from-rose-500 to-pink-500 text-white font-semibold rounded-full hover:opacity-90 transition shadow-lg"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Add Memory
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Events View */}
+              {memoriesView === 'events' && (
+                <div className="space-y-8">
+                  {/* Event Categories - Dynamic from app data */}
+                  {(() => {
+                    const today = new Date();
+
+                    // Get past trips (where end date has passed)
+                    const pastTrips = trips.filter(trip => {
+                      if (!trip.dates?.end) return false;
+                      const endDate = parseLocalDate(trip.dates.end);
+                      return endDate < today;
+                    }).map(trip => ({
+                      id: `trip-${trip.id}`,
+                      title: `${trip.emoji} ${trip.destination}`,
+                      date: new Date(trip.dates.start).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                      location: trip.destination,
+                      image: trip.coverImage,
+                      isTrip: true
+                    }));
+
+                    // Get completed fitness events (races that have passed)
+                    const completedFitnessEvents = [];
+                    const fitnessEventsData = [
+                      { id: 'indy-half-2026', name: 'Indy Half Marathon', date: '2026-05-02', location: 'Indianapolis, IN', emoji: '🏃' },
+                      { id: 'triathlon-2026', name: 'Triathlon', date: '2026-09-20', location: 'TBD', emoji: '🏊' },
+                    ];
+                    fitnessEventsData.forEach(event => {
+                      const eventDate = parseLocalDate(event.date);
+                      if (eventDate < today) {
+                        completedFitnessEvents.push({
+                          id: `fitness-${event.id}`,
+                          title: `${event.emoji} ${event.name}`,
+                          date: eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                          location: event.location,
+                          isFitness: true
+                        });
+                      }
+                    });
+
+                    // Get memories by category
+                    const getMemoriesByCategory = (cat) => memories.filter(m => m.category === cat).map(m => ({
+                      ...m,
+                      isMemory: true,
+                      date: m.date ? parseLocalDate(m.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No date'
+                    }));
+
+                    // Get past party events
+                    const pastPartyEvents = partyEvents.filter(event => {
+                      if (!event.date) return false;
+                      const eventDate = parseLocalDate(event.date);
+                      return eventDate < today;
+                    }).map(event => ({
+                      id: `party-${event.id}`,
+                      title: event.name,
+                      emoji: event.emoji,
+                      date: event.date ? parseLocalDate(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No date',
+                      location: event.location,
+                      image: (event.images || [])[0],
+                      images: event.images || [],
+                      isPartyEvent: true,
+                      partyEvent: event
+                    }));
+
+                    const categories = [
+                      {
+                        id: 'datenight',
+                        category: 'Dates',
+                        emoji: '🥂',
+                        color: 'from-rose-500/20 to-pink-500/20',
+                        borderColor: 'border-rose-500/30',
+                        events: getMemoriesByCategory('datenight')
+                      },
+                      {
+                        id: 'travel',
+                        category: 'Travel Adventures',
+                        emoji: '✈️',
+                        color: 'from-teal-500/20 to-cyan-500/20',
+                        borderColor: 'border-teal-500/30',
+                        events: [...pastTrips, ...getMemoriesByCategory('travel')]
+                      },
+                      {
+                        id: 'fitness',
+                        category: 'Fitness Achievements',
+                        emoji: '🏆',
+                        color: 'from-orange-500/20 to-red-500/20',
+                        borderColor: 'border-orange-500/30',
+                        events: [...completedFitnessEvents, ...getMemoriesByCategory('fitness')]
+                      },
+                      {
+                        id: 'concert',
+                        category: 'Concerts & Shows',
+                        emoji: '🎵',
+                        color: 'from-purple-500/20 to-indigo-500/20',
+                        borderColor: 'border-purple-500/30',
+                        events: getMemoriesByCategory('concert')
+                      },
+                      {
+                        id: 'pride',
+                        category: 'Pride & Community',
+                        emoji: '🏳️‍🌈',
+                        color: 'from-amber-500/20 to-orange-500/20',
+                        borderColor: 'border-amber-500/30',
+                        events: getMemoriesByCategory('pride')
+                      },
+                      {
+                        id: 'karaoke',
+                        category: 'Songs & Karaoke',
+                        emoji: '🎤',
+                        color: 'from-fuchsia-500/20 to-pink-500/20',
+                        borderColor: 'border-fuchsia-500/30',
+                        events: getMemoriesByCategory('karaoke')
+                      },
+                      {
+                        id: 'parties',
+                        category: 'Parties & Gatherings',
+                        emoji: '🎉',
+                        color: 'from-violet-500/20 to-purple-500/20',
+                        borderColor: 'border-violet-500/30',
+                        events: pastPartyEvents
+                      },
+                    ];
+
+                    return categories;
+                  })().map((cat) => (
+                    <div key={cat.id} className={`bg-gradient-to-r ${cat.color} rounded-3xl p-6 border ${cat.borderColor}`}>
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="text-3xl">{cat.emoji}</span>
+                        <h3 className="text-xl font-bold text-white">{cat.category}</h3>
+                        <span className="text-white/50 text-sm">({cat.events.length} memories)</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {cat.events.map((event) => (
+                          <div
+                            key={event.id}
+                            onClick={() => {
+                              if (event.isMemory) setEditingMemory(event);
+                              else if (event.isPartyEvent) {
+                                setActiveSection('events');
+                                setSelectedPartyEvent(event.partyEvent);
+                              }
+                            }}
+                            onDragOver={(e) => {
+                              if (event.isMemory || event.isPartyEvent) {
+                                e.preventDefault();
+                                if (event.isMemory) setDragOverMemoryId(event.id);
+                                else if (event.isPartyEvent) setDragOverEventId(event.partyEvent.id);
+                              }
+                            }}
+                            onDragLeave={() => {
+                              setDragOverMemoryId(null);
+                              setDragOverEventId(null);
+                            }}
+                            onDrop={(e) => {
+                              if (event.isMemory) handleCardDrop(e, event.id);
+                              else if (event.isPartyEvent) handleEventCardDrop(e, event.partyEvent.id);
+                            }}
+                            className={`rounded-xl p-4 hover:bg-white/20 transition ${(event.isMemory || event.isPartyEvent) ? 'cursor-pointer' : ''} relative group ${
+                              event.isSpecial || event.isFirstTime ? 'special-memory-card' : 'bg-white/10'
+                            } ${dragOverMemoryId === event.id ? 'ring-4 ring-orange-500 ring-opacity-50' : ''} ${
+                              event.isPartyEvent && dragOverEventId === event.partyEvent?.id ? 'ring-4 ring-purple-500 ring-opacity-50' : ''
+                            }`}
+                          >
+                            {/* Upload indicator */}
+                            {uploadingToMemoryId === event.id && (
+                              <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center z-10">
+                                <Loader className="w-6 h-6 text-orange-500 animate-spin" />
+                              </div>
+                            )}
+                            {event.isPartyEvent && uploadingToEventId === event.partyEvent?.id && (
+                              <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center z-10">
+                                <Loader className="w-6 h-6 text-purple-500 animate-spin" />
+                              </div>
+                            )}
+                            {/* Drop indicator */}
+                            {dragOverMemoryId === event.id && (
+                              <div className="absolute inset-0 bg-orange-500/20 rounded-xl flex items-center justify-center z-10 pointer-events-none">
+                                <div className="text-orange-400 text-sm font-semibold">Drop photo</div>
+                              </div>
+                            )}
+                            {event.isPartyEvent && dragOverEventId === event.partyEvent?.id && (
+                              <div className="absolute inset-0 bg-purple-500/20 rounded-xl flex items-center justify-center z-10 pointer-events-none">
+                                <div className="text-purple-400 text-sm font-semibold">Drop photo</div>
+                              </div>
+                            )}
+                            {/* Memory highlight indicators */}
+                            {event.isFirstTime && (
+                              <div className="absolute -top-1 -right-1 text-lg">🎉</div>
+                            )}
+                            {event.isSpecial && !event.isFirstTime && (
+                              <div className="absolute -top-1 -right-1 text-lg">🌈</div>
+                            )}
+                            {/* Party event indicator */}
+                            {event.isPartyEvent && event.emoji && (
+                              <div className="absolute -top-1 -right-1 text-lg">{event.emoji}</div>
+                            )}
+                            {/* Edit button for memories */}
+                            {event.isMemory && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingMemory(event); }}
+                                className="absolute top-2 right-2 p-1.5 bg-white/10 hover:bg-white/20 rounded-lg opacity-0 group-hover:opacity-100 transition"
+                              >
+                                <Pencil className="w-3 h-3 text-white/70" />
+                              </button>
+                            )}
+                            {/* Image thumbnail (random from images array, or from link field if it's an image URL) */}
+                            {(() => {
+                              const isLinkImage = event.link && /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(event.link);
+                              const imageUrl = (event.isMemory ? getRandomMemoryImage(event) : event.image) || (isLinkImage ? event.link : null);
+                              return imageUrl ? (
+                                <div className="mb-2 -mx-2 -mt-2">
+                                  <img src={imageUrl} alt="" className="w-full h-20 object-cover rounded-t-lg" />
+                                </div>
+                              ) : null;
+                            })()}
+                            <h4 className="font-semibold text-white mb-1">{event.title}</h4>
+                            <p className="text-slate-400 text-sm">{event.date}</p>
+                            {event.location && (
+                              <p className="text-slate-500 text-xs flex items-center gap-1 mt-1">
+                                <MapPin className="w-3 h-3" />
+                                {event.location}
+                              </p>
+                            )}
+                            {event.comment && (
+                              <p className="text-slate-400 text-xs mt-2 italic truncate">"{event.comment}"</p>
+                            )}
+                            {/* Photo count for party events */}
+                            {event.isPartyEvent && (event.images || []).length > 0 && (
+                              <p className="text-slate-500 text-xs mt-1 flex items-center gap-1">
+                                <Image className="w-3 h-3" />
+                                {(event.images || []).length} photos
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => setShowAddMemoryModal(cat.id)}
+                          className="bg-white/5 rounded-xl p-4 border-2 border-dashed border-white/20 hover:border-white/40 transition flex items-center justify-center gap-2 text-white/50 hover:text-white/70"
+                        >
+                          <Plus className="w-5 h-5" />
+                          Add Memory
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Media View */}
+              {memoriesView === 'media' && (() => {
+                // Collect all photos from memories
+                const memoryPhotos = memories.flatMap(memory => {
+                  const images = getMemoryImages(memory);
+                  return images.map(img => ({
+                    src: img,
+                    memory: memory,
+                    event: null,
+                    title: memory.title,
+                    date: memory.date,
+                    category: memory.category,
+                    type: 'memory'
+                  }));
+                });
+
+                // Collect all photos from events
+                const eventPhotos = partyEvents.flatMap(event => {
+                  const images = event.images || [];
+                  return images.map(img => ({
+                    src: img,
+                    memory: null,
+                    event: event,
+                    title: event.name,
+                    date: event.date,
+                    category: 'events',
+                    type: 'event'
+                  }));
+                });
+
+                // Combine and sort by date
+                const allPhotos = [...memoryPhotos, ...eventPhotos].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                // Get category counts for albums (including events)
+                const categoryAlbums = [
+                  { id: 'datenight', name: 'Dates', emoji: '🥂' },
+                  { id: 'travel', name: 'Travel', emoji: '✈️' },
+                  { id: 'fitness', name: 'Fitness', emoji: '🏆' },
+                  { id: 'concert', name: 'Concerts & Shows', emoji: '🎵' },
+                  { id: 'pride', name: 'Pride', emoji: '🏳️‍🌈' },
+                  { id: 'karaoke', name: 'Songs & Karaoke', emoji: '🎤' },
+                  { id: 'milestone', name: 'Milestones', emoji: '⭐' },
+                  { id: 'events', name: 'Events & Parties', emoji: '🎉' },
+                ].map(cat => ({
+                  ...cat,
+                  count: allPhotos.filter(p => p.category === cat.id).length
+                })).filter(cat => cat.count > 0);
+
+                const memoriesWithPhotos = memories.filter(m => getMemoryImages(m).length > 0).length;
+                const eventsWithPhotos = partyEvents.filter(e => (e.images || []).length > 0).length;
+
+                return (
+                <div className="space-y-8">
+                  {/* Photo count */}
+                  <div className="text-center">
+                    <p className="text-white/60">
+                      {allPhotos.length} photos from {memoriesWithPhotos} memories
+                      {eventsWithPhotos > 0 && ` and ${eventsWithPhotos} events`}
+                    </p>
+                  </div>
+
+                  {/* Photo Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {allPhotos.map((photo, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => {
+                          if (photo.type === 'memory' && photo.memory) {
+                            setEditingMemory(photo.memory);
+                          } else if (photo.type === 'event' && photo.event) {
+                            setActiveSection('events');
+                            setSelectedPartyEvent(photo.event);
+                          }
+                        }}
+                        className="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer"
+                      >
+                        <img
+                          src={photo.src}
+                          alt={photo.title}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition" />
+                        <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition">
+                          <div className="flex items-center gap-1 mb-1">
+                            {photo.type === 'event' && <span className="text-xs bg-purple-500/80 px-1.5 py-0.5 rounded">Event</span>}
+                            <p className="text-white font-medium text-sm truncate">{photo.title}</p>
+                          </div>
+                          <p className="text-white/60 text-xs">{photo.date}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {allPhotos.length === 0 && (
+                      <div className="col-span-full text-center py-12">
+                        <div className="text-6xl mb-4">📷</div>
+                        <p className="text-white/60">No photos yet</p>
+                        <p className="text-white/40 text-sm mt-1">Add photos to your memories or events to see them here</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Albums by Category */}
+                  {categoryAlbums.length > 0 && (
+                    <div className="mt-12">
+                      <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Folder className="w-5 h-5" />
+                        Albums by Category
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {categoryAlbums.map((album, idx) => (
+                          <div key={idx} className="bg-white/10 rounded-2xl p-4 hover:bg-white/20 transition cursor-pointer group">
+                            <div className="text-4xl mb-2">{album.emoji}</div>
+                            <h4 className="font-semibold text-white">{album.name}</h4>
+                            <p className="text-slate-400 text-sm">{album.count} photo{album.count !== 1 ? 's' : ''}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                );
+              })()}
+            </div>
+          )}
+          {/* ========== END MEMORIES SECTION ========== */}
 
         </div>
       </main>
@@ -5698,6 +7919,696 @@ export default function TripPlanner() {
         <MyProfileModal onClose={() => setShowMyProfileModal(false)} />
       )}
 
+      {/* Edit Training Week Modal */}
+      {editingTrainingWeek && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-white/10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">
+                  Edit Week {editingTrainingWeek.week.weekNumber || getActiveTrainingPlan(editingTrainingWeek.eventId).findIndex(w => w.id === editingTrainingWeek.week.id) + 1}
+                </h2>
+                <button
+                  onClick={() => setEditingTrainingWeek(null)}
+                  className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-white/60 text-sm mt-1">
+                {formatDate(editingTrainingWeek.week.startDate)} - {formatDate(editingTrainingWeek.week.endDate)}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Runs Section */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-orange-300">🏃 Runs</h3>
+                  <button
+                    onClick={() => {
+                      const newRun = {
+                        id: Date.now(),
+                        label: 'New Run',
+                        distance: '0',
+                        mike: false,
+                        adam: false,
+                        notes: ''
+                      };
+                      setEditingTrainingWeek(prev => ({
+                        ...prev,
+                        week: {
+                          ...prev.week,
+                          runs: [...(prev.week.runs || []), newRun]
+                        }
+                      }));
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 text-orange-300 rounded-lg text-sm hover:bg-orange-500/30 transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Run
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {editingTrainingWeek.week.runs?.map((run, idx) => (
+                    <div key={run.id} className="flex items-center gap-3 bg-white/5 rounded-lg p-3">
+                      <input
+                        type="text"
+                        value={run.label || ''}
+                        onChange={(e) => {
+                          const updatedRuns = [...editingTrainingWeek.week.runs];
+                          updatedRuns[idx] = { ...run, label: e.target.value };
+                          setEditingTrainingWeek(prev => ({
+                            ...prev,
+                            week: { ...prev.week, runs: updatedRuns }
+                          }));
+                        }}
+                        className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                        placeholder="Run name"
+                      />
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={run.distance || ''}
+                          onChange={(e) => {
+                            const updatedRuns = [...editingTrainingWeek.week.runs];
+                            updatedRuns[idx] = { ...run, distance: e.target.value };
+                            setEditingTrainingWeek(prev => ({
+                              ...prev,
+                              week: { ...prev.week, runs: updatedRuns }
+                            }));
+                          }}
+                          className="w-20 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm text-center"
+                          placeholder="0"
+                          step="0.1"
+                        />
+                        <span className="text-white/60 text-sm">mi</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const updatedRuns = editingTrainingWeek.week.runs.filter((_, i) => i !== idx);
+                          setEditingTrainingWeek(prev => ({
+                            ...prev,
+                            week: { ...prev.week, runs: updatedRuns }
+                          }));
+                        }}
+                        className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cross Training Section */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-red-300">💪 Cross Training</h3>
+                  <button
+                    onClick={() => {
+                      const newCT = {
+                        id: Date.now(),
+                        label: 'New Cross Training',
+                        mike: false,
+                        adam: false,
+                        notes: ''
+                      };
+                      setEditingTrainingWeek(prev => ({
+                        ...prev,
+                        week: {
+                          ...prev.week,
+                          crossTraining: [...(prev.week.crossTraining || []), newCT]
+                        }
+                      }));
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-red-500/20 text-red-300 rounded-lg text-sm hover:bg-red-500/30 transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Cross Training
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {editingTrainingWeek.week.crossTraining?.map((ct, idx) => (
+                    <div key={ct.id} className="flex items-center gap-3 bg-white/5 rounded-lg p-3">
+                      <input
+                        type="text"
+                        value={ct.label || ''}
+                        onChange={(e) => {
+                          const updatedCT = [...editingTrainingWeek.week.crossTraining];
+                          updatedCT[idx] = { ...ct, label: e.target.value };
+                          setEditingTrainingWeek(prev => ({
+                            ...prev,
+                            week: { ...prev.week, crossTraining: updatedCT }
+                          }));
+                        }}
+                        className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                        placeholder="Activity name"
+                      />
+                      <button
+                        onClick={() => {
+                          const updatedCT = editingTrainingWeek.week.crossTraining.filter((_, i) => i !== idx);
+                          setEditingTrainingWeek(prev => ({
+                            ...prev,
+                            week: { ...prev.week, crossTraining: updatedCT }
+                          }));
+                        }}
+                        className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Week Notes */}
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-3">📝 Week Notes</h3>
+                <textarea
+                  value={editingTrainingWeek.week.weekNotes || ''}
+                  onChange={(e) => {
+                    setEditingTrainingWeek(prev => ({
+                      ...prev,
+                      week: { ...prev.week, weekNotes: e.target.value }
+                    }));
+                  }}
+                  placeholder="Add notes for this week..."
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 resize-none"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-white/10 flex justify-end gap-3">
+              <button
+                onClick={() => setEditingTrainingWeek(null)}
+                className="px-5 py-2.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  // Save the edited week
+                  const { eventId, week } = editingTrainingWeek;
+
+                  // Calculate new total miles
+                  const totalMiles = week.runs?.reduce((sum, run) => sum + (parseFloat(run.distance) || 0), 0) || 0;
+
+                  // Update the training plan
+                  updateTrainingWeek(eventId, week.id, {
+                    runs: week.runs,
+                    crossTraining: week.crossTraining,
+                    weekNotes: week.weekNotes,
+                    totalMiles: totalMiles
+                  });
+
+                  setEditingTrainingWeek(null);
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-lg hover:opacity-90 transition"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Memory Modal */}
+      {editingMemory && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-white/10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">Edit Memory</h2>
+                <button
+                  onClick={() => setEditingMemory(null)}
+                  className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Title</label>
+                <input
+                  type="text"
+                  value={editingMemory.title || ''}
+                  onChange={(e) => setEditingMemory(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40"
+                  placeholder="Memory title"
+                />
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={editingMemory.date || ''}
+                  onChange={(e) => setEditingMemory(prev => ({ ...prev, date: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white"
+                />
+              </div>
+
+              {/* Location */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Location</label>
+                <input
+                  type="text"
+                  value={editingMemory.location || ''}
+                  onChange={(e) => setEditingMemory(prev => ({ ...prev, location: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40"
+                  placeholder="Where did this happen?"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={editingMemory.description || ''}
+                  onChange={(e) => setEditingMemory(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40"
+                  placeholder="Short description"
+                />
+              </div>
+
+              {/* Images */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">
+                  Images ({getMemoryImages(editingMemory).length})
+                </label>
+                <div
+                  className={`border-2 border-dashed rounded-xl p-4 transition ${
+                    dragOver ? 'border-orange-500 bg-orange-500/10' : 'border-white/20'
+                  }`}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => handleDrop(e, true)}
+                >
+                  {/* Existing images grid */}
+                  {getMemoryImages(editingMemory).length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {getMemoryImages(editingMemory).map((img, idx) => (
+                        <div key={idx} className="relative group aspect-square">
+                          <img src={img} alt="" className="w-full h-full object-cover rounded-lg" />
+                          <button
+                            onClick={() => {
+                              const allImages = getMemoryImages(editingMemory);
+                              const newImages = allImages.filter((_, i) => i !== idx);
+                              setEditingMemory(prev => ({ ...prev, images: newImages, image: '' }));
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition"
+                            title="Remove image"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Upload area */}
+                  <div className="flex gap-2">
+                    <label className={`flex-1 px-4 py-3 rounded-lg cursor-pointer flex items-center justify-center gap-2 transition border-2 border-dashed ${
+                      uploadingPhoto ? 'bg-white/5 text-white/40 border-white/10' : 'bg-white/5 hover:bg-white/10 text-white/70 border-white/20 hover:border-orange-500'
+                    }`}>
+                      {uploadingPhoto ? <Loader className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                      <span>{uploadingPhoto ? 'Uploading...' : 'Add Photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingPhoto}
+                        onChange={(e) => e.target.files?.[0] && uploadMemoryPhoto(e.target.files[0], true)}
+                      />
+                    </label>
+                  </div>
+                  {dragOver && (
+                    <div className="text-center text-orange-400 mt-2 text-sm">Drop image here to add</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Link / Video */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Link (Video URL)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={editingMemory.link || ''}
+                    onChange={(e) => setEditingMemory(prev => ({ ...prev, link: e.target.value }))}
+                    className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40"
+                    placeholder="YouTube, Sora, or other video link..."
+                  />
+                  {editingMemory.link && (
+                    <button
+                      onClick={() => setEditingMemory(prev => ({ ...prev, link: '' }))}
+                      className="px-3 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition"
+                      title="Remove link"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Comment */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Comment / Note</label>
+                <textarea
+                  value={editingMemory.comment || ''}
+                  onChange={(e) => setEditingMemory(prev => ({ ...prev, comment: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 resize-none"
+                  rows={3}
+                  placeholder="Any personal notes or comments..."
+                />
+              </div>
+
+              {/* Icon (for timeline) */}
+              {editingMemory.category === 'milestone' && (
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Icon (emoji)</label>
+                  <input
+                    type="text"
+                    value={editingMemory.icon || ''}
+                    onChange={(e) => setEditingMemory(prev => ({ ...prev, icon: e.target.value }))}
+                    className="w-24 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-center text-2xl"
+                    placeholder="✨"
+                  />
+                </div>
+              )}
+
+              {/* Highlight Toggles */}
+              <div className="pt-2 space-y-3">
+                {/* Extra Special Toggle */}
+                <button
+                  onClick={() => setEditingMemory(prev => ({ ...prev, isSpecial: !prev.isSpecial }))}
+                  className={`w-full p-4 rounded-xl border-2 transition flex items-center justify-center gap-3 ${
+                    editingMemory.isSpecial
+                      ? 'border-transparent bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500 text-white'
+                      : 'border-white/20 bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                  style={editingMemory.isSpecial ? {
+                    backgroundSize: '200% 200%',
+                    animation: 'rainbow-shift 3s ease infinite'
+                  } : {}}
+                >
+                  <span className="text-2xl">🌈</span>
+                  <span className="font-semibold">
+                    {editingMemory.isSpecial ? 'Extra Special Memory!' : 'Make Extra Special'}
+                  </span>
+                  {editingMemory.isSpecial && <span className="text-2xl">✨</span>}
+                </button>
+
+                {/* First Time Toggle */}
+                <button
+                  onClick={() => setEditingMemory(prev => ({ ...prev, isFirstTime: !prev.isFirstTime }))}
+                  className={`w-full p-4 rounded-xl border-4 transition flex items-center justify-center gap-3 ${
+                    editingMemory.isFirstTime
+                      ? 'border-transparent text-white'
+                      : 'border-white/20 bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                  style={editingMemory.isFirstTime ? {
+                    background: 'linear-gradient(#1e293b, #1e293b) padding-box, repeating-linear-gradient(45deg, #ef4444 0px, #ef4444 10px, #f97316 10px, #f97316 20px, #eab308 20px, #eab308 30px, #22c55e 30px, #22c55e 40px, #3b82f6 40px, #3b82f6 50px, #8b5cf6 50px, #8b5cf6 60px) border-box',
+                  } : {}}
+                >
+                  <span className="text-2xl">🎉</span>
+                  <span className="font-semibold">
+                    {editingMemory.isFirstTime ? 'A First Time Memory!' : 'Mark as First Time'}
+                  </span>
+                  {editingMemory.isFirstTime && <span className="text-2xl">⭐</span>}
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-white/10 flex justify-between">
+              <button
+                onClick={() => {
+                  // Delete memory
+                  const newMemories = memories.filter(m => m.id !== editingMemory.id);
+                  setMemories(newMemories);
+                  saveMemoriesToFirestore(newMemories);
+                  setEditingMemory(null);
+                }}
+                className="px-5 py-2.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition"
+              >
+                Delete
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setEditingMemory(null)}
+                  className="px-5 py-2.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    // Save memory
+                    const newMemories = memories.map(m => m.id === editingMemory.id ? editingMemory : m);
+                    setMemories(newMemories);
+                    saveMemoriesToFirestore(newMemories);
+                    setEditingMemory(null);
+                  }}
+                  className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white font-semibold rounded-lg hover:opacity-90 transition"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Memory Modal */}
+      {showAddMemoryModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-white/10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">Add New Memory</h2>
+                <button
+                  onClick={() => {
+                    setNewMemoryData({ title: '', date: '', location: '', description: '', image: '', images: [], link: '', comment: '' });
+                    setShowAddMemoryModal(null);
+                  }}
+                  className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">Category</label>
+                <select
+                  value={showAddMemoryModal}
+                  onChange={(e) => setShowAddMemoryModal(e.target.value)}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white"
+                >
+                  <option value="milestone">📅 Timeline Milestone</option>
+                  <option value="datenight">🥂 Date</option>
+                  <option value="travel">✈️ Travel</option>
+                  <option value="fitness">🏆 Fitness</option>
+                  <option value="concert">🎵 Concert / Show</option>
+                  <option value="pride">🏳️‍🌈 Pride / Community</option>
+                  <option value="karaoke">🎤 Songs / Karaoke</option>
+                </select>
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={newMemoryData.title}
+                  onChange={(e) => setNewMemoryData(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40"
+                  placeholder="What happened?"
+                />
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Date *</label>
+                <input
+                  type="date"
+                  value={newMemoryData.date}
+                  onChange={(e) => setNewMemoryData(prev => ({ ...prev, date: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white"
+                />
+              </div>
+
+              {/* Location */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Location</label>
+                <input
+                  type="text"
+                  value={newMemoryData.location}
+                  onChange={(e) => setNewMemoryData(prev => ({ ...prev, location: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40"
+                  placeholder="Where?"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={newMemoryData.description}
+                  onChange={(e) => setNewMemoryData(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40"
+                  placeholder="Short description"
+                />
+              </div>
+
+              {/* Images */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">
+                  Images ({(newMemoryData.images || []).length})
+                </label>
+                <div
+                  className={`border-2 border-dashed rounded-xl p-4 transition ${
+                    dragOver ? 'border-orange-500 bg-orange-500/10' : 'border-white/20'
+                  }`}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => handleDrop(e, false)}
+                >
+                  {/* Existing images grid */}
+                  {(newMemoryData.images || []).length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {(newMemoryData.images || []).map((img, idx) => (
+                        <div key={idx} className="relative group aspect-square">
+                          <img src={img} alt="" className="w-full h-full object-cover rounded-lg" />
+                          <button
+                            onClick={() => {
+                              const newImages = (newMemoryData.images || []).filter((_, i) => i !== idx);
+                              setNewMemoryData(prev => ({ ...prev, images: newImages }));
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition"
+                            title="Remove image"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Upload area */}
+                  <div className="flex gap-2">
+                    <label className={`flex-1 px-4 py-3 rounded-lg cursor-pointer flex items-center justify-center gap-2 transition border-2 border-dashed ${
+                      uploadingPhoto ? 'bg-white/5 text-white/40 border-white/10' : 'bg-white/5 hover:bg-white/10 text-white/70 border-white/20 hover:border-orange-500'
+                    }`}>
+                      {uploadingPhoto ? <Loader className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                      <span>{uploadingPhoto ? 'Uploading...' : 'Add Photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingPhoto}
+                        onChange={(e) => e.target.files?.[0] && uploadMemoryPhoto(e.target.files[0], false)}
+                      />
+                    </label>
+                  </div>
+                  {dragOver && (
+                    <div className="text-center text-orange-400 mt-2 text-sm">Drop image here to add</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Link / Video */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Link (Video URL)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={newMemoryData.link}
+                    onChange={(e) => setNewMemoryData(prev => ({ ...prev, link: e.target.value }))}
+                    className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40"
+                    placeholder="YouTube, Sora, or other video link..."
+                  />
+                  {newMemoryData.link && (
+                    <button
+                      onClick={() => setNewMemoryData(prev => ({ ...prev, link: '' }))}
+                      className="px-3 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition"
+                      title="Remove link"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Comment */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Comment</label>
+                <textarea
+                  value={newMemoryData.comment}
+                  onChange={(e) => setNewMemoryData(prev => ({ ...prev, comment: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 resize-none"
+                  rows={2}
+                  placeholder="Any notes..."
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-white/10 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setNewMemoryData({ title: '', date: '', location: '', description: '', image: '', images: [], link: '', comment: '' });
+                  setShowAddMemoryModal(null);
+                }}
+                className="px-5 py-2.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!newMemoryData.title || !newMemoryData.date) {
+                    alert('Title and Date are required');
+                    return;
+                  }
+
+                  const newMemory = {
+                    id: Date.now(),
+                    category: showAddMemoryModal,
+                    title: newMemoryData.title,
+                    date: newMemoryData.date,
+                    location: newMemoryData.location,
+                    description: newMemoryData.description,
+                    image: '',
+                    images: newMemoryData.images || [],
+                    link: newMemoryData.link,
+                    comment: newMemoryData.comment,
+                    icon: '✨'
+                  };
+
+                  const newMemories = [...memories, newMemory];
+                  setMemories(newMemories);
+                  saveMemoriesToFirestore(newMemories);
+                  setNewMemoryData({ title: '', date: '', location: '', description: '', image: '', images: [], link: '', comment: '' });
+                  setShowAddMemoryModal(null);
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white font-semibold rounded-lg hover:opacity-90 transition"
+              >
+                Add Memory
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bouncing Emoji Overlay */}
       {bouncingEmoji && (
         <div
@@ -5723,6 +8634,19 @@ export default function TripPlanner() {
           editItem={showAddModal.editItem}
         />
       )}
+
+      {/* Global Styles for Rainbow Effects */}
+      <style>{`
+        @keyframes rainbow-border {
+          0% { background-position: 100% 100%, 0% 50%; }
+          100% { background-position: 100% 100%, 200% 50%; }
+        }
+        @keyframes rainbow-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
 
       {/* Bottom rainbow bar */}
       <div className="h-1.5 w-full bg-gradient-to-r from-red-500 via-orange-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500" />
