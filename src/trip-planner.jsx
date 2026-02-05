@@ -5936,7 +5936,33 @@ export default function TripPlanner() {
       </main>
 
       {/* Trip Detail Modal */}
-      {selectedTrip && <TripDetail trip={selectedTrip} />}
+      {selectedTrip && (
+        <TripDetail
+          trip={selectedTrip}
+          editingTripDates={editingTripDates}
+          setEditingTripDates={setEditingTripDates}
+          setSelectedTrip={setSelectedTrip}
+          tripDetails={tripDetails}
+          setTripDetails={setTripDetails}
+          canEditTrip={canEditTrip}
+          removeItem={removeItem}
+          removeLink={removeLink}
+          setShowAddModal={setShowAddModal}
+          setShowLinkModal={setShowLinkModal}
+          setShowGuestModal={setShowGuestModal}
+          showLinkModal={showLinkModal}
+          showGuestModal={showGuestModal}
+          isOwner={isOwner}
+          isGuest={isGuest}
+          guestPermissions={guestPermissions}
+          currentUser={currentUser}
+          updateTripDates={updateTripDates}
+          showToast={showToast}
+          saveToFirestore={saveToFirestore}
+          LinkModal={LinkModal}
+          GuestModal={GuestModal}
+        />
+      )}
 
       {/* New Trip Modal */}
       {showNewTripModal && (
@@ -5968,23 +5994,44 @@ export default function TripPlanner() {
           <GuestModal
             trip={trip}
             onClose={() => setShowGuestModal(null)}
+            setTrips={setTrips}
+            guestEmail={guestEmail}
+            setGuestEmail={setGuestEmail}
+            guestPermission={guestPermission}
+            setGuestPermission={setGuestPermission}
+            currentUser={currentUser}
           />
         ) : null;
       })()}
 
       {/* Open Date Modal */}
       {showOpenDateModal && (
-        <OpenDateModal onClose={() => setShowOpenDateModal(false)} />
+        <OpenDateModal
+          onClose={() => setShowOpenDateModal(false)}
+          openDates={openDates}
+          setOpenDates={setOpenDates}
+          companions={companions}
+        />
       )}
 
       {/* Companions Modal */}
       {showCompanionsModal && (
-        <CompanionsModal onClose={() => setShowCompanionsModal(false)} />
+        <CompanionsModal
+          onClose={() => setShowCompanionsModal(false)}
+          companions={companions}
+          setCompanions={setCompanions}
+          setOpenDates={setOpenDates}
+        />
       )}
 
       {/* My Profile Modal - For companions */}
       {showMyProfileModal && currentCompanion && (
-        <MyProfileModal onClose={() => setShowMyProfileModal(false)} />
+        <MyProfileModal
+          onClose={() => setShowMyProfileModal(false)}
+          currentCompanion={currentCompanion}
+          setCompanions={setCompanions}
+          setCurrentCompanion={setCurrentCompanion}
+        />
       )}
 
       {/* Edit Training Week Modal */}
