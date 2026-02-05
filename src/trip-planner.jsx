@@ -731,6 +731,9 @@ export default function TripPlanner() {
   const [showImportModal, setShowImportModal] = useState(null); // Google Calendar event to import
   const [importSettings, setImportSettings] = useState({ type: 'event', color: 'from-blue-400 to-indigo-500' });
   const [calendarViewMonth, setCalendarViewMonth] = useState(new Date()); // Month for calendar section view
+  const [availableCalendars, setAvailableCalendars] = useState([]); // List of user's calendars
+  const [selectedCalendarId, setSelectedCalendarId] = useState('primary'); // Selected calendar to fetch from
+  const [showCalendarPicker, setShowCalendarPicker] = useState(false); // Show calendar selection modal
   const [showRandomExperience, setShowRandomExperience] = useState(false);
   const [easterEggClicks, setEasterEggClicks] = useState(0);
   const [showDisneyMagic, setShowDisneyMagic] = useState(false);
@@ -1567,18 +1570,35 @@ export default function TripPlanner() {
             return;
           }
 
-          // Set the access token on gapi client
-          window.gapi.client.setToken({ access_token: tokenResponse.access_token });
+          try {
+            // Set the access token on gapi client
+            window.gapi.client.setToken({ access_token: tokenResponse.access_token });
 
-          // Load the Calendar API discovery doc if not already loaded
-          if (!window.gapi.client.calendar) {
-            await window.gapi.client.load('calendar', 'v3');
+            // Load the Calendar API discovery doc if not already loaded
+            if (!window.gapi.client.calendar) {
+              await window.gapi.client.load('calendar', 'v3');
+            }
+
+            // Fetch list of available calendars
+            const calendarListResponse = await window.gapi.client.calendar.calendarList.list();
+            const calendars = calendarListResponse.result.items || [];
+            setAvailableCalendars(calendars);
+
+            // If multiple calendars, show picker; otherwise use primary
+            if (calendars.length > 1) {
+              setShowCalendarPicker(true);
+              setCalendarLoading(false);
+            } else {
+              // Only one calendar, use it directly
+              setCalendarConnected(true);
+              await fetchGoogleCalendarEvents();
+              setCalendarLoading(false);
+            }
+          } catch (err) {
+            console.error('Error after OAuth:', err);
+            showToast('Failed to load calendars', 'error');
+            setCalendarLoading(false);
           }
-
-          // Successfully connected
-          setCalendarConnected(true);
-          await fetchGoogleCalendarEvents();
-          setCalendarLoading(false);
         },
       });
 
@@ -1591,19 +1611,30 @@ export default function TripPlanner() {
     }
   };
 
+  // Select a calendar and fetch its events
+  const selectCalendar = async (calendarId) => {
+    setSelectedCalendarId(calendarId);
+    setShowCalendarPicker(false);
+    setCalendarConnected(true);
+    setCalendarLoading(true);
+    await fetchGoogleCalendarEvents(calendarId);
+    setCalendarLoading(false);
+  };
+
   // Fetch events from Google Calendar
-  const fetchGoogleCalendarEvents = async () => {
+  const fetchGoogleCalendarEvents = async (calendarId = null) => {
     setCalendarLoading(true);
     try {
       if (!window.gapi?.client?.calendar) {
         throw new Error('Google Calendar API not initialized');
       }
 
+      const calId = calendarId || selectedCalendarId || 'primary';
       const now = new Date();
       const threeMonthsLater = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
 
       const response = await window.gapi.client.calendar.events.list({
-        calendarId: 'primary',
+        calendarId: calId,
         timeMin: now.toISOString(),
         timeMax: threeMonthsLater.toISOString(),
         showDeleted: false,
@@ -7168,6 +7199,54 @@ export default function TripPlanner() {
           updateItem={updateItem}
           editItem={showAddModal.editItem}
         />
+      )}
+
+      {/* Calendar Picker Modal */}
+      {showCalendarPicker && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-white/10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">Select Calendar</h2>
+                <button
+                  onClick={() => setShowCalendarPicker(false)}
+                  className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-slate-400 text-sm mt-2">Choose which calendar to sync</p>
+            </div>
+
+            <div className="p-4 space-y-2">
+              {availableCalendars.map(calendar => (
+                <button
+                  key={calendar.id}
+                  onClick={() => selectCalendar(calendar.id)}
+                  className={`w-full p-4 rounded-xl border-2 transition flex items-center gap-3 ${
+                    selectedCalendarId === calendar.id
+                      ? 'border-blue-500 bg-blue-500/20'
+                      : 'border-white/20 bg-white/5 hover:border-white/40'
+                  }`}
+                >
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: calendar.backgroundColor || '#4285f4' }}
+                  />
+                  <div className="text-left flex-1">
+                    <div className="text-white font-medium">{calendar.summary}</div>
+                    {calendar.description && (
+                      <div className="text-slate-400 text-sm truncate">{calendar.description}</div>
+                    )}
+                  </div>
+                  {calendar.primary && (
+                    <span className="text-xs bg-blue-500/30 text-blue-300 px-2 py-1 rounded-full">Primary</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Google Calendar Import Modal */}
