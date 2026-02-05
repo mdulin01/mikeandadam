@@ -1709,7 +1709,7 @@ export default function TripPlanner() {
         special: googleEvent.description,
         status: 'upcoming',
         guests: [],
-        image: '', // Can be added later
+        coverImage: '', // Can be added later
       };
       setTrips(prev => [...prev, newTrip]);
       saveToFirestore([...trips, newTrip], wishlist, tripDetails);
@@ -1727,7 +1727,7 @@ export default function TripPlanner() {
         guests: [],
         tasks: [],
         photos: [],
-        image: '', // Cover image like trips
+        coverImage: '', // Cover image like trips
       };
       setPartyEvents(prev => [...prev, newEvent]);
       savePartyEventsToFirestore([...partyEvents, newEvent]);
@@ -4715,6 +4715,7 @@ export default function TripPlanner() {
                             key={event.id}
                             onClick={() => {
                               if (event.type === 'google') {
+                                setImportSettings(prev => ({ ...prev, customName: '' }));
                                 setShowImportModal(event.data);
                               } else if (event.type === 'travel') {
                                 setActiveSection('travel');
@@ -4803,6 +4804,7 @@ export default function TripPlanner() {
                                 if (eventsOnDay.length === 1) {
                                   const event = eventsOnDay[0];
                                   if (event.type === 'google') {
+                                    setImportSettings(prev => ({ ...prev, customName: '' }));
                                     setShowImportModal(event.data);
                                   } else if (event.type === 'travel') {
                                     setActiveSection('travel');
