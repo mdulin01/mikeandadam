@@ -1574,14 +1574,13 @@ export default function TripPlanner() {
             // Set the access token on gapi client
             window.gapi.client.setToken({ access_token: tokenResponse.access_token });
 
-            // Load the Calendar API discovery doc if not already loaded
-            if (!window.gapi.client.calendar) {
-              await window.gapi.client.load('calendar', 'v3');
-            }
+            // Load the Calendar API discovery doc
+            await window.gapi.client.load('https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest');
 
             // Fetch list of available calendars
             const calendarListResponse = await window.gapi.client.calendar.calendarList.list();
             const calendars = calendarListResponse.result.items || [];
+            console.log('Loaded calendars:', calendars);
             setAvailableCalendars(calendars);
 
             // If multiple calendars, show picker; otherwise use primary
@@ -1591,12 +1590,13 @@ export default function TripPlanner() {
             } else {
               // Only one calendar, use it directly
               setCalendarConnected(true);
-              await fetchGoogleCalendarEvents();
+              await fetchGoogleCalendarEvents(calendars[0]?.id || 'primary');
               setCalendarLoading(false);
             }
           } catch (err) {
             console.error('Error after OAuth:', err);
-            showToast('Failed to load calendars', 'error');
+            console.error('Error details:', JSON.stringify(err, null, 2));
+            showToast('Failed to load calendars: ' + (err.message || err.result?.error?.message || 'Unknown error'), 'error');
             setCalendarLoading(false);
           }
         },
