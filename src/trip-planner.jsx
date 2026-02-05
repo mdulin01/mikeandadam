@@ -4551,8 +4551,8 @@ export default function TripPlanner() {
                   today.setHours(0, 0, 0, 0);
                   const allEvents = getAllCalendarEvents();
                   const monthEvents = allEvents.filter(event => {
-                    const start = new Date(event.start);
-                    const end = new Date(event.end);
+                    const start = parseLocalDate(event.start);
+                    const end = parseLocalDate(event.end);
                     return (start.getMonth() === calendarViewMonth.getMonth() && start.getFullYear() === calendarViewMonth.getFullYear()) ||
                            (end.getMonth() === calendarViewMonth.getMonth() && end.getFullYear() === calendarViewMonth.getFullYear());
                   });
@@ -4562,10 +4562,10 @@ export default function TripPlanner() {
                   return (
                     <div className="mb-6 space-y-3">
                       {monthEvents.slice(0, 5).map(event => {
-                        const startDate = new Date(event.start);
+                        const startDate = parseLocalDate(event.start);
                         const daysUntil = Math.ceil((startDate - today) / (1000 * 60 * 60 * 24));
                         const isMultiDay = event.start !== event.end;
-                        const endDate = new Date(event.end);
+                        const endDate = parseLocalDate(event.end);
 
                         return (
                           <div
@@ -4633,11 +4633,10 @@ export default function TripPlanner() {
                     // Helper to get events on a specific day
                     const getEventsOnDay = (day) => {
                       const checkDate = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth(), day);
+                      checkDate.setHours(0, 0, 0, 0);
                       return allEvents.filter(event => {
-                        const start = new Date(event.start);
-                        start.setHours(0, 0, 0, 0);
-                        const end = new Date(event.end);
-                        end.setHours(0, 0, 0, 0);
+                        const start = parseLocalDate(event.start);
+                        const end = parseLocalDate(event.end);
                         return checkDate >= start && checkDate <= end;
                       });
                     };
