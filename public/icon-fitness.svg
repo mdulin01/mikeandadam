@@ -1,20 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="fitGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#059669"/>
-      <stop offset="100%" style="stop-color:#10b981"/>
+      <stop offset="0%" style="stop-color:#f97316"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
     </linearGradient>
   </defs>
+  <!-- Background -->
   <rect width="512" height="512" rx="96" fill="url(#fitGrad)"/>
-  <!-- Dumbbell icon -->
-  <g fill="white">
-    <!-- Left weight -->
-    <rect x="100" y="180" width="50" height="152" rx="8"/>
-    <rect x="80" y="210" width="90" height="92" rx="8"/>
-    <!-- Bar -->
-    <rect x="170" y="240" width="172" height="32" rx="4"/>
-    <!-- Right weight -->
-    <rect x="362" y="180" width="50" height="152" rx="8"/>
-    <rect x="342" y="210" width="90" height="92" rx="8"/>
+
+  <!-- Two runners side by side - representing Mike & Adam training together -->
+  <!-- Runner 1 (left - Mike) -->
+  <g fill="white" transform="translate(70, 80) scale(0.8)">
+    <!-- Head -->
+    <circle cx="120" cy="80" r="40"/>
+    <!-- Body -->
+    <path d="M90,130 L90,220 L60,320 L100,320 L130,240 L130,220 L130,130 Z" fill="white"/>
+    <!-- Running legs -->
+    <path d="M90,220 L40,350 L80,350 L130,260" stroke="white" stroke-width="30" stroke-linecap="round" fill="none"/>
+    <path d="M130,220 L200,340 L160,350 L130,260" stroke="white" stroke-width="30" stroke-linecap="round" fill="none"/>
+    <!-- Running arms -->
+    <path d="M90,150 L20,200" stroke="white" stroke-width="25" stroke-linecap="round"/>
+    <path d="M130,150 L180,100" stroke="white" stroke-width="25" stroke-linecap="round"/>
+  </g>
+
+  <!-- Runner 2 (right - Adam) -->
+  <g fill="white" transform="translate(220, 80) scale(0.8)">
+    <!-- Head -->
+    <circle cx="120" cy="80" r="40"/>
+    <!-- Body -->
+    <path d="M90,130 L90,220 L60,320 L100,320 L130,240 L130,220 L130,130 Z" fill="white"/>
+    <!-- Running legs -->
+    <path d="M90,220 L40,350 L80,350 L130,260" stroke="white" stroke-width="30" stroke-linecap="round" fill="none"/>
+    <path d="M130,220 L200,340 L160,350 L130,260" stroke="white" stroke-width="30" stroke-linecap="round" fill="none"/>
+    <!-- Running arms -->
+    <path d="M90,150 L20,200" stroke="white" stroke-width="25" stroke-linecap="round"/>
+    <path d="M130,150 L180,100" stroke="white" stroke-width="25" stroke-linecap="round"/>
+  </g>
+
+  <!-- Heart between them symbolizing running together -->
+  <g transform="translate(256, 420)">
+    <path d="M0,-20 C-20,-40 -40,-20 -40,0 C-40,30 0,50 0,50 C0,50 40,30 40,0 C40,-20 20,-40 0,-20 Z" fill="#fbbf24"/>
   </g>
 </svg>

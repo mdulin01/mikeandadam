@@ -13,10 +13,26 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Adventures" />
 
-    <!-- Icons -->
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.json" />
+    <!-- Icons - Dynamic based on app mode -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" id="favicon" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" id="apple-icon" />
+    <link rel="manifest" href="/manifest.json" id="manifest" />
+
+    <!-- Dynamic manifest/icon selection based on URL parameter -->
+    <script>
+      (function() {
+        const params = new URLSearchParams(window.location.search);
+        const appMode = params.get('app');
+        if (appMode === 'fitness') {
+          document.getElementById('manifest').href = '/manifest-fitness.json';
+          document.getElementById('apple-icon').href = '/icon-fitness-192.png';
+          document.getElementById('favicon').href = '/icon-fitness.svg';
+          // Update iOS meta tags
+          document.querySelector('meta[name="apple-mobile-web-app-title"]').content = 'Fitness';
+          document.querySelector('meta[name="theme-color"]').content = '#ea580c';
+        }
+      })();
+    </script>
 
     <title>Mike & Adam's Adventures</title>
 

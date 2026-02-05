@@ -407,7 +407,19 @@ export default function TripPlanner() {
   }, []);
 
   // Main section navigation
-  const [activeSection, setActiveSection] = useState('home'); // 'home' | 'travel' | 'fitness' | 'nutrition' | 'events' | 'lifePlanning' | 'business' | 'memories'
+  // Check URL for app mode at initialization
+  const initialAppMode = (() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const appParam = urlParams.get('app');
+    const isStandalone = typeof window !== 'undefined' && (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone ||
+      document.referrer.includes('android-app://')
+    );
+    return appParam === 'fitness' || (isStandalone && window.location.search.includes('fitness'));
+  })();
+
+  const [activeSection, setActiveSection] = useState(initialAppMode ? 'fitness' : 'home'); // 'home' | 'travel' | 'fitness' | 'nutrition' | 'events' | 'lifePlanning' | 'business' | 'memories'
   const [memoriesView, setMemoriesView] = useState('timeline'); // 'timeline' | 'events' | 'media'
 
   // Memories state - imported from memories_data.xlsx
@@ -706,6 +718,18 @@ export default function TripPlanner() {
       if (isMountedRef.current) setUploadingPhoto(false);
     }
   };
+
+  // PWA App Mode Detection - Check if running as installed app or with ?app=fitness parameter
+  const [isAppMode, setIsAppMode] = useState(() => {
+    // Check URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const appParam = urlParams.get('app');
+    // Check if running in standalone mode (installed PWA)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         window.navigator.standalone || // iOS Safari
+                         document.referrer.includes('android-app://');
+    return appParam === 'fitness' || (isStandalone && window.location.search.includes('fitness'));
+  });
 
   // App state
   const [trips, setTrips] = useState(defaultTrips);
@@ -2529,47 +2553,74 @@ export default function TripPlanner() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* User info and logout */}
-              <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
-                {user.photoURL ? (
-                  <img src={user.photoURL} alt="" className="w-6 h-6 rounded-full" />
-                ) : (
-                  <User className="w-5 h-5 text-white/70" />
-                )}
-                <span className="text-white/70 text-sm">{currentUser}</span>
-                {currentCompanion && (
-                  <span className="text-xs bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full">
-                    {currentCompanion.relationship}
-                  </span>
-                )}
-                {/* Profile button for companions */}
-                {currentCompanion && (
+            {/* User info - simplified in app mode */}
+            {!initialAppMode ? (
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* User info and logout */}
+                <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="" className="w-6 h-6 rounded-full" />
+                  ) : (
+                    <User className="w-5 h-5 text-white/70" />
+                  )}
+                  <span className="text-white/70 text-sm">{currentUser}</span>
+                  {currentCompanion && (
+                    <span className="text-xs bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full">
+                      {currentCompanion.relationship}
+                    </span>
+                  )}
+                  {/* Profile button for companions */}
+                  {currentCompanion && (
+                    <button
+                      onClick={() => setShowMyProfileModal(true)}
+                      className="ml-1 p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition"
+                      title="Edit my profile"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
-                    onClick={() => setShowMyProfileModal(true)}
-                    className="ml-1 p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition"
-                    title="Edit my profile"
+                    onClick={handleLogout}
+                    className="ml-2 text-xs text-white/50 hover:text-white transition underline"
                   >
-                    <Pencil className="w-4 h-4" />
+                    log out
                   </button>
+                </div>
+
+
+                {/* Companion badge */}
+                {currentCompanion && !isOwner && (
+                  <div className="flex items-center bg-amber-500/20 rounded-full px-3 py-1.5">
+                    <span className="text-amber-300 text-sm">👋 Welcome, {currentCompanion.firstName || currentCompanion.name}!</span>
+                  </div>
                 )}
+
+              </div>
+            ) : (
+              /* Simplified user switcher for app mode */
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={handleLogout}
-                  className="ml-2 text-xs text-white/50 hover:text-white transition underline"
+                  onClick={() => isOwner && setCurrentUser('Mike')}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                    currentUser === 'Mike'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  }`}
                 >
-                  log out
+                  Mike
+                </button>
+                <button
+                  onClick={() => isOwner && setCurrentUser('Adam')}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                    currentUser === 'Adam'
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  }`}
+                >
+                  Adam
                 </button>
               </div>
-
-
-              {/* Companion badge */}
-              {currentCompanion && !isOwner && (
-                <div className="flex items-center bg-amber-500/20 rounded-full px-3 py-1.5">
-                  <span className="text-amber-300 text-sm">👋 Welcome, {currentCompanion.firstName || currentCompanion.name}!</span>
-                </div>
-              )}
-
-            </div>
+            )}
           </div>
 
           {/* Sync status indicator */}
@@ -2580,55 +2631,67 @@ export default function TripPlanner() {
             </div>
           )}
 
-          {/* Section Navigation */}
-          <div className="mt-6 flex gap-2 flex-wrap items-center">
-            {/* Coming Soon dropdown for Life Planning & Business */}
-            <div className="relative group">
-              <button
-                className="flex items-center gap-1 px-3 py-2.5 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white rounded-full font-semibold transition shadow-lg"
-                title="Coming Soon"
-              >
-                🚧
-              </button>
-              <div className="absolute left-0 top-full mt-2 bg-slate-800 rounded-xl shadow-xl border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 min-w-[160px]">
+          {/* Section Navigation - Hidden in App Mode */}
+          {!initialAppMode && (
+            <div className="mt-6 flex gap-2 flex-wrap items-center">
+              {/* Coming Soon dropdown for Life Planning & Business */}
+              <div className="relative group">
                 <button
-                  onClick={() => setActiveSection('lifePlanning')}
-                  className="w-full flex items-center gap-2 px-4 py-3 text-white/70 hover:bg-white/10 hover:text-white rounded-t-xl transition"
+                  className="flex items-center gap-1 px-3 py-2.5 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white rounded-full font-semibold transition shadow-lg"
+                  title="Coming Soon"
                 >
-                  🎯 Life Planning
+                  🚧
                 </button>
-                <button
-                  onClick={() => setActiveSection('business')}
-                  className="w-full flex items-center gap-2 px-4 py-3 text-white/70 hover:bg-white/10 hover:text-white rounded-b-xl transition"
-                >
-                  💼 Business
-                </button>
+                <div className="absolute left-0 top-full mt-2 bg-slate-800 rounded-xl shadow-xl border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 min-w-[160px]">
+                  <button
+                    onClick={() => setActiveSection('lifePlanning')}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-white/70 hover:bg-white/10 hover:text-white rounded-t-xl transition"
+                  >
+                    🎯 Life Planning
+                  </button>
+                  <button
+                    onClick={() => setActiveSection('business')}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-white/70 hover:bg-white/10 hover:text-white rounded-b-xl transition"
+                  >
+                    💼 Business
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Main navigation buttons */}
-            {[
-              { id: 'home', label: 'Home', emoji: '🏠', gradient: 'from-pink-500 to-purple-500' },
-              { id: 'travel', label: 'Travel', emoji: '✈️', gradient: 'from-teal-400 to-cyan-500' },
-              { id: 'calendar', label: 'Calendar', emoji: '📅', gradient: 'from-blue-400 to-indigo-500' },
-              { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
-              { id: 'events', label: 'Events', emoji: '🎉', gradient: 'from-amber-400 to-orange-500' },
-              { id: 'memories', label: 'Memories', emoji: '💝', gradient: 'from-rose-400 to-pink-500' },
-            ].map(section => (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold transition shadow-lg ${
-                  activeSection === section.id
-                    ? `bg-gradient-to-r ${section.gradient} text-white`
-                    : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
-                }`}
-              >
-                <span>{section.emoji}</span>
-                {section.label}
-              </button>
-            ))}
-          </div>
+              {/* Main navigation buttons */}
+              {[
+                { id: 'home', label: 'Home', emoji: '🏠', gradient: 'from-pink-500 to-purple-500' },
+                { id: 'travel', label: 'Travel', emoji: '✈️', gradient: 'from-teal-400 to-cyan-500' },
+                { id: 'calendar', label: 'Calendar', emoji: '📅', gradient: 'from-blue-400 to-indigo-500' },
+                { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
+                { id: 'events', label: 'Events', emoji: '🎉', gradient: 'from-amber-400 to-orange-500' },
+                { id: 'memories', label: 'Memories', emoji: '💝', gradient: 'from-rose-400 to-pink-500' },
+              ].map(section => (
+                <button
+                  key={section.id}
+                  onClick={() => setActiveSection(section.id)}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold transition shadow-lg ${
+                    activeSection === section.id
+                      ? `bg-gradient-to-r ${section.gradient} text-white`
+                      : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+                  }`}
+                >
+                  <span>{section.emoji}</span>
+                  {section.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* App Mode Header - Fitness Training title */}
+          {initialAppMode && (
+            <div className="mt-4 text-center">
+              <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500 flex items-center justify-center gap-2">
+                <span className="text-3xl">🏃</span>
+                Fitness Training
+              </h2>
+            </div>
+          )}
 
           {/* Action Buttons - Travel Section */}
           {activeSection === 'travel' && (
