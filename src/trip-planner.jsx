@@ -747,6 +747,8 @@ export default function TripPlanner() {
   const [isGuest, setIsGuest] = useState(false); // true if user is a trip guest (not owner or companion)
   const [guestTripIds, setGuestTripIds] = useState([]); // array of trip IDs this guest has access to
   const [guestPermissions, setGuestPermissions] = useState({}); // { tripId: 'edit' | 'view' }
+  const [guestEmail, setGuestEmail] = useState(''); // for guest modal input
+  const [guestPermission, setGuestPermission] = useState('edit'); // for guest modal input
 
   // ========== CELEBRATION STATE ==========
   const [confetti, setConfetti] = useState(null); // { type: 'run' | 'week', x?, y? }
@@ -1967,10 +1969,6 @@ export default function TripPlanner() {
   }
 
   // NewTripModal - moved to ./components/NewTripModal.jsx
-
-  // Guest Modal State (lifted out to prevent re-render issues)
-  const [guestEmail, setGuestEmail] = useState('');
-  const [guestPermission, setGuestPermission] = useState('edit');
 
   // GuestModal - moved to ./components/GuestModal.jsx
 
