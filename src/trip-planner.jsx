@@ -1514,22 +1514,34 @@ export default function TripPlanner() {
 
   // Load Google API scripts
   const loadGoogleScripts = () => {
-    return new Promise((resolve) => {
-      // Load GAPI
-      if (!window.gapi) {
-        const gapiScript = document.createElement('script');
-        gapiScript.src = 'https://apis.google.com/js/api.js';
-        gapiScript.onload = () => {
-          window.gapi.load('client', async () => {
+    return new Promise((resolve, reject) => {
+      const initGapiClient = () => {
+        window.gapi.load('client', async () => {
+          try {
             await window.gapi.client.init({
               apiKey: GOOGLE_API_KEY,
-              discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
             });
+            console.log('GAPI client initialized');
             resolve();
-          });
-        };
+          } catch (err) {
+            console.error('Failed to init gapi client:', err);
+            reject(err);
+          }
+        });
+      };
+
+      if (!window.gapi) {
+        // Load GAPI script
+        const gapiScript = document.createElement('script');
+        gapiScript.src = 'https://apis.google.com/js/api.js';
+        gapiScript.onload = initGapiClient;
+        gapiScript.onerror = () => reject(new Error('Failed to load GAPI'));
         document.body.appendChild(gapiScript);
+      } else if (!window.gapi.client) {
+        // GAPI loaded but client not initialized
+        initGapiClient();
       } else {
+        // Already fully initialized
         resolve();
       }
     });
