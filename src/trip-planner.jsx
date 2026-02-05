@@ -1505,26 +1505,44 @@ export default function TripPlanner() {
 
   // ========== GOOGLE CALENDAR INTEGRATION ==========
 
-  // Initialize Google Calendar API
+  const GOOGLE_CLIENT_ID = '803115812045-l2r8qgijts7rp56shcdt422cl8kjfb62.apps.googleusercontent.com';
+  const GOOGLE_API_KEY = 'AIzaSyB4pbBVj7Dryy3C57V2s6L4N_znGEyuib0';
+  const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
+
+  // Load Google API scripts
+  const loadGoogleScripts = () => {
+    return new Promise((resolve) => {
+      // Load GAPI
+      if (!window.gapi) {
+        const gapiScript = document.createElement('script');
+        gapiScript.src = 'https://apis.google.com/js/api.js';
+        gapiScript.onload = () => {
+          window.gapi.load('client', async () => {
+            await window.gapi.client.init({
+              apiKey: GOOGLE_API_KEY,
+              discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
+            });
+            resolve();
+          });
+        };
+        document.body.appendChild(gapiScript);
+      } else {
+        resolve();
+      }
+    });
+  };
+
+  // Initialize Google Identity Services
   const initGoogleCalendar = () => {
     return new Promise((resolve, reject) => {
-      if (window.gapi) {
-        window.gapi.load('client:auth2', async () => {
-          try {
-            await window.gapi.client.init({
-              apiKey: 'AIzaSyB4pbBVj7Dryy3C57V2s6L4N_znGEyuib0',
-              clientId: '803115812045-l2r8qgijts7rp56shcdt422cl8kjfb62.apps.googleusercontent.com',
-              discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-              scope: 'https://www.googleapis.com/auth/calendar.readonly',
-            });
-            resolve(true);
-          } catch (error) {
-            console.error('Error initializing Google Calendar:', error);
-            reject(error);
-          }
-        });
+      if (!window.google?.accounts?.oauth2) {
+        const gisScript = document.createElement('script');
+        gisScript.src = 'https://accounts.google.com/gsi/client';
+        gisScript.onload = () => resolve();
+        gisScript.onerror = () => reject(new Error('Failed to load Google Identity Services'));
+        document.body.appendChild(gisScript);
       } else {
-        reject(new Error('Google API not loaded'));
+        resolve();
       }
     });
   };
@@ -1533,32 +1551,33 @@ export default function TripPlanner() {
   const connectGoogleCalendar = async () => {
     setCalendarLoading(true);
     try {
-      // Check if gapi is loaded
-      if (!window.gapi) {
-        // Load the Google API script dynamically
-        const script = document.createElement('script');
-        script.src = 'https://apis.google.com/js/api.js';
-        script.onload = async () => {
-          await initGoogleCalendar();
-          const authInstance = window.gapi.auth2.getAuthInstance();
-          await authInstance.signIn();
+      // Load both scripts
+      await loadGoogleScripts();
+      await initGoogleCalendar();
+
+      // Create token client
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: SCOPES,
+        callback: async (tokenResponse) => {
+          if (tokenResponse.error) {
+            console.error('OAuth error:', tokenResponse);
+            showToast('Failed to connect to Google Calendar', 'error');
+            setCalendarLoading(false);
+            return;
+          }
+          // Successfully got token
           setCalendarConnected(true);
           await fetchGoogleCalendarEvents();
-        };
-        document.body.appendChild(script);
-      } else {
-        await initGoogleCalendar();
-        const authInstance = window.gapi.auth2.getAuthInstance();
-        if (!authInstance.isSignedIn.get()) {
-          await authInstance.signIn();
-        }
-        setCalendarConnected(true);
-        await fetchGoogleCalendarEvents();
-      }
+          setCalendarLoading(false);
+        },
+      });
+
+      // Request access token (will show Google sign-in popup)
+      tokenClient.requestAccessToken({ prompt: 'consent' });
     } catch (error) {
       console.error('Error connecting to Google Calendar:', error);
       showToast('Failed to connect to Google Calendar', 'error');
-    } finally {
       setCalendarLoading(false);
     }
   };
