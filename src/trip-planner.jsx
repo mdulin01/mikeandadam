@@ -729,7 +729,7 @@ export default function TripPlanner() {
   const [googleCalendarEvents, setGoogleCalendarEvents] = useState([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [showImportModal, setShowImportModal] = useState(null); // Google Calendar event to import
-  const [importSettings, setImportSettings] = useState({ type: 'event', color: 'from-blue-400 to-indigo-500' });
+  const [importSettings, setImportSettings] = useState({ type: 'event', color: 'from-blue-400 to-indigo-500', customName: '' });
   const [calendarViewMonth, setCalendarViewMonth] = useState(new Date()); // Month for calendar section view
   const [availableCalendars, setAvailableCalendars] = useState([]); // List of user's calendars
   const [selectedCalendarId, setSelectedCalendarId] = useState('primary'); // Selected calendar to fetch from
@@ -1692,12 +1692,13 @@ export default function TripPlanner() {
 
   // Import Google Calendar event as trip, event, or memory
   const importGoogleEvent = (googleEvent, settings) => {
-    const { type, color } = settings;
+    const { type, color, customName } = settings;
+    const eventName = customName || googleEvent.title;
 
     if (type === 'travel') {
       const newTrip = {
         id: `trip-${Date.now()}`,
-        destination: googleEvent.title,
+        destination: eventName,
         emoji: '✈️',
         dates: {
           start: googleEvent.start.split('T')[0],
@@ -1708,14 +1709,15 @@ export default function TripPlanner() {
         special: googleEvent.description,
         status: 'upcoming',
         guests: [],
+        image: '', // Can be added later
       };
       setTrips(prev => [...prev, newTrip]);
       saveToFirestore([...trips, newTrip], wishlist, tripDetails);
-      showToast(`Added "${googleEvent.title}" as a trip!`, 'success');
+      showToast(`Added "${eventName}" as a trip!`, 'success');
     } else if (type === 'event') {
       const newEvent = {
         id: `event-${Date.now()}`,
-        title: googleEvent.title,
+        name: eventName,
         emoji: '🎉',
         date: googleEvent.start.split('T')[0],
         time: googleEvent.start.includes('T') ? googleEvent.start.split('T')[1].substring(0, 5) : '',
@@ -1725,14 +1727,15 @@ export default function TripPlanner() {
         guests: [],
         tasks: [],
         photos: [],
+        image: '', // Cover image like trips
       };
       setPartyEvents(prev => [...prev, newEvent]);
       savePartyEventsToFirestore([...partyEvents, newEvent]);
-      showToast(`Added "${googleEvent.title}" as an event!`, 'success');
+      showToast(`Added "${eventName}" as an event!`, 'success');
     } else if (type === 'memory') {
       const newMemory = {
         id: `memory-${Date.now()}`,
-        title: googleEvent.title,
+        title: eventName,
         date: googleEvent.start.split('T')[0],
         category: 'Milestone',
         description: googleEvent.description,
@@ -1742,10 +1745,12 @@ export default function TripPlanner() {
       };
       setMemories(prev => [...prev, newMemory]);
       saveMemoriesToFirestore([...memories, newMemory]);
-      showToast(`Added "${googleEvent.title}" as a memory!`, 'success');
+      showToast(`Added "${eventName}" as a memory!`, 'success');
     }
 
     setShowImportModal(null);
+    // Reset custom name for next import
+    setImportSettings(prev => ({ ...prev, customName: '' }));
   };
 
   // Get all calendar events (trips + events + google)
@@ -4923,6 +4928,18 @@ export default function TripPlanner() {
                     )}
                   </div>
 
+                  {/* Cover Image */}
+                  {selectedPartyEvent.coverImage && (
+                    <div className="relative h-48 md:h-64 rounded-2xl overflow-hidden mb-6">
+                      <img
+                        src={selectedPartyEvent.coverImage}
+                        alt={selectedPartyEvent.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    </div>
+                  )}
+
                   {/* Event Info Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     {/* Location Card */}
@@ -5440,73 +5457,106 @@ export default function TripPlanner() {
                             onDragOver={(e) => { e.preventDefault(); setDragOverEventId(event.id); }}
                             onDragLeave={() => setDragOverEventId(null)}
                             onDrop={(e) => { e.stopPropagation(); handleEventCardDrop(e, event.id); }}
-                            className={`relative bg-gradient-to-br ${event.color || 'from-purple-500/30 to-pink-500/30'} rounded-2xl p-5 border cursor-pointer hover:scale-[1.02] transition-all ${isPast ? 'opacity-60' : ''} ${
+                            className={`relative rounded-2xl border cursor-pointer hover:scale-[1.02] transition-all overflow-hidden ${isPast ? 'opacity-60' : ''} ${
                               dragOverEventId === event.id ? 'border-purple-500 scale-105' : 'border-white/20'
                             }`}
                           >
-                            {/* Upload indicator */}
-                            {uploadingToEventId === event.id && (
-                              <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center z-10">
-                                <Loader className="w-8 h-8 text-purple-500 animate-spin" />
-                              </div>
-                            )}
-                            {/* Drop indicator */}
-                            {dragOverEventId === event.id && (
-                              <div className="absolute inset-0 bg-purple-500/30 rounded-2xl flex items-center justify-center z-10 pointer-events-none">
-                                <div className="text-white font-semibold">📷 Drop to add photo</div>
-                              </div>
-                            )}
-                            {/* Photo preview if event has images */}
-                            {(event.images || []).length > 0 && (
-                              <div className="absolute top-2 right-2 flex -space-x-2">
-                                {(event.images || []).slice(0, 3).map((img, i) => (
-                                  <div key={i} className="w-8 h-8 rounded-full border-2 border-white/50 overflow-hidden">
-                                    <img src={img} alt="" className="w-full h-full object-cover" />
+                            {/* Cover Image or Gradient Background */}
+                            {event.coverImage ? (
+                              <div className="relative h-40">
+                                <img
+                                  src={event.coverImage}
+                                  alt={event.name}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                                {/* Content overlay on image */}
+                                <div className="absolute inset-0 p-5 flex flex-col justify-end">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <span className="text-3xl drop-shadow-lg">{event.emoji}</span>
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                      isPast ? 'bg-slate-500/80 text-slate-200' :
+                                      isToday ? 'bg-green-500 text-white' :
+                                      daysUntil <= 7 ? 'bg-amber-500 text-white' :
+                                      'bg-white/30 text-white backdrop-blur-sm'
+                                    }`}>
+                                      {isPast ? 'Past' : isToday ? '🎉 Today!' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
+                                    </span>
                                   </div>
-                                ))}
-                                {(event.images || []).length > 3 && (
-                                  <div className="w-8 h-8 rounded-full border-2 border-white/50 bg-black/50 flex items-center justify-center text-white text-xs font-bold">
-                                    +{(event.images || []).length - 3}
+                                  <h3 className="text-xl font-bold text-white drop-shadow-lg">{event.name}</h3>
+                                  <p className="text-white/90 text-sm">
+                                    {formatDate(event.date, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                    {event.time && ` • ${event.time}`}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className={`bg-gradient-to-br ${event.color || 'from-purple-500/30 to-pink-500/30'} p-5`}>
+                                {/* Upload indicator */}
+                                {uploadingToEventId === event.id && (
+                                  <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center z-10">
+                                    <Loader className="w-8 h-8 text-purple-500 animate-spin" />
                                   </div>
                                 )}
+                                {/* Drop indicator */}
+                                {dragOverEventId === event.id && (
+                                  <div className="absolute inset-0 bg-purple-500/30 rounded-2xl flex items-center justify-center z-10 pointer-events-none">
+                                    <div className="text-white font-semibold">📷 Drop to add photo</div>
+                                  </div>
+                                )}
+                                {/* Photo preview if event has images */}
+                                {(event.images || []).length > 0 && (
+                                  <div className="absolute top-2 right-2 flex -space-x-2">
+                                    {(event.images || []).slice(0, 3).map((img, i) => (
+                                      <div key={i} className="w-8 h-8 rounded-full border-2 border-white/50 overflow-hidden">
+                                        <img src={img} alt="" className="w-full h-full object-cover" />
+                                      </div>
+                                    ))}
+                                    {(event.images || []).length > 3 && (
+                                      <div className="w-8 h-8 rounded-full border-2 border-white/50 bg-black/50 flex items-center justify-center text-white text-xs font-bold">
+                                        +{(event.images || []).length - 3}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                <div className="flex items-start justify-between mb-3">
+                                  <span className="text-4xl">{event.emoji}</span>
+                                  {!isPast && !(event.images || []).length && (
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                      isToday ? 'bg-green-500 text-white' :
+                                      daysUntil <= 7 ? 'bg-amber-500 text-white' :
+                                      'bg-white/20 text-white'
+                                    }`}>
+                                      {isToday ? '🎉 Today!' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
+                                    </span>
+                                  )}
+                                  {isPast && !(event.images || []).length && (
+                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-slate-500/50 text-slate-300">
+                                      Past
+                                    </span>
+                                  )}
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-1">{event.name}</h3>
+                                <p className="text-white/80 text-sm mb-3">
+                                  {formatDate(event.date, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                  {event.time && ` • ${event.time}`}
+                                </p>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1 text-white/70 text-sm">
+                                    <Users className="w-4 h-4" />
+                                    <span>{(event.guests || []).length + 2}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-white/70 text-sm">
+                                    <Image className="w-4 h-4" />
+                                    <span>{(event.images || []).length}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-white/70 text-sm">
+                                    <CheckSquare className="w-4 h-4" />
+                                    <span>{(event.tasks || []).filter(t => t.completed).length}/{(event.tasks || []).length}</span>
+                                  </div>
+                                </div>
                               </div>
                             )}
-                            <div className="flex items-start justify-between mb-3">
-                              <span className="text-4xl">{event.emoji}</span>
-                              {!isPast && !(event.images || []).length && (
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                  isToday ? 'bg-green-500 text-white' :
-                                  daysUntil <= 7 ? 'bg-amber-500 text-white' :
-                                  'bg-white/20 text-white'
-                                }`}>
-                                  {isToday ? '🎉 Today!' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
-                                </span>
-                              )}
-                              {isPast && !(event.images || []).length && (
-                                <span className="px-3 py-1 rounded-full text-sm font-medium bg-slate-500/50 text-slate-300">
-                                  Past
-                                </span>
-                              )}
-                            </div>
-                            <h3 className="text-xl font-bold text-white mb-1">{event.name}</h3>
-                            <p className="text-white/80 text-sm mb-3">
-                              {formatDate(event.date, { weekday: 'short', month: 'short', day: 'numeric' })}
-                              {event.time && ` • ${event.time}`}
-                            </p>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1 text-white/70 text-sm">
-                                <Users className="w-4 h-4" />
-                                <span>{(event.guests || []).length + 2}</span>
-                              </div>
-                              <div className="flex items-center gap-1 text-white/70 text-sm">
-                                <Image className="w-4 h-4" />
-                                <span>{(event.images || []).length}</span>
-                              </div>
-                              <div className="flex items-center gap-1 text-white/70 text-sm">
-                                <CheckSquare className="w-4 h-4" />
-                                <span>{(event.tasks || []).filter(t => t.completed).length}/{(event.tasks || []).length}</span>
-                              </div>
-                            </div>
                           </div>
                         );
                       })}
@@ -5737,6 +5787,51 @@ export default function TripPlanner() {
                             />
                           ))}
                         </div>
+                      </div>
+
+                      {/* Cover Image */}
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-2">Cover Image (optional)</label>
+                        <input
+                          type="url"
+                          placeholder="Paste image URL (e.g., from Unsplash)"
+                          value={editingEvent ? (editingEvent.coverImage || '') : (newEventData.coverImage || '')}
+                          onChange={(e) => {
+                            if (editingEvent) {
+                              setEditingEvent({ ...editingEvent, coverImage: e.target.value });
+                            } else {
+                              setNewEventData({ ...newEventData, coverImage: e.target.value });
+                            }
+                          }}
+                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                        />
+                        {/* Image Preview */}
+                        {(editingEvent?.coverImage || newEventData.coverImage) && (
+                          <div className="mt-3 relative rounded-xl overflow-hidden">
+                            <img
+                              src={editingEvent ? editingEvent.coverImage : newEventData.coverImage}
+                              alt="Cover preview"
+                              className="w-full h-32 object-cover"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (editingEvent) {
+                                  setEditingEvent({ ...editingEvent, coverImage: '' });
+                                } else {
+                                  setNewEventData({ ...newEventData, coverImage: '' });
+                                }
+                              }}
+                              className="absolute top-2 right-2 p-1.5 bg-red-500/80 text-white rounded-full hover:bg-red-500 transition"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                        <p className="text-xs text-slate-500 mt-2">
+                          Tip: Find free images at <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">unsplash.com</a>
+                        </p>
                       </div>
 
                       {/* Action Buttons */}
@@ -7345,10 +7440,21 @@ export default function TripPlanner() {
             </div>
 
             <div className="p-6">
-              {/* Event Preview */}
+              {/* Event Name - Editable */}
+              <div className="mb-6">
+                <label className="text-white/70 text-sm font-medium mb-2 block">Event name:</label>
+                <input
+                  type="text"
+                  value={importSettings.customName || showImportModal.title}
+                  onChange={(e) => setImportSettings(prev => ({ ...prev, customName: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-white/40"
+                  placeholder="Event name"
+                />
+              </div>
+
+              {/* Event Details */}
               <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/10">
-                <h3 className="text-white font-semibold text-lg">{showImportModal.title}</h3>
-                <div className="text-slate-400 text-sm mt-2 space-y-1">
+                <div className="text-slate-400 text-sm space-y-1">
                   <p>📅 {(() => {
                     const startDate = parseLocalDate(showImportModal.start.split('T')[0]);
                     // For all-day events, Google uses exclusive end dates, so subtract 1 day
