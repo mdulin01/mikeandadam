@@ -1,0 +1,17 @@
+id,category,date,title,description,icon,location,image,link,comment,isFirstTime
+2,datenight,2025-03-02,First Date,The night everything changed ✨,🥂,,,,,True
+3,datenight,2025-03-21,First Sleepover,Fifth date magic 💫,🌙,,,,,True
+4,datenight,2025-05-17,Becoming Official,"Champagne, flowers, and a big question 💐",💍,St. Augustine,,,,True
+5,datenight,2025-06-30,First I Love You,Three little words that mean everything 💕,❤️,,,,,True
+6,travel,2025-03-05,Adam in NYC,Broadway adventures - Death Becomes Her & Happy Ending,🗽,New York City,,,,False
+7,travel,2025-06-12,Meeting the Family,Trip to NY to meet Adam's family and new nephew,👨‍👩‍👦,New York,,,,True
+8,travel,2025-07-04,Puerto Vallarta,Beach vacation in Mexico 🏖️,🌴,"Puerto Vallarta, Mexico",,,,False
+9,travel,2025-05-17,St. Augustine Weekend,Island vibes and sea breeze,🌊,"St. Augustine, FL",,,,False
+10,travel,2025-11-12,Miami Cruise Trip,Setting sail together,🚢,"Miami, FL",,,,False
+11,travel,2026-01-01,New Year in PV,Starting the year with sunshine ☀️,🎆,"Puerto Vallarta, Mexico",,,,False
+12,fitness,2025-07-21,Adam Graduates!,Sonography school complete! 🎓,🎓,"Greensboro, NC",,,,True
+13,concert,2025-03-05,Death Becomes Her,Broadway magic in NYC,🎭,New York City,,,,False
+14,concert,2025-03-05,Happy Ending,Afternoon show on Broadway,🎬,New York City,,,,False
+15,concert,2025-03-25,Gay Men's Chorus,Spring concert season,🎵,"Greensboro, NC",,,,False
+16,pride,2025-05-03,Mini Pride Festival,Rainbow flags and community love 🏳️‍🌈,🏳️‍🌈,,,,,False
+17,karaoke,2025-03-03,First Playlist,Mike made Adam a playlist with Dolly Parton 🎶,🎤,,,https://youtube.com/playlist?list=PLP4ZjEUrW1OeaTmkiCFUpBtMUvYLydf_g,,False

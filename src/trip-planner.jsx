@@ -5947,6 +5947,7 @@ export default function TripPlanner() {
           canEditTrip={canEditTrip}
           removeItem={removeItem}
           removeLink={removeLink}
+          addLink={addLink}
           setShowAddModal={setShowAddModal}
           setShowLinkModal={setShowLinkModal}
           setShowGuestModal={setShowGuestModal}
@@ -5959,8 +5960,11 @@ export default function TripPlanner() {
           updateTripDates={updateTripDates}
           showToast={showToast}
           saveToFirestore={saveToFirestore}
-          LinkModal={LinkModal}
-          GuestModal={GuestModal}
+          setTrips={setTrips}
+          guestEmail={guestEmail}
+          setGuestEmail={setGuestEmail}
+          guestPermission={guestPermission}
+          setGuestPermission={setGuestPermission}
         />
       )}
 

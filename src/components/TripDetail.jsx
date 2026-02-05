@@ -3,6 +3,8 @@ import {
   Calendar, Plane, Hotel, Music, MapPin, Plus, X, Users, ExternalLink, Pencil, Check, Link
 } from 'lucide-react';
 import { formatDate } from '../utils';
+import LinkModal from './LinkModal';
+import GuestModal from './GuestModal';
 
 // Starburst SVG component for mid-century flair with pulse animation
 const Starburst = ({ className, animated = false }) => (
@@ -79,6 +81,7 @@ const TripDetail = ({
   canEditTrip,
   removeItem,
   removeLink,
+  addLink,
   setShowAddModal,
   setShowLinkModal,
   setShowGuestModal,
@@ -91,8 +94,11 @@ const TripDetail = ({
   updateTripDates,
   showToast,
   saveToFirestore,
-  LinkModal,
-  GuestModal,
+  setTrips,
+  guestEmail,
+  setGuestEmail,
+  guestPermission,
+  setGuestPermission,
 }) => {
   const details = tripDetails[trip.id] || { flights: [], hotels: [], events: [], links: [] };
   const userCanEdit = canEditTrip(trip.id);
@@ -712,8 +718,19 @@ const TripDetail = ({
           </div>
         </div>
       </div>
-      {showLinkModal === trip.id && <LinkModal tripId={trip.id} onClose={() => setShowLinkModal(null)} addLink={() => {}} />}
-      {showGuestModal === trip.id && <GuestModal trip={trip} onClose={() => setShowGuestModal(null)} />}
+      {showLinkModal === trip.id && <LinkModal tripId={trip.id} onClose={() => setShowLinkModal(null)} addLink={addLink} />}
+      {showGuestModal === trip.id && (
+        <GuestModal
+          trip={trip}
+          onClose={() => setShowGuestModal(null)}
+          setTrips={setTrips}
+          guestEmail={guestEmail}
+          setGuestEmail={setGuestEmail}
+          guestPermission={guestPermission}
+          setGuestPermission={setGuestPermission}
+          currentUser={currentUser}
+        />
+      )}
     </div>
   );
 };
