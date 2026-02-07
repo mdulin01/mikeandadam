@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Calendar, Plane, Hotel, Music, MapPin, Plus, X, ChevronLeft, ChevronRight, Heart, Anchor, Sun, Star, Clock, Users, ExternalLink, Sparkles, Pencil, Check, MoreVertical, Trash2, Palette, Image, Link, Globe, Loader, LogIn, LogOut, User, UserPlus, Share2, Upload, Folder, Edit3, CheckSquare, RefreshCw } from 'lucide-react';
+import { Calendar, Plane, Hotel, Music, MapPin, Plus, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Heart, Anchor, Sun, Star, Clock, Users, ExternalLink, Sparkles, Pencil, Check, MoreVertical, Trash2, Palette, Image, Link, Globe, Loader, LogIn, LogOut, User, UserPlus, Share2, Upload, Folder, Edit3, CheckSquare, RefreshCw, Camera } from 'lucide-react';
 
 // Import constants and utilities
 import {
@@ -407,20 +407,33 @@ export default function TripPlanner() {
   }, []);
 
   // Main section navigation
-  // Check URL for app mode at initialization
+  // Check URL for app mode at initialization - supports multiple app types
   const initialAppMode = (() => {
     const urlParams = new URLSearchParams(window.location.search);
     const appParam = urlParams.get('app');
+    const validApps = ['fitness', 'travel', 'events', 'memories'];
+    if (appParam && validApps.includes(appParam)) {
+      return appParam;
+    }
     const isStandalone = typeof window !== 'undefined' && (
       window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone ||
       document.referrer.includes('android-app://')
     );
-    return appParam === 'fitness' || (isStandalone && window.location.search.includes('fitness'));
+    // Check for any app mode in standalone
+    for (const app of validApps) {
+      if (isStandalone && window.location.search.includes(app)) {
+        return app;
+      }
+    }
+    return null;
   })();
 
-  const [activeSection, setActiveSection] = useState(initialAppMode ? 'fitness' : 'home'); // 'home' | 'travel' | 'fitness' | 'nutrition' | 'events' | 'lifePlanning' | 'business' | 'memories'
+  const [activeSection, setActiveSection] = useState(initialAppMode || 'home'); // 'home' | 'travel' | 'fitness' | 'nutrition' | 'events' | 'lifePlanning' | 'business' | 'memories'
   const [memoriesView, setMemoriesView] = useState('timeline'); // 'timeline' | 'events' | 'media'
+  const [collapsedMemorySections, setCollapsedMemorySections] = useState({}); // { sectionId: true/false }
+  const [timelineSortOrder, setTimelineSortOrder] = useState('newest'); // 'newest' | 'oldest'
+  const [timelineYearFilter, setTimelineYearFilter] = useState('all'); // 'all' | specific year
 
   // Memories state - imported from memories_data.xlsx
   const [memories, setMemories] = useState([
@@ -456,6 +469,9 @@ export default function TripPlanner() {
     { id: 126, category: 'concert', date: '2025-12-17', title: 'Dolly Christmas Show', description: 'Looking good in the new Christmas shirt', icon: '🎵', location: 'Greensboro, NC', image: '', link: '', comment: '', isFirstTime: false },
   ]);
   const [editingMemory, setEditingMemory] = useState(null); // memory object being edited
+  const [editingPhotoIndex, setEditingPhotoIndex] = useState(null); // which photo is being edited for positioning
+  const [photoPosition, setPhotoPosition] = useState({ x: 50, y: 50, zoom: 100 }); // x%, y%, zoom%
+  const [showPartnershipQuote, setShowPartnershipQuote] = useState(false); // cute quote popup
   const [showAddMemoryModal, setShowAddMemoryModal] = useState(null); // category for new memory
   const [newMemoryData, setNewMemoryData] = useState({
     title: '', date: '', location: '', description: '', image: '', images: [], link: '', comment: ''
@@ -508,13 +524,13 @@ export default function TripPlanner() {
     return () => clearInterval(interval);
   }, [getAllMemoryPhotos]);
 
-  // Handle drag and drop for photo upload in modals
+  // Handle drag and drop for photo/video upload in modals
   const handleDrop = (e, isEdit = false) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer?.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      uploadMemoryPhoto(file, isEdit);
+    if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
+      uploadMemoryMedia(file, isEdit);
     }
   };
 
@@ -658,14 +674,124 @@ export default function TripPlanner() {
     }
   };
 
-  // Upload photo to Firebase Storage (with HEIC conversion) - for modals
-  const uploadMemoryPhoto = async (file, isEdit = false) => {
+  // Handle event cover image upload in modal
+  const handleEventCoverImageSelect = async (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file size
-    const sizeError = validateFileSize(file);
-    if (sizeError) {
-      showToast(sizeError, 'error');
+    // Show preview immediately
+    const previewUrl = URL.createObjectURL(file);
+    setEventCoverImagePreview(previewUrl);
+    setUploadingEventCoverImage(true);
+
+    try {
+      // Convert to data URL for storage (works offline, persists in Firestore)
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result;
+        if (editingEvent) {
+          setEditingEvent({ ...editingEvent, coverImage: dataUrl });
+        } else {
+          setNewEventData({ ...newEventData, coverImage: dataUrl });
+        }
+        setUploadingEventCoverImage(false);
+      };
+      reader.onerror = () => {
+        if (editingEvent) {
+          setEditingEvent({ ...editingEvent, coverImage: previewUrl });
+        } else {
+          setNewEventData({ ...newEventData, coverImage: previewUrl });
+        }
+        setUploadingEventCoverImage(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error processing event cover image:', error);
+      if (editingEvent) {
+        setEditingEvent({ ...editingEvent, coverImage: previewUrl });
+      } else {
+        setNewEventData({ ...newEventData, coverImage: previewUrl });
+      }
+      setUploadingEventCoverImage(false);
+    }
+  };
+
+  const removeEventCoverImage = () => {
+    setEventCoverImagePreview(null);
+    if (editingEvent) {
+      setEditingEvent({ ...editingEvent, coverImage: '' });
+    } else {
+      setNewEventData({ ...newEventData, coverImage: '' });
+    }
+    if (eventCoverFileRef.current) eventCoverFileRef.current.value = '';
+    if (eventCoverCameraRef.current) eventCoverCameraRef.current.value = '';
+  };
+
+  // Handle fitness cover image upload in modal
+  const handleFitnessCoverImageSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Show preview immediately
+    const previewUrl = URL.createObjectURL(file);
+    setFitnessCoverImagePreview(previewUrl);
+    setUploadingFitnessCoverImage(true);
+
+    try {
+      // Convert to data URL for storage (works offline, persists in Firestore)
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result;
+        if (editingFitnessEvent) {
+          setEditingFitnessEvent({ ...editingFitnessEvent, coverImage: dataUrl });
+        } else {
+          setNewFitnessEventData(prev => ({ ...prev, coverImage: dataUrl }));
+        }
+        setUploadingFitnessCoverImage(false);
+      };
+      reader.onerror = () => {
+        if (editingFitnessEvent) {
+          setEditingFitnessEvent({ ...editingFitnessEvent, coverImage: previewUrl });
+        } else {
+          setNewFitnessEventData(prev => ({ ...prev, coverImage: previewUrl }));
+        }
+        setUploadingFitnessCoverImage(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error processing fitness cover image:', error);
+      if (editingFitnessEvent) {
+        setEditingFitnessEvent({ ...editingFitnessEvent, coverImage: previewUrl });
+      } else {
+        setNewFitnessEventData(prev => ({ ...prev, coverImage: previewUrl }));
+      }
+      setUploadingFitnessCoverImage(false);
+    }
+  };
+
+  const removeFitnessCoverImage = () => {
+    setFitnessCoverImagePreview(null);
+    if (editingFitnessEvent) {
+      setEditingFitnessEvent({ ...editingFitnessEvent, coverImage: '' });
+    } else {
+      setNewFitnessEventData(prev => ({ ...prev, coverImage: '' }));
+    }
+    if (fitnessCoverFileRef.current) fitnessCoverFileRef.current.value = '';
+    if (fitnessCoverCameraRef.current) fitnessCoverCameraRef.current.value = '';
+  };
+
+  // Upload photo/video to Firebase Storage (with HEIC conversion for images) - for modals
+  const uploadMemoryMedia = async (file, isEdit = false) => {
+    if (!file) return;
+
+    // Check if it's a video file
+    const isVideo = file.type.startsWith('video/') ||
+                    /\.(mp4|mov|m4v|webm|avi)$/i.test(file.name);
+
+    // Validate file size (more lenient for videos - 50MB)
+    const maxSize = isVideo ? 50 * 1024 * 1024 : MAX_FILE_SIZE_BYTES;
+    if (file.size > maxSize) {
+      showToast(`File too large. Max size: ${isVideo ? '50MB' : MAX_FILE_SIZE_MB + 'MB'}`, 'error');
       return;
     }
 
@@ -674,22 +800,25 @@ export default function TripPlanner() {
       let fileToUpload = file;
       let fileName = file.name;
 
-      // Convert HEIC/HEIF to JPEG
-      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
-                     file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
-      if (isHeic) {
-        const convertedBlob = await heic2any({
-          blob: file,
-          toType: 'image/jpeg',
-          quality: 0.9
-        });
-        fileToUpload = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
-        fileName = fileToUpload.name;
+      // Convert HEIC/HEIF to JPEG (only for images)
+      if (!isVideo) {
+        const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
+                       file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+        if (isHeic) {
+          const convertedBlob = await heic2any({
+            blob: file,
+            toType: 'image/jpeg',
+            quality: 0.9
+          });
+          fileToUpload = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
+          fileName = fileToUpload.name;
+        }
       }
 
       const timestamp = Date.now();
       const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const storageRef = ref(storage, `memories/${timestamp}_${safeName}`);
+      const folder = isVideo ? 'videos' : 'memories';
+      const storageRef = ref(storage, `${folder}/${timestamp}_${safeName}`);
       await uploadBytes(storageRef, fileToUpload);
       const downloadURL = await getDownloadURL(storageRef);
 
@@ -697,27 +826,46 @@ export default function TripPlanner() {
       if (!isMountedRef.current) return;
 
       if (isEdit) {
-        // Add to images array instead of replacing
-        setEditingMemory(prev => {
-          const currentImages = prev.images || [];
-          const allImages = prev.image && !currentImages.includes(prev.image)
-            ? [prev.image, ...currentImages]
-            : currentImages;
-          return { ...prev, images: [...allImages, downloadURL], image: '' };
-        });
+        if (isVideo) {
+          // Add to videos array
+          setEditingMemory(prev => {
+            const currentVideos = prev.videos || [];
+            return { ...prev, videos: [...currentVideos, downloadURL] };
+          });
+        } else {
+          // Add to images array
+          setEditingMemory(prev => {
+            const currentImages = prev.images || [];
+            const allImages = prev.image && !currentImages.includes(prev.image)
+              ? [prev.image, ...currentImages]
+              : currentImages;
+            return { ...prev, images: [...allImages, downloadURL], image: '' };
+          });
+        }
       } else {
-        setNewMemoryData(prev => {
-          const currentImages = prev.images || [];
-          return { ...prev, images: [...currentImages, downloadURL] };
-        });
+        if (isVideo) {
+          setNewMemoryData(prev => {
+            const currentVideos = prev.videos || [];
+            return { ...prev, videos: [...currentVideos, downloadURL] };
+          });
+        } else {
+          setNewMemoryData(prev => {
+            const currentImages = prev.images || [];
+            return { ...prev, images: [...currentImages, downloadURL] };
+          });
+        }
       }
+      showToast(isVideo ? 'Video uploaded!' : 'Photo uploaded!', 'success');
     } catch (error) {
       console.error('Upload failed:', error);
-      if (isMountedRef.current) showToast('Photo upload failed. Please try again.', 'error');
+      if (isMountedRef.current) showToast('Upload failed. Please try again.', 'error');
     } finally {
       if (isMountedRef.current) setUploadingPhoto(false);
     }
   };
+
+  // Alias for backward compatibility
+  const uploadMemoryPhoto = uploadMemoryMedia;
 
   // PWA App Mode Detection - Check if running as installed app or with ?app=fitness parameter
   const [isAppMode, setIsAppMode] = useState(() => {
@@ -759,6 +907,7 @@ export default function TripPlanner() {
   const [selectedCalendarId, setSelectedCalendarId] = useState('primary'); // Selected calendar to fetch from
   const [showCalendarPicker, setShowCalendarPicker] = useState(false); // Show calendar selection modal
   const [showRandomExperience, setShowRandomExperience] = useState(false);
+  const [travelViewMode, setTravelViewMode] = useState('main'); // 'main', 'random', 'wishlist'
   const [easterEggClicks, setEasterEggClicks] = useState(0);
   const [showDisneyMagic, setShowDisneyMagic] = useState(false);
   const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
@@ -781,6 +930,10 @@ export default function TripPlanner() {
   const [guestPermissions, setGuestPermissions] = useState({}); // { tripId: 'edit' | 'view' }
   const [guestEmail, setGuestEmail] = useState(''); // for guest modal input
   const [guestPermission, setGuestPermission] = useState('edit'); // for guest modal input
+
+  // ========== UI STATE ==========
+  const [showComingSoonMenu, setShowComingSoonMenu] = useState(false); // click-based dropdown
+  const [showAddNewMenu, setShowAddNewMenu] = useState(false); // home page add new menu
 
   // ========== CELEBRATION STATE ==========
   const [confetti, setConfetti] = useState(null); // { type: 'run' | 'week', x?, y? }
@@ -848,129 +1001,129 @@ export default function TripPlanner() {
   // Hardcoded Indy Half Marathon Training Plan - "Salad, Run, Salad"
   const indyHalfTrainingPlan = [
     { weekNumber: 1, startDate: '2026-01-11', endDate: '2026-01-17', runs: [
-      { id: 1, label: 'Short Run', distance: '2', mike: true, adam: true, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '3', mike: true, adam: true, notes: '' },
-      { id: 3, label: 'Long Run', distance: '4', mike: true, adam: true, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2 mi', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3 mi', mike: true, adam: true, notes: '' },
+      { id: 3, label: 'Long Run', distance: '4 mi', mike: true, adam: true, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: true, adam: true, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: true, adam: true, notes: '' }
     ], totalMiles: 9, weekNotes: '' },
     { weekNumber: 2, startDate: '2026-01-18', endDate: '2026-01-24', runs: [
-      { id: 1, label: 'Short Run', distance: '2', mike: true, adam: true, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '3', mike: true, adam: true, notes: '' },
-      { id: 3, label: 'Long Run', distance: '4', mike: true, adam: true, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2 mi', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3 mi', mike: true, adam: true, notes: '' },
+      { id: 3, label: 'Long Run', distance: '4 mi', mike: true, adam: true, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: true, adam: true, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: true, adam: true, notes: '' }
     ], totalMiles: 9, weekNotes: '' },
     { weekNumber: 3, startDate: '2026-01-25', endDate: '2026-01-31', runs: [
-      { id: 1, label: 'Short Run', distance: '2', mike: true, adam: true, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '3', mike: true, adam: true, notes: '' },
-      { id: 3, label: 'Long Run', distance: '5', mike: true, adam: true, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2 mi', mike: true, adam: true, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3 mi', mike: true, adam: true, notes: '' },
+      { id: 3, label: 'Long Run', distance: '5 mi', mike: true, adam: true, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: true, adam: true, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: true, adam: true, notes: '' }
     ], totalMiles: 10, weekNotes: '' },
     { weekNumber: 4, startDate: '2026-02-01', endDate: '2026-02-07', runs: [
-      { id: 1, label: 'Short Run', distance: '2', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '6', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '6 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 11, weekNotes: 'SOBER!! 🎯' },
     { weekNumber: 5, startDate: '2026-02-08', endDate: '2026-02-14', runs: [
-      { id: 1, label: 'Short Run', distance: '2', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '6', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '6 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 12, weekNotes: '' },
     { weekNumber: 6, startDate: '2026-02-15', endDate: '2026-02-21', runs: [
-      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '6', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '6 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 13, weekNotes: '' },
     { weekNumber: 7, startDate: '2026-02-22', endDate: '2026-02-28', runs: [
-      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '8', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '8 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 15, weekNotes: '' },
     { weekNumber: 8, startDate: '2026-03-01', endDate: '2026-03-07', runs: [
-      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '8', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '8 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 15, weekNotes: '✈️ Mike in Spain (Fri-Sat)' },
     { weekNumber: 9, startDate: '2026-03-08', endDate: '2026-03-14', runs: [
-      { id: 1, label: 'Short Run', distance: '4', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '8', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '8 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 17, weekNotes: '✈️ Mike in Spain (all week)' },
     { weekNumber: 10, startDate: '2026-03-15', endDate: '2026-03-21', runs: [
-      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '9', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '9 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 17, weekNotes: '🗽 Mike & Adam in NYC (Thurs-Sat)' },
     { weekNumber: 11, startDate: '2026-03-22', endDate: '2026-03-28', runs: [
-      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '10', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '10 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 18, weekNotes: '🗽 Mike & Adam in NYC (Sun-Mon)' },
     { weekNumber: 12, startDate: '2026-03-29', endDate: '2026-04-04', runs: [
-      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '11', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '11 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 19, weekNotes: '' },
     { weekNumber: 13, startDate: '2026-04-05', endDate: '2026-04-11', runs: [
-      { id: 1, label: 'Short Run', distance: '5.5', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '12', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '5.5 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '12 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 22.5, weekNotes: '🏛️ Mike & Adam in DC (Thurs-Sat)' },
     { weekNumber: 14, startDate: '2026-04-12', endDate: '2026-04-18', runs: [
-      { id: 1, label: 'Short Run', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '14', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '14 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 24, weekNotes: '🏛️ Mike & Adam in DC (Sun-Mon)' },
     { weekNumber: 15, startDate: '2026-04-19', endDate: '2026-04-25', runs: [
-      { id: 1, label: 'Short Run', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '8', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '8 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 15, weekNotes: '📉 Taper Week - Rest up!' },
     { weekNumber: 16, startDate: '2026-04-26', endDate: '2026-05-02', runs: [
-      { id: 1, label: 'Short Run', distance: '2', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '3', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run', distance: '13.1', mike: false, adam: false, notes: '' }
+      { id: 1, label: 'Short Run', distance: '2 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run', distance: '13.1 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
@@ -984,205 +1137,205 @@ export default function TripPlanner() {
     // === PRE-SEASON: Swimming Cross-Training (Feb 2 - May 9) ===
     // During this phase, runs are tracked in Half Marathon plan
     { weekNumber: 1, startDate: '2026-02-02', endDate: '2026-02-08', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '400m', mike: false, notes: 'Easy pace, focus on form' }
+      { id: 1, label: '🏊 Swim', distance: '450 yds', mike: false, notes: 'Easy pace, focus on form' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '🏊 Pre-Season Week 1 - Getting in the water!' },
     { weekNumber: 2, startDate: '2026-02-09', endDate: '2026-02-15', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '450m', mike: false, notes: 'Freestyle drills' }
+      { id: 1, label: '🏊 Swim', distance: '500 yds', mike: false, notes: 'Freestyle drills' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '' },
     { weekNumber: 3, startDate: '2026-02-16', endDate: '2026-02-22', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '500m', mike: false, notes: '' }
+      { id: 1, label: '🏊 Swim', distance: '550 yds', mike: false, notes: '' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '' },
     { weekNumber: 4, startDate: '2026-02-23', endDate: '2026-03-01', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '550m', mike: false, notes: '' }
+      { id: 1, label: '🏊 Swim', distance: '600 yds', mike: false, notes: '' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '' },
     { weekNumber: 5, startDate: '2026-03-02', endDate: '2026-03-08', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '600m', mike: false, notes: '' }
+      { id: 1, label: '🏊 Swim', distance: '650 yds', mike: false, notes: '' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '🏊 Building endurance!' },
     { weekNumber: 6, startDate: '2026-03-09', endDate: '2026-03-15', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '650m', mike: false, notes: '' }
+      { id: 1, label: '🏊 Swim', distance: '700 yds', mike: false, notes: '' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '' },
     { weekNumber: 7, startDate: '2026-03-16', endDate: '2026-03-22', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '700m', mike: false, notes: '' }
+      { id: 1, label: '🏊 Swim', distance: '750 yds', mike: false, notes: '' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '' },
     { weekNumber: 8, startDate: '2026-03-23', endDate: '2026-03-29', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '750m', mike: false, notes: '' }
+      { id: 1, label: '🏊 Swim', distance: '825 yds', mike: false, notes: '' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '' },
     { weekNumber: 9, startDate: '2026-03-30', endDate: '2026-04-05', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '800m', mike: false, notes: '' }
+      { id: 1, label: '🏊 Swim', distance: '875 yds', mike: false, notes: '' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '🏊 Halfway to race swim distance!' },
     { weekNumber: 10, startDate: '2026-04-06', endDate: '2026-04-12', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '850m', mike: false, notes: '' }
+      { id: 1, label: '🏊 Swim', distance: '925 yds', mike: false, notes: '' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '' },
     { weekNumber: 11, startDate: '2026-04-13', endDate: '2026-04-19', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '900m', mike: false, notes: '' }
+      { id: 1, label: '🏊 Swim', distance: '1000 yds', mike: false, notes: '' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '' },
     { weekNumber: 12, startDate: '2026-04-20', endDate: '2026-04-26', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '950m', mike: false, notes: '' }
+      { id: 1, label: '🏊 Swim', distance: '1050 yds', mike: false, notes: '' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '' },
     { weekNumber: 13, startDate: '2026-04-27', endDate: '2026-05-03', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '1000m', mike: false, notes: 'Race distance achieved!' }
+      { id: 1, label: '🏊 Swim', distance: '1100 yds', mike: false, notes: 'Race distance achieved!' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '🏃 Half Marathon Week! Focus on race.' },
     { weekNumber: 14, startDate: '2026-05-04', endDate: '2026-05-09', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '600m', mike: false, notes: 'Recovery swim' }
+      { id: 1, label: '🏊 Swim', distance: '650 yds', mike: false, notes: 'Recovery swim' }
     ], crossTraining: [], totalMiles: 0, weekNotes: '🔄 Transition week - recover from Half!' },
 
     // === MAIN TRAINING: Full Triathlon (May 10 onwards) ===
     { weekNumber: 15, startDate: '2026-05-10', endDate: '2026-05-16', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '500m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '550 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '10 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '2', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '2 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '🚴 Full tri training begins!' },
     { weekNumber: 16, startDate: '2026-05-17', endDate: '2026-05-23', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '600m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '650 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '12 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '2.5', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '2.5 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 17, startDate: '2026-05-24', endDate: '2026-05-30', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '700m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '750 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '14 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '3', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '3 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 18, startDate: '2026-05-31', endDate: '2026-06-06', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '800m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '875 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '15 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '3', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '3 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 19, startDate: '2026-06-07', endDate: '2026-06-13', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '900m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1000 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '16 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '3.5', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '3.5 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 20, startDate: '2026-06-14', endDate: '2026-06-20', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1000m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1100 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '18 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '4', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '4 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 21, startDate: '2026-06-21', endDate: '2026-06-27', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1000m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1100 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '20 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '4', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '4 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 22, startDate: '2026-06-28', endDate: '2026-07-04', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1100m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1200 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '22 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '4.5', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '4.5 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '🎆 4th of July Week!' },
     { weekNumber: 23, startDate: '2026-07-05', endDate: '2026-07-11', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1200m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1300 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '24 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '5 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 24, startDate: '2026-07-12', endDate: '2026-07-18', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1300m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1425 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '26 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '5 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 25, startDate: '2026-07-19', endDate: '2026-07-25', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1400m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1530 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '28 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5.5', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '5.5 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 26, startDate: '2026-07-26', endDate: '2026-08-01', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1500m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1640 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '30 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '6', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '6 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '🏊 Peak Swim Week!' },
     { weekNumber: 27, startDate: '2026-08-02', endDate: '2026-08-08', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1500m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1640 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '30 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '6', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '6 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 28, startDate: '2026-08-09', endDate: '2026-08-15', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1500m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1640 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '28 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5.5', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '5.5 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 29, startDate: '2026-08-16', endDate: '2026-08-22', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1400m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1530 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '26 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '5 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 30, startDate: '2026-08-23', endDate: '2026-08-29', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1300m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1425 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '24 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '5 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '' },
     { weekNumber: 31, startDate: '2026-08-30', endDate: '2026-09-05', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1200m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1300 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '22 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '4', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '4 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '📉 Taper begins!' },
     { weekNumber: 32, startDate: '2026-09-06', endDate: '2026-09-12', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1000m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '1100 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '18 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '3', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '3 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '📉 Taper Week 2' },
     { weekNumber: 33, startDate: '2026-09-13', endDate: '2026-09-19', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '800m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '875 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '14 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '2.5', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '2.5 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
       { id: 2, label: 'Strength', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '📉 Taper Week 3 - Rest up!' },
     { weekNumber: 34, startDate: '2026-09-20', endDate: '2026-09-26', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '500m', mike: false, notes: '' },
+      { id: 1, label: 'Swim', distance: '550 yds', mike: false, notes: '' },
       { id: 2, label: 'Bike', distance: '10 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '6.2', mike: false, notes: '' }
+      { id: 3, label: 'Run', distance: '6.2 mi', mike: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Race Day Prep', mike: false, notes: '' },
       { id: 2, label: 'Rest', mike: false, notes: '' }
@@ -1260,6 +1413,25 @@ export default function TripPlanner() {
   const [fitnessTrainingPlans, setFitnessTrainingPlans] = useState({});
   const [selectedFitnessEvent, setSelectedFitnessEvent] = useState(null);
   const [fitnessViewMode, setFitnessViewMode] = useState('events'); // 'events' | 'training' | 'stats'
+  const [showAddFitnessEventModal, setShowAddFitnessEventModal] = useState(false);
+  const [editingFitnessEvent, setEditingFitnessEvent] = useState(null);
+  const [newFitnessEventData, setNewFitnessEventData] = useState({
+    name: '',
+    emoji: '🏃',
+    date: '',
+    type: 'running', // running, half-marathon, marathon, triathlon, cycling, swimming, other
+    url: '',
+    trainingWeeks: 12,
+    color: 'from-orange-400 to-red-500',
+    description: '',
+    participants: 'both', // 'mike', 'adam', 'both'
+    location: '',
+    coverImage: null
+  });
+  const [fitnessCoverImagePreview, setFitnessCoverImagePreview] = useState(null);
+  const [uploadingFitnessCoverImage, setUploadingFitnessCoverImage] = useState(false);
+  const fitnessCoverFileRef = useRef(null);
+  const fitnessCoverCameraRef = useRef(null);
   // ========== END FITNESS SECTION STATE ==========
 
   // ========== EVENTS/PARTY SECTION STATE ==========
@@ -1270,14 +1442,19 @@ export default function TripPlanner() {
   const [eventViewMode, setEventViewMode] = useState('upcoming');
   const [newEventData, setNewEventData] = useState({
     name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
-    location: '', entryCode: '', description: '', color: 'from-purple-400 to-pink-500'
+    location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500'
   });
   const [eventGuestEmail, setEventGuestEmail] = useState('');
   const [eventGuestPermission, setEventGuestPermission] = useState('edit');
   const [newTaskText, setNewTaskText] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
+  const [swipeState, setSwipeState] = useState({ id: null, startX: 0, currentX: 0, swiping: false });
   const [uploadingToEventId, setUploadingToEventId] = useState(null);
   const [dragOverEventId, setDragOverEventId] = useState(null);
+  const [eventCoverImagePreview, setEventCoverImagePreview] = useState(null);
+  const [uploadingEventCoverImage, setUploadingEventCoverImage] = useState(false);
+  const eventCoverFileRef = useRef(null);
+  const eventCoverCameraRef = useRef(null);
   // ========== END EVENTS/PARTY SECTION STATE ==========
 
   // Use refs for companions and trips to avoid recreating auth listener when they change
@@ -1547,6 +1724,7 @@ export default function TripPlanner() {
   const GOOGLE_CLIENT_ID = '803115812045-l2r8qgijts7rp56shcdt422cl8kjfb62.apps.googleusercontent.com';
   const GOOGLE_API_KEY = 'AIzaSyB4pbBVj7Dryy3C57V2s6L4N_znGEyuib0';
   const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
+  const [googleScriptsLoaded, setGoogleScriptsLoaded] = useState(false);
 
   // Load Google API scripts
   const loadGoogleScripts = () => {
@@ -1601,12 +1779,23 @@ export default function TripPlanner() {
   // Connect to Google Calendar
   const connectGoogleCalendar = async () => {
     setCalendarLoading(true);
-    try {
-      // Load both scripts
-      await loadGoogleScripts();
-      await initGoogleCalendar();
 
-      // Create token client
+    // Check if scripts are pre-loaded (Safari needs this to preserve user gesture)
+    if (!googleScriptsLoaded) {
+      try {
+        // Quick load attempt - may break user gesture chain on Safari
+        await loadGoogleScripts();
+        await initGoogleCalendar();
+      } catch (error) {
+        console.error('Error loading Google scripts:', error);
+        showToast('Failed to load Google Calendar. Please refresh and try again.', 'error');
+        setCalendarLoading(false);
+        return;
+      }
+    }
+
+    try {
+      // Create token client - this should happen synchronously after user click
       const tokenClient = window.google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: SCOPES,
@@ -1650,11 +1839,17 @@ export default function TripPlanner() {
         },
       });
 
-      // Request access token (will show Google sign-in popup)
+      // Request access token - should work now that scripts are pre-loaded
       tokenClient.requestAccessToken({ prompt: 'consent' });
     } catch (error) {
       console.error('Error connecting to Google Calendar:', error);
-      showToast('Failed to connect to Google Calendar', 'error');
+      // Provide helpful message for Safari users
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        showToast('Calendar popup may be blocked. Check Safari settings or try on desktop.', 'error');
+      } else {
+        showToast('Failed to connect to Google Calendar. Please try again.', 'error');
+      }
       setCalendarLoading(false);
     }
   };
@@ -1911,18 +2106,36 @@ export default function TripPlanner() {
   // Update a training week
   const updateTrainingWeek = async (eventId, weekId, updates) => {
     const newPlans = { ...fitnessTrainingPlans };
+
+    // Initialize plan if it doesn't exist
     if (!newPlans[eventId]) {
-      // Generate training weeks for this event
-      const event = fitnessEvents.find(e => e.id === eventId);
-      if (event) {
-        const today = new Date().toISOString().split('T')[0];
-        newPlans[eventId] = generateTrainingWeeks(today, event.date, eventId);
+      // Use hardcoded plans for specific events
+      if (eventId === 'triathlon-2026') {
+        newPlans[eventId] = JSON.parse(JSON.stringify(triathlonTrainingPlan));
+      } else if (eventId === 'indy-half-2026') {
+        newPlans[eventId] = JSON.parse(JSON.stringify(indyHalfTrainingPlan));
+      } else {
+        // Generate training weeks for other events
+        const event = fitnessEvents.find(e => e.id === eventId);
+        if (event) {
+          const today = new Date().toISOString().split('T')[0];
+          newPlans[eventId] = generateTrainingWeeks(today, event.date, eventId);
+        }
       }
     }
 
-    newPlans[eventId] = newPlans[eventId].map(week =>
-      week.id === weekId ? { ...week, ...updates } : week
-    );
+    if (!newPlans[eventId]) return;
+
+    // Find week by id OR weekNumber (for backwards compatibility)
+    const weekIdNum = weekId.includes('week-') ? parseInt(weekId.split('week-')[1]) : null;
+    newPlans[eventId] = newPlans[eventId].map(week => {
+      const matches = week.id === weekId || (weekIdNum && week.weekNumber === weekIdNum);
+      if (matches) {
+        // Ensure the week has proper id for future lookups
+        return { ...week, ...updates, id: weekId };
+      }
+      return week;
+    });
 
     setFitnessTrainingPlans(newPlans);
     await saveFitnessToFirestore(null, newPlans);
@@ -1931,33 +2144,54 @@ export default function TripPlanner() {
   // Update a workout (run or cross-training)
   const updateWorkout = async (eventId, weekId, workoutType, workoutId, updates) => {
     const newPlans = { ...fitnessTrainingPlans };
-    if (!newPlans[eventId]) return;
+
+    // Initialize plan if it doesn't exist
+    if (!newPlans[eventId]) {
+      if (eventId === 'triathlon-2026') {
+        newPlans[eventId] = JSON.parse(JSON.stringify(triathlonTrainingPlan));
+      } else if (eventId === 'indy-half-2026') {
+        newPlans[eventId] = JSON.parse(JSON.stringify(indyHalfTrainingPlan));
+      } else {
+        return; // Can't update non-existent plan
+      }
+    }
 
     // Get current workout state before update
-    const currentWeek = newPlans[eventId].find(w => w.id === weekId);
+    // Find week by id OR weekNumber (for backwards compatibility)
+    const weekIdNum = weekId.includes('week-') ? parseInt(weekId.split('week-')[1]) : null;
+    const findWeek = (w) => w.id === weekId || (weekIdNum && w.weekNumber === weekIdNum);
+
+    const currentWeek = newPlans[eventId].find(findWeek);
     const currentWorkout = currentWeek?.[workoutType]?.find(w => w.id === workoutId);
-    const wasCompletedTogether = currentWorkout?.mike && currentWorkout?.adam;
+    // For Mike-only plans (no adam field), consider complete when mike is done
+    const isMikeOnlyPlan = currentWorkout && !('adam' in currentWorkout);
+    const wasCompletedTogether = isMikeOnlyPlan ? currentWorkout?.mike : (currentWorkout?.mike && currentWorkout?.adam);
 
     // Check if all runs were complete before this update
-    const wereAllRunsComplete = currentWeek?.runs?.every(r => r.mike && r.adam);
+    const wereAllRunsComplete = currentWeek?.runs?.every(r =>
+      ('adam' in r) ? (r.mike && r.adam) : r.mike
+    );
 
     newPlans[eventId] = newPlans[eventId].map(week => {
-      if (week.id !== weekId) return week;
+      if (!findWeek(week)) return week;
 
       const updatedWorkouts = week[workoutType].map(workout =>
         workout.id === workoutId ? { ...workout, ...updates } : workout
       );
 
-      return { ...week, [workoutType]: updatedWorkouts };
+      // Ensure the week has proper id for future lookups
+      return { ...week, [workoutType]: updatedWorkouts, id: weekId };
     });
 
     // Get updated state
-    const updatedWeek = newPlans[eventId].find(w => w.id === weekId);
+    const updatedWeek = newPlans[eventId].find(findWeek);
     const updatedWorkout = updatedWeek?.[workoutType]?.find(w => w.id === workoutId);
-    const isNowCompletedTogether = updatedWorkout?.mike && updatedWorkout?.adam;
+    const isNowCompletedTogether = isMikeOnlyPlan ? updatedWorkout?.mike : (updatedWorkout?.mike && updatedWorkout?.adam);
 
     // Check if all runs are now complete
-    const areAllRunsNowComplete = updatedWeek?.runs?.every(r => r.mike && r.adam);
+    const areAllRunsNowComplete = updatedWeek?.runs?.every(r =>
+      ('adam' in r) ? (r.mike && r.adam) : r.mike
+    );
 
     setFitnessTrainingPlans(newPlans);
     await saveFitnessToFirestore(null, newPlans);
@@ -1994,10 +2228,10 @@ export default function TripPlanner() {
     await saveFitnessToFirestore(null, newPlans);
   };
 
-  // Get the active training plan for an event - always uses hardcoded plans
-  // but merges completion status from Firebase
+  // Get the active training plan for an event - uses hardcoded plans as base
+  // but merges all changes (completion status, edits, new activities) from Firebase
   const getActiveTrainingPlan = (eventId) => {
-    // Helper to merge Firebase completion status into hardcoded plan
+    // Helper to merge Firebase data into hardcoded plan
     const mergeWithFirebase = (hardcodedPlan) => {
       const firebasePlan = fitnessTrainingPlans[eventId];
       if (!firebasePlan) return hardcodedPlan;
@@ -2006,18 +2240,80 @@ export default function TripPlanner() {
         const fbWeek = firebasePlan.find(w => w.weekNumber === week.weekNumber);
         if (!fbWeek) return week;
 
+        // Merge runs - iterate over HARDCODED runs first, then add any extra Firebase runs
+        const fbRuns = fbWeek.runs || [];
+
+        // Start with hardcoded runs, merge Firebase data by index/id
+        const mergedRuns = week.runs.map((hardcodedRun, idx) => {
+          // Find matching Firebase run by id first, then fall back to index
+          const fbRun = fbRuns.find(r => r.id === hardcodedRun.id) || fbRuns[idx];
+
+          if (!fbRun) {
+            // No Firebase data for this run, use hardcoded
+            return { ...hardcodedRun };
+          }
+
+          // Merge Firebase values with hardcoded defaults
+          // For boolean fields (mike, adam), use Firebase if defined (even if false)
+          // For string fields (distance, label), only use Firebase if it has actual content
+          const merged = {
+            ...hardcodedRun,
+            mike: fbRun.mike !== undefined ? fbRun.mike : hardcodedRun.mike,
+            distance: fbRun.distance && fbRun.distance.trim() ? fbRun.distance : hardcodedRun.distance,
+            label: fbRun.label && fbRun.label.trim() ? fbRun.label : hardcodedRun.label,
+            notes: fbRun.notes || hardcodedRun.notes || ''
+          };
+
+          // Handle adam field
+          if ('adam' in hardcodedRun) {
+            merged.adam = fbRun.adam !== undefined ? fbRun.adam : hardcodedRun.adam;
+          }
+
+          return merged;
+        });
+
+        // Add any extra runs from Firebase that aren't in hardcoded (user-added runs)
+        fbRuns.forEach((fbRun, idx) => {
+          if (idx >= week.runs.length && !mergedRuns.find(r => r.id === fbRun.id)) {
+            mergedRuns.push(fbRun);
+          }
+        });
+
+        // Same for cross training - iterate over HARDCODED first
+        const fbCrossTraining = fbWeek.crossTraining || [];
+
+        const mergedCrossTraining = week.crossTraining.map((hardcodedCT, idx) => {
+          const fbCT = fbCrossTraining.find(c => c.id === hardcodedCT.id) || fbCrossTraining[idx];
+
+          if (!fbCT) {
+            return { ...hardcodedCT };
+          }
+
+          const merged = {
+            ...hardcodedCT,
+            mike: fbCT.mike !== undefined ? fbCT.mike : hardcodedCT.mike,
+            label: fbCT.label && fbCT.label.trim() ? fbCT.label : hardcodedCT.label,
+            notes: fbCT.notes || hardcodedCT.notes || ''
+          };
+
+          if ('adam' in hardcodedCT) {
+            merged.adam = fbCT.adam !== undefined ? fbCT.adam : hardcodedCT.adam;
+          }
+
+          return merged;
+        });
+
+        // Add any extra cross training from Firebase
+        fbCrossTraining.forEach((fbCT, idx) => {
+          if (idx >= week.crossTraining.length && !mergedCrossTraining.find(c => c.id === fbCT.id)) {
+            mergedCrossTraining.push(fbCT);
+          }
+        });
+
         return {
           ...week,
-          runs: week.runs.map((run, idx) => ({
-            ...run,
-            mike: fbWeek.runs?.[idx]?.mike ?? run.mike,
-            adam: fbWeek.runs?.[idx]?.adam ?? run.adam
-          })),
-          crossTraining: week.crossTraining.map((ct, idx) => ({
-            ...ct,
-            mike: fbWeek.crossTraining?.[idx]?.mike ?? ct.mike,
-            adam: fbWeek.crossTraining?.[idx]?.adam ?? ct.adam
-          })),
+          runs: mergedRuns,
+          crossTraining: mergedCrossTraining,
           weekNotes: fbWeek.weekNotes || week.weekNotes
         };
       });
@@ -2045,6 +2341,21 @@ export default function TripPlanner() {
         showToast('Sign in failed. Please try again.', 'error');
       });
   }, [showToast]);
+
+  // Pre-load Google Calendar scripts on mount (for Safari/iOS popup compatibility)
+  useEffect(() => {
+    const preloadGoogleScripts = async () => {
+      try {
+        await loadGoogleScripts();
+        await initGoogleCalendar();
+        setGoogleScriptsLoaded(true);
+        console.log('Google scripts pre-loaded');
+      } catch (err) {
+        console.log('Failed to pre-load Google scripts:', err);
+      }
+    };
+    preloadGoogleScripts();
+  }, []);
 
   // Auth handlers - try popup first, fall back to redirect for Safari/iOS
   const handleLogin = async () => {
@@ -2326,9 +2637,63 @@ export default function TripPlanner() {
 
   return (
     <div
-      className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 relative overflow-hidden"
+      className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 relative"
       onClick={closeMenus}
     >
+      {/* Global styles for UI enhancements */}
+      <style>{`
+        html, body {
+          background-color: #1e293b;
+          overscroll-behavior: none;
+        }
+        @supports (-webkit-touch-callout: none) {
+          body {
+            min-height: -webkit-fill-available;
+          }
+        }
+
+        /* Reduced motion for accessibility */
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
+
+        /* Loading skeleton animation */
+        @keyframes skeleton-pulse {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.7; }
+        }
+        .skeleton {
+          background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%);
+          background-size: 200% 100%;
+          animation: skeleton-pulse 1.5s ease-in-out infinite;
+          border-radius: 0.5rem;
+        }
+
+        /* Standardized form inputs */
+        .form-input {
+          width: 100%;
+          padding: 0.625rem 0.875rem;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 0.75rem;
+          color: white;
+          font-size: 0.875rem;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+          outline: none;
+          border-color: rgba(139, 92, 246, 0.5);
+          box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+        .form-input::placeholder {
+          color: rgba(148, 163, 184, 0.6);
+        }
+      `}</style>
+
       {/* Rainbow top bar */}
       <div className="h-1.5 w-full bg-gradient-to-r from-red-500 via-orange-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500" />
 
@@ -2526,12 +2891,13 @@ export default function TripPlanner() {
       {/* Anchor removed for cleaner UI */}
 
       {/* Header */}
-      <header className="relative z-10 pt-8 pb-4 px-6">
+      <header className="relative z-10 pt-4 md:pt-8 pb-2 md:pb-4 px-4 md:px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+          <div className="flex items-center justify-between gap-2 md:gap-4 relative">
+            {/* Left side: Names + Section Title on mobile */}
+            <div className="flex items-center gap-2 md:gap-4 min-w-0">
+              <div className="flex items-center gap-1 md:gap-2 shrink-0">
+                <h1 className="text-base md:text-3xl font-bold tracking-tight whitespace-nowrap">
                   <button
                     onClick={() => isOwner && setCurrentUser('Mike')}
                     className={`${currentUser === 'Mike' ? 'text-teal-400' : 'text-white'} ${isOwner ? 'hover:opacity-80 cursor-pointer' : ''} transition`}
@@ -2546,26 +2912,142 @@ export default function TripPlanner() {
                     Adam
                   </button>
                 </h1>
-                <p className="text-slate-400 flex items-center gap-2">
-                  Living our best life together
-                  <span className="text-pink-400">💕</span>
-                </p>
+                {/* Hearts icon - clickable */}
+                <button
+                  onClick={() => setShowPartnershipQuote(true)}
+                  className="text-pink-400 hover:text-pink-300 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                  title="Our love story"
+                >
+                  💕
+                </button>
+                {/* Mobile section indicator */}
+                <span className="md:hidden text-white/40 text-sm">•</span>
+                <span className="md:hidden text-sm font-medium text-white/80 truncate">
+                  {activeSection === 'home' && '🌈 Home'}
+                  {activeSection === 'travel' && '✈️ Travel'}
+                  {activeSection === 'fitness' && '🏃 Fitness'}
+                  {activeSection === 'events' && '🎉 Events'}
+                  {activeSection === 'memories' && '💝 Memories'}
+                  {activeSection === 'nutrition' && '🥗 Nutrition'}
+                  {activeSection === 'lifePlanning' && '🎯 Planning'}
+                  {activeSection === 'business' && '💼 Business'}
+                  {activeSection === 'calendar' && '📅 Calendar'}
+                  {activeSection === 'apps' && '📱 Mini Apps'}
+                </span>
               </div>
+            </div>
+
+            {/* Section Title - Centered on desktop, below header on mobile */}
+            <div className="absolute left-1/2 transform -translate-x-1/2 text-center hidden md:block">
+              {activeSection === 'home' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center justify-center gap-2">
+                    <span>🌈</span>
+                    Welcome to Our World
+                  </h2>
+                  <p className="text-xs text-slate-400">Plan adventures, stay healthy, build our future</p>
+                </div>
+              )}
+              {activeSection === 'travel' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">✈️ Our Adventures</h2>
+                  <p className="text-xs text-slate-400">Let's Travel The World</p>
+                </div>
+              )}
+              {activeSection === 'fitness' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">🏃 Fitness Training</h2>
+                  <p className="text-xs text-slate-400">Train together, achieve together</p>
+                </div>
+              )}
+              {activeSection === 'events' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">🎉 Events</h2>
+                  <p className="text-xs text-slate-400">Plan parties and gather friends</p>
+                </div>
+              )}
+              {activeSection === 'memories' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">💝 Our Memories</h2>
+                  <p className="text-xs text-slate-400">The story of us, one moment at a time</p>
+                </div>
+              )}
+              {activeSection === 'nutrition' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">🥗 Nutrition</h2>
+                  <p className="text-xs text-slate-400">Recipes, meal planning & grocery lists</p>
+                </div>
+              )}
+              {activeSection === 'lifePlanning' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">🎯 Life Planning</h2>
+                  <p className="text-xs text-slate-400">Dream big, plan together</p>
+                </div>
+              )}
+              {activeSection === 'business' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">💼 Business</h2>
+                  <p className="text-xs text-slate-400">Build and grow together</p>
+                </div>
+              )}
+              {activeSection === 'calendar' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">📅 Calendar</h2>
+                  <p className="text-xs text-slate-400">Our schedule at a glance</p>
+                </div>
+              )}
+              {activeSection === 'apps' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">📱 Mini Apps</h2>
+                  <p className="text-xs text-slate-400">Add to your home screen</p>
+                </div>
+              )}
             </div>
 
             {/* User info - simplified in app mode */}
             {!initialAppMode ? (
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* User info and logout */}
-                <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
+              <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
+                {/* Calendar icon */}
+                <button
+                  onClick={() => setActiveSection('calendar')}
+                  className={`flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-lg md:rounded-xl transition shadow-lg ${
+                    activeSection === 'calendar'
+                      ? 'bg-gradient-to-br from-blue-400 to-indigo-500 text-white'
+                      : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+                  }`}
+                  title="Calendar"
+                >
+                  <Calendar className="w-4 h-4 md:w-5 md:h-5" />
+                </button>
+
+                {/* Mini Apps button - navigates to apps page */}
+                <button
+                  onClick={() => setActiveSection('apps')}
+                  className={`flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-lg md:rounded-xl transition shadow-lg ${
+                    activeSection === 'apps'
+                      ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white ring-2 ring-white/30'
+                      : 'bg-gradient-to-br from-blue-500 to-purple-600 text-white hover:opacity-90'
+                  }`}
+                  title="Mini Apps"
+                >
+                  <svg className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                  </svg>
+                </button>
+
+                {/* User info and logout - simplified on mobile */}
+                <div className="flex items-center gap-2 bg-white/10 rounded-full px-2 py-1.5 md:px-4 md:py-2">
                   {user.photoURL ? (
                     <img src={user.photoURL} alt="" className="w-6 h-6 rounded-full" />
                   ) : (
                     <User className="w-5 h-5 text-white/70" />
                   )}
-                  <span className="text-white/70 text-sm">{currentUser}</span>
+                  <span className="hidden md:inline text-white/70 text-sm">{currentUser}</span>
                   {currentCompanion && (
-                    <span className="text-xs bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full">
+                    <span className="hidden md:inline text-xs bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full">
                       {currentCompanion.relationship}
                     </span>
                   )}
@@ -2573,7 +3055,7 @@ export default function TripPlanner() {
                   {currentCompanion && (
                     <button
                       onClick={() => setShowMyProfileModal(true)}
-                      className="ml-1 p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition"
+                      className="hidden md:block ml-1 p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition"
                       title="Edit my profile"
                     >
                       <Pencil className="w-4 h-4" />
@@ -2581,16 +3063,16 @@ export default function TripPlanner() {
                   )}
                   <button
                     onClick={handleLogout}
-                    className="ml-2 text-xs text-white/50 hover:text-white transition underline"
+                    className="hidden md:block ml-2 text-xs text-white/50 hover:text-white transition underline"
                   >
                     log out
                   </button>
                 </div>
 
 
-                {/* Companion badge */}
+                {/* Companion badge - hidden on mobile */}
                 {currentCompanion && !isOwner && (
-                  <div className="flex items-center bg-amber-500/20 rounded-full px-3 py-1.5">
+                  <div className="hidden md:flex items-center bg-amber-500/20 rounded-full px-3 py-1.5">
                     <span className="text-amber-300 text-sm">👋 Welcome, {currentCompanion.firstName || currentCompanion.name}!</span>
                   </div>
                 )}
@@ -2631,45 +3113,23 @@ export default function TripPlanner() {
             </div>
           )}
 
-          {/* Section Navigation - Hidden in App Mode */}
+          {/* Section Navigation - Hidden on mobile (we have bottom nav) and in App Mode */}
           {!initialAppMode && (
-            <div className="mt-6 flex gap-2 flex-wrap items-center">
-              {/* Coming Soon dropdown for Life Planning & Business */}
-              <div className="relative group">
-                <button
-                  className="flex items-center gap-1 px-3 py-2.5 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white rounded-full font-semibold transition shadow-lg"
-                  title="Coming Soon"
-                >
-                  🚧
-                </button>
-                <div className="absolute left-0 top-full mt-2 bg-slate-800 rounded-xl shadow-xl border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 min-w-[160px]">
-                  <button
-                    onClick={() => setActiveSection('lifePlanning')}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-white/70 hover:bg-white/10 hover:text-white rounded-t-xl transition"
-                  >
-                    🎯 Life Planning
-                  </button>
-                  <button
-                    onClick={() => setActiveSection('business')}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-white/70 hover:bg-white/10 hover:text-white rounded-b-xl transition"
-                  >
-                    💼 Business
-                  </button>
-                </div>
-              </div>
-
+            <div className="mt-6 hidden md:flex gap-2 flex-wrap items-center justify-center">
               {/* Main navigation buttons */}
               {[
                 { id: 'home', label: 'Home', emoji: '🏠', gradient: 'from-pink-500 to-purple-500' },
                 { id: 'travel', label: 'Travel', emoji: '✈️', gradient: 'from-teal-400 to-cyan-500' },
-                { id: 'calendar', label: 'Calendar', emoji: '📅', gradient: 'from-blue-400 to-indigo-500' },
                 { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
                 { id: 'events', label: 'Events', emoji: '🎉', gradient: 'from-amber-400 to-orange-500' },
                 { id: 'memories', label: 'Memories', emoji: '💝', gradient: 'from-rose-400 to-pink-500' },
               ].map(section => (
                 <button
                   key={section.id}
-                  onClick={() => setActiveSection(section.id)}
+                  onClick={() => {
+                    setActiveSection(section.id);
+                    if (section.id === 'travel') setTravelViewMode('main');
+                  }}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold transition shadow-lg ${
                     activeSection === section.id
                       ? `bg-gradient-to-r ${section.gradient} text-white`
@@ -2683,83 +3143,291 @@ export default function TripPlanner() {
             </div>
           )}
 
-          {/* App Mode Header - Fitness Training title */}
+          {/* App Mode Header - Dynamic title based on app type */}
           {initialAppMode && (
             <div className="mt-4 text-center">
-              <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500 flex items-center justify-center gap-2">
-                <span className="text-3xl">🏃</span>
-                Fitness Training
-              </h2>
+              {initialAppMode === 'fitness' && (
+                <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500 flex items-center justify-center gap-2">
+                  <span className="text-3xl">🏃</span>
+                  Fitness Training
+                </h2>
+              )}
+              {initialAppMode === 'travel' && (
+                <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-500 flex items-center justify-center gap-2">
+                  <span className="text-3xl">✈️</span>
+                  Travel Adventures
+                </h2>
+              )}
+              {initialAppMode === 'events' && (
+                <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500 flex items-center justify-center gap-2">
+                  <span className="text-3xl">🎉</span>
+                  Events
+                </h2>
+              )}
+              {initialAppMode === 'memories' && (
+                <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-pink-500 flex items-center justify-center gap-2">
+                  <span className="text-3xl">💝</span>
+                  Our Memories
+                </h2>
+              )}
             </div>
           )}
 
-          {/* Action Buttons - Travel Section */}
-          {activeSection === 'travel' && (
-          <div className="flex gap-3 mt-6 flex-wrap">
-            {/* Owner-only buttons */}
-            {isOwner && (
-              <>
-                <button
-                  onClick={() => setShowNewTripModal('adventure')}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-400 to-cyan-500 text-white font-semibold rounded-full hover:opacity-90 transition shadow-lg"
-                >
-                  <Plus className="w-5 h-5" />
-                  New Adventure
-                </button>
-                <button
-                  onClick={() => setShowRandomExperience(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 text-white font-semibold rounded-full hover:opacity-90 transition shadow-lg"
-                >
-                  🎲 Random Adventure
-                </button>
-                <button
-                  onClick={() => setShowNewTripModal('wishlist')}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-400 via-purple-400 to-indigo-400 text-white font-semibold rounded-full hover:opacity-90 transition shadow-lg"
-                >
-                  <Sparkles className="w-5 h-5" />
-                  Add to Wishlist 🦄
-                </button>
-              </>
-            )}
-            {/* Owner-only management buttons */}
-            {isOwner && (
-              <>
-                <button
-                  onClick={() => setShowOpenDateModal(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-400 to-emerald-500 text-white font-semibold rounded-full hover:opacity-90 transition shadow-lg"
-                >
-                  📅 Open Dates
-                </button>
-                <button
-                  onClick={() => setShowCompanionsModal(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white font-semibold rounded-full hover:opacity-90 transition shadow-lg"
-                >
-                  👥 Travel Circle
-                </button>
-              </>
-            )}
-            {/* Companion profile button */}
-            {currentCompanion && !isOwner && (
-              <button
-                onClick={() => setShowMyProfileModal(true)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-400 to-indigo-500 text-white font-semibold rounded-full hover:opacity-90 transition shadow-lg"
-              >
-                <User className="w-5 h-5" />
-                My Profile
-              </button>
-            )}
-          </div>
-          )}
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 px-6 pb-12">
+      <main className="relative z-10 px-6 pb-24 md:pb-12">
         <div className="max-w-6xl mx-auto">
 
           {/* ========== HOME SECTION ========== */}
           {activeSection === 'home' && (
             <div className="mt-8">
+              {/* TODAY'S FOCUS CARD */}
+              {(() => {
+                // Calculate upcoming trip
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const upcomingTrips = trips
+                  .filter(t => {
+                    const tripDate = parseLocalDate(t.dates?.start);
+                    return tripDate && tripDate >= today;
+                  })
+                  .sort((a, b) => parseLocalDate(a.dates?.start) - parseLocalDate(b.dates?.start));
+                const nextTrip = upcomingTrips[0];
+                const daysUntilTrip = nextTrip ? Math.ceil((parseLocalDate(nextTrip.dates?.start) - today) / (1000 * 60 * 60 * 24)) : null;
+
+                // Calculate events this week
+                const weekFromNow = new Date(today);
+                weekFromNow.setDate(weekFromNow.getDate() + 7);
+                const thisWeekEvents = partyEvents.filter(e => {
+                  const eventDate = parseLocalDate(e.date);
+                  return eventDate && eventDate >= today && eventDate <= weekFromNow;
+                }).sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
+
+                // Get today's workout from active training plans
+                const todayStr = today.toISOString().split('T')[0];
+                const dayOfWeek = today.getDay(); // 0 = Sunday
+                const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                const todayName = dayNames[dayOfWeek];
+
+                let todaysWorkout = null;
+                let workoutEvent = null;
+
+                // Check each fitness event's training plan
+                for (const event of fitnessEvents) {
+                  const plan = fitnessTrainingPlans[event.id];
+                  if (!plan) continue;
+
+                  // Find current week (week that contains today)
+                  const currentWeek = plan.find(week => {
+                    if (!week.startDate) return false;
+                    const weekStart = parseLocalDate(week.startDate);
+                    const weekEnd = new Date(weekStart);
+                    weekEnd.setDate(weekEnd.getDate() + 6);
+                    return today >= weekStart && today <= weekEnd;
+                  });
+
+                  if (currentWeek) {
+                    // Check runs for today
+                    const todayRun = currentWeek.runs?.find(r => r.day?.toLowerCase() === todayName);
+                    if (todayRun && todayRun.distance) {
+                      todaysWorkout = { type: 'run', ...todayRun, weekNumber: currentWeek.weekNumber };
+                      workoutEvent = event;
+                      break;
+                    }
+                    // Check cross-training for today
+                    const todayCross = currentWeek.crossTraining?.find(c => c.day?.toLowerCase() === todayName);
+                    if (todayCross && todayCross.activity) {
+                      todaysWorkout = { type: 'cross', ...todayCross, weekNumber: currentWeek.weekNumber };
+                      workoutEvent = event;
+                      break;
+                    }
+                  }
+                }
+
+                // Calculate upcoming fitness event
+                const upcomingFitnessEvents = fitnessEvents
+                  .filter(e => {
+                    const eventDate = parseLocalDate(e.date);
+                    return eventDate && eventDate >= today;
+                  })
+                  .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
+                const nextFitnessEvent = upcomingFitnessEvents[0];
+                const daysUntilFitness = nextFitnessEvent ? Math.ceil((parseLocalDate(nextFitnessEvent.date) - today) / (1000 * 60 * 60 * 24)) : null;
+
+                return (
+                  <div className="mb-8 bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden">
+                    <div className="p-5 border-b border-white/10">
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        <span className="text-2xl">🎯</span>
+                        Today's Focus
+                        <span className="text-sm font-normal text-white/50 ml-auto">
+                          {today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                        </span>
+                      </h2>
+                    </div>
+
+                    <div className="p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {/* Today's Workout */}
+                      {todaysWorkout && workoutEvent ? (
+                        <button
+                          onClick={() => {
+                            setSelectedFitnessEvent(workoutEvent);
+                            setActiveSection('fitness');
+                            setFitnessViewMode('training');
+                          }}
+                          className="bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-2xl p-4 border border-orange-500/30 hover:border-orange-500/50 transition text-left group"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="text-2xl">{todaysWorkout.type === 'run' ? '🏃' : '💪'}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              (todaysWorkout.mike || todaysWorkout.adam)
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-orange-500/20 text-orange-400'
+                            }`}>
+                              {(todaysWorkout.mike || todaysWorkout.adam) ? 'Done!' : 'Today'}
+                            </span>
+                          </div>
+                          <div className="font-semibold text-white">
+                            {todaysWorkout.type === 'run'
+                              ? `${todaysWorkout.distance} mi ${todaysWorkout.description || 'Run'}`
+                              : todaysWorkout.activity
+                            }
+                          </div>
+                          <div className="text-sm text-white/60 mt-1">
+                            Week {todaysWorkout.weekNumber} • {workoutEvent.name}
+                          </div>
+                          <div className="text-xs text-orange-400 mt-2 opacity-0 group-hover:opacity-100 transition">
+                            View training plan →
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="text-2xl">😴</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">Rest Day</span>
+                          </div>
+                          <div className="font-semibold text-white">No workout scheduled</div>
+                          <div className="text-sm text-white/60 mt-1">Take it easy today!</div>
+                        </div>
+                      )}
+
+                      {/* Next Trip Countdown */}
+                      {nextTrip && (
+                        <button
+                          onClick={() => {
+                            setSelectedTrip(nextTrip);
+                            setActiveSection('travel');
+                          }}
+                          className="bg-gradient-to-br from-teal-500/20 to-cyan-500/20 rounded-2xl p-4 border border-teal-500/30 hover:border-teal-500/50 transition text-left group"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="text-2xl">✈️</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-400">
+                              {daysUntilTrip === 0 ? 'Today!' : daysUntilTrip === 1 ? 'Tomorrow!' : `${daysUntilTrip} days`}
+                            </span>
+                          </div>
+                          <div className="font-semibold text-white truncate">{nextTrip.destination}</div>
+                          <div className="text-sm text-white/60 mt-1">
+                            {nextTrip.dates?.start && new Date(nextTrip.dates.start + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {nextTrip.dates?.end && ` - ${new Date(nextTrip.dates.end + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                          </div>
+                          <div className="text-xs text-teal-400 mt-2 opacity-0 group-hover:opacity-100 transition">
+                            View trip details →
+                          </div>
+                        </button>
+                      )}
+
+                      {/* Events This Week */}
+                      {thisWeekEvents.length > 0 ? (
+                        <button
+                          onClick={() => {
+                            if (thisWeekEvents[0]) {
+                              setSelectedPartyEvent(thisWeekEvents[0]);
+                            }
+                            setActiveSection('events');
+                          }}
+                          className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-2xl p-4 border border-amber-500/30 hover:border-amber-500/50 transition text-left group"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="text-2xl">🎉</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                              {thisWeekEvents.length} this week
+                            </span>
+                          </div>
+                          <div className="font-semibold text-white truncate">{thisWeekEvents[0].name}</div>
+                          <div className="text-sm text-white/60 mt-1">
+                            {new Date(thisWeekEvents[0].date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                          </div>
+                          {thisWeekEvents.length > 1 && (
+                            <div className="text-xs text-white/40 mt-1">+{thisWeekEvents.length - 1} more</div>
+                          )}
+                          <div className="text-xs text-amber-400 mt-2 opacity-0 group-hover:opacity-100 transition">
+                            View events →
+                          </div>
+                        </button>
+                      ) : nextFitnessEvent && (
+                        <button
+                          onClick={() => {
+                            setSelectedFitnessEvent(nextFitnessEvent);
+                            setActiveSection('fitness');
+                          }}
+                          className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl p-4 border border-purple-500/30 hover:border-purple-500/50 transition text-left group"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="text-2xl">🏆</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">
+                              {daysUntilFitness} days
+                            </span>
+                          </div>
+                          <div className="font-semibold text-white truncate">{nextFitnessEvent.name}</div>
+                          <div className="text-sm text-white/60 mt-1">
+                            {new Date(nextFitnessEvent.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </div>
+                          <div className="text-xs text-purple-400 mt-2 opacity-0 group-hover:opacity-100 transition">
+                            View race details →
+                          </div>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Quick Actions Row */}
+                    <div className="px-5 pb-5 flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => setShowAddMemoryModal('milestone')}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-white/70 hover:text-white transition"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span className="hidden sm:inline">Quick Memory</span>
+                        <span className="sm:hidden">Memory</span>
+                      </button>
+                      <button
+                        onClick={() => setActiveSection('calendar')}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-white/70 hover:text-white transition"
+                      >
+                        <Calendar className="w-4 h-4" />
+                        <span className="hidden sm:inline">View Calendar</span>
+                        <span className="sm:hidden">Calendar</span>
+                      </button>
+                      {nextTrip && (
+                        <button
+                          onClick={() => {
+                            setSelectedTrip(nextTrip);
+                            setActiveSection('travel');
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-white/70 hover:text-white transition"
+                        >
+                          <CheckSquare className="w-4 h-4" />
+                          <span className="hidden sm:inline">Packing List</span>
+                          <span className="sm:hidden">Packing</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Photo Carousel Hero with Dramatic Floating Animations */}
               <div className="mb-12 relative">
                 {/* Enhanced CSS animations */}
@@ -2815,141 +3483,84 @@ export default function TripPlanner() {
                   }
                 `}</style>
 
-                {/* Photo Carousel */}
-                <div className="flex justify-center relative z-10">
-                  <div className="relative rounded-3xl overflow-hidden shadow-2xl w-full max-w-xl h-96">
-                    {(() => {
-                      const allPhotos = getAllMemoryPhotos();
-                      if (allPhotos.length === 0) {
+              </div>
+
+              {/* Photo Carousel - Full Width */}
+              <div
+                onClick={() => setActiveSection('memories')}
+                className="relative rounded-3xl overflow-hidden shadow-2xl h-72 md:h-80 cursor-pointer group mb-8"
+              >
+                {(() => {
+                  const allPhotos = getAllMemoryPhotos();
+                  if (allPhotos.length === 0) {
+                    return (
+                      <>
+                        <img
+                          src="/gallery/pier-painting.jpg"
+                          alt="Provincetown Pier Painting"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                          <p className="text-white text-lg font-medium text-center">Add photos to memories! 📷</p>
+                        </div>
+                      </>
+                    );
+                  }
+                  const currentPhoto = allPhotos[heroPhotoIndex % allPhotos.length];
+                  const currentMemory = memories.find(m => getMemoryImages(m).includes(currentPhoto));
+                  const photoIndex = currentMemory ? getMemoryImages(currentMemory).indexOf(currentPhoto) : 0;
+                  const imgSettings = currentMemory?.imageSettings?.[photoIndex] || { x: 50, y: 50, zoom: 100 };
+                  return (
+                    <>
+                      {allPhotos.map((photo, idx) => {
+                        const mem = memories.find(m => getMemoryImages(m).includes(photo));
+                        const pIdx = mem ? getMemoryImages(mem).indexOf(photo) : 0;
+                        const settings = mem?.imageSettings?.[pIdx] || { x: 50, y: 50, zoom: 100 };
                         return (
-                          <>
-                            <img
-                              src="/gallery/pier-painting.jpg"
-                              alt="Provincetown Pier Painting"
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-                              <p className="text-white text-lg font-medium text-center">Add photos to memories to see them here! 📷</p>
-                            </div>
-                          </>
+                          <img
+                            key={idx}
+                            src={photo}
+                            alt={mem?.title || 'Memory'}
+                            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
+                              idx === heroPhotoIndex % allPhotos.length ? 'opacity-100' : 'opacity-0'
+                            }`}
+                            style={{
+                              objectPosition: `${settings.x}% ${settings.y}%`,
+                              transform: `scale(${settings.zoom / 100})`,
+                              transformOrigin: `${settings.x}% ${settings.y}%`
+                            }}
+                          />
                         );
-                      }
-                      const currentPhoto = allPhotos[heroPhotoIndex % allPhotos.length];
-                      const currentMemory = memories.find(m => getMemoryImages(m).includes(currentPhoto));
-                      return (
-                        <>
-                          {allPhotos.map((photo, idx) => (
-                            <img
-                              key={idx}
-                              src={photo}
-                              alt={currentMemory?.title || 'Memory'}
-                              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
-                                idx === heroPhotoIndex % allPhotos.length ? 'opacity-100' : 'opacity-0'
-                              }`}
-                            />
-                          ))}
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 z-10">
-                            <p className="text-white text-lg font-medium text-center">
-                              {currentMemory?.title || 'Our Memories'} 💕
-                            </p>
-                            <p className="text-white/70 text-sm text-center">{currentMemory?.date}</p>
-                          </div>
-                          {/* Photo indicators */}
-                          <div className="absolute bottom-16 left-0 right-0 flex justify-center gap-2 z-10">
-                            {allPhotos.slice(0, 10).map((_, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => setHeroPhotoIndex(idx)}
-                                className={`w-2 h-2 rounded-full transition-all ${
-                                  idx === heroPhotoIndex % allPhotos.length
-                                    ? 'bg-white w-4'
-                                    : 'bg-white/50 hover:bg-white/70'
-                                }`}
-                              />
-                            ))}
-                            {allPhotos.length > 10 && (
-                              <span className="text-white/50 text-xs ml-1">+{allPhotos.length - 10}</span>
-                            )}
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              {/* Welcome Text */}
-              <div className="text-center mb-12">
-                <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-                  Welcome to Our World
-                </h2>
-                <p className="text-xl text-slate-300 max-w-2xl mx-auto">
-                  A space for Mike & Adam to plan adventures, stay healthy, and build our future together.
-                </p>
-              </div>
-
-              {/* Values Cards */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                {/* Travel Value */}
-                <div
-                  onClick={() => setActiveSection('travel')}
-                  className="bg-gradient-to-br from-teal-500/20 to-cyan-500/20 rounded-3xl p-8 border border-teal-500/30 hover:border-teal-500/60 transition cursor-pointer group"
-                >
-                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">✈️</div>
-                  <h3 className="text-2xl font-bold text-white mb-3">Love of Travel</h3>
-                  <p className="text-slate-300">
-                    Exploring the world together, one adventure at a time. From beaches to cities, every journey is better when we're together.
-                  </p>
-                  <div className="mt-4 flex items-center gap-2 text-teal-400 font-medium">
-                    <span>View trips</span>
-                    <span>→</span>
-                  </div>
-                </div>
-
-                {/* Health Value */}
-                <div
-                  onClick={() => setActiveSection('fitness')}
-                  className="bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-3xl p-8 border border-orange-500/30 hover:border-orange-500/60 transition cursor-pointer group"
-                >
-                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">💪</div>
-                  <h3 className="text-2xl font-bold text-white mb-3">Being Healthy</h3>
-                  <p className="text-slate-300">
-                    Training for half marathons, triathlons, and beyond. Supporting each other to be our strongest selves.
-                  </p>
-                  <div className="mt-4 flex items-center gap-2 text-orange-400 font-medium">
-                    <span>View fitness</span>
-                    <span>→</span>
-                  </div>
-                </div>
-
-                {/* Pride Value */}
-                <div className="bg-gradient-to-br from-pink-500/20 via-purple-500/20 to-indigo-500/20 rounded-3xl p-8 border border-purple-500/30 hover:border-purple-500/60 transition group">
-                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">🏳️‍🌈</div>
-                  <h3 className="text-2xl font-bold text-white mb-3">Embracing Who We Are</h3>
-                  <p className="text-slate-300">
-                    Living authentically, celebrating our love, and building a life filled with pride, joy, and adventure.
-                  </p>
-                  <div className="mt-4 flex items-center gap-2 text-purple-400 font-medium">
-                    <span>Love is love</span>
-                    <span>💕</span>
-                  </div>
-                </div>
-
-                {/* Entertaining Value */}
-                <div
-                  onClick={() => setActiveSection('events')}
-                  className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-3xl p-8 border border-amber-500/30 hover:border-amber-500/60 transition cursor-pointer group"
-                >
-                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">🎉</div>
-                  <h3 className="text-2xl font-bold text-white mb-3">Effortless Entertaining</h3>
-                  <p className="text-slate-300">
-                    Hosting friends, throwing parties, and creating memorable moments in our home together.
-                  </p>
-                  <div className="mt-4 flex items-center gap-2 text-amber-400 font-medium">
-                    <span>Plan events</span>
-                    <span>→</span>
-                  </div>
-                </div>
+                      })}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 z-10">
+                        <p className="text-white text-lg font-medium text-center">
+                          {currentMemory?.title || 'Our Memories'} 💕
+                        </p>
+                      </div>
+                      {/* Photo indicators */}
+                      <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-2 z-10">
+                        {allPhotos.slice(0, 10).map((_, idx) => (
+                          <button
+                            key={idx}
+                            onClick={(e) => { e.stopPropagation(); setHeroPhotoIndex(idx); }}
+                            className={`w-2 h-2 rounded-full transition-all ${
+                              idx === heroPhotoIndex % allPhotos.length
+                                ? 'bg-white w-4'
+                                : 'bg-white/50 hover:bg-white/70'
+                            }`}
+                          />
+                        ))}
+                        {allPhotos.length > 10 && (
+                          <span className="text-white/50 text-xs ml-1">+{allPhotos.length - 10}</span>
+                        )}
+                      </div>
+                      {/* Hover overlay */}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
+                        <span className="text-white font-medium opacity-0 group-hover:opacity-100 transition">View Memories →</span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Quick Stats */}
@@ -2991,6 +3602,83 @@ export default function TripPlanner() {
 
           {/* ========== TRAVEL SECTION ========== */}
           {activeSection === 'travel' && (
+          <div className="mt-8">
+            {/* Action Buttons - Travel */}
+            <div className="flex gap-1.5 md:gap-2 mb-6 items-center flex-wrap">
+              {/* Owner-only New Adventure button */}
+              {isOwner && (
+                <button
+                  onClick={() => setShowNewTripModal('adventure')}
+                  className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 rounded-xl font-medium transition bg-teal-500/20 text-teal-300 hover:bg-teal-500/30 border border-teal-500/30 text-sm md:text-base"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">New Adventure</span>
+                  <span className="sm:hidden">New</span>
+                </button>
+              )}
+
+              {/* View Switcher - compact on mobile */}
+              <button
+                onClick={() => setTravelViewMode('main')}
+                className={`px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base ${
+                  travelViewMode === 'main'
+                    ? 'bg-teal-500 text-white'
+                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                }`}
+              >
+                <span className="hidden sm:inline">✈️ Adventures</span>
+                <span className="sm:hidden">✈️</span>
+              </button>
+              <button
+                onClick={() => setTravelViewMode('random')}
+                className={`px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base ${
+                  travelViewMode === 'random'
+                    ? 'bg-teal-500 text-white'
+                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                }`}
+                title="Random Adventure"
+              >
+                🎲
+              </button>
+              <button
+                onClick={() => setTravelViewMode('wishlist')}
+                className={`px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base ${
+                  travelViewMode === 'wishlist'
+                    ? 'bg-teal-500 text-white'
+                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                }`}
+                title="Wishlist"
+              >
+                <span className="hidden sm:inline">🦄 Wishlist</span>
+                <span className="sm:hidden">🦄</span>
+              </button>
+
+              {/* Spacer */}
+              <div className="flex-1" />
+
+              {/* Right-justified icon buttons */}
+              {isOwner && (
+                <>
+                  <button
+                    onClick={() => setShowOpenDateModal(true)}
+                    className="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white/10 text-slate-300 hover:bg-white/20 transition"
+                    title="Open Dates"
+                  >
+                    📅
+                  </button>
+                  <button
+                    onClick={() => setShowTravelCircleModal(true)}
+                    className="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white/10 text-slate-300 hover:bg-white/20 transition"
+                    title="Travel Circle"
+                  >
+                    👥
+                  </button>
+                </>
+              )}
+            </div>
+
+          {/* Main Adventures View */}
+          {travelViewMode === 'main' && (
           <>
           {/* Countdown Banner for Next Trip */}
           {(() => {
@@ -3128,14 +3816,17 @@ export default function TripPlanner() {
             );
           })()}
 
-          {/* Trip Cards - Confirmed Adventures */}
-          <section className="mb-12">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              <Star className="w-6 h-6 text-cyan-400" />
-              Our Adventures
-            </h2>
+          {/* Trip Cards - Confirmed Adventures (skip the first upcoming trip since it's in the banner) */}
+          <section className="mt-8 mb-12">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {confirmedTrips.map(trip => (
+              {(() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const upcomingTrips = sortedTrips.filter(t => parseLocalDate(t.dates.start) > today);
+                const nextTripId = upcomingTrips.length > 0 ? upcomingTrips[0].id : null;
+                // Filter out the next upcoming trip (shown in banner) from the grid
+                return confirmedTrips.filter(trip => trip.id !== nextTripId);
+              })().map(trip => (
                 <div
                   key={trip.id}
                   className={`bg-gradient-to-br ${trip.color} rounded-3xl text-white text-left relative overflow-hidden group hover:scale-105 transition-transform duration-300 shadow-xl`}
@@ -3768,43 +4459,6 @@ export default function TripPlanner() {
             )}
           </section>
 
-          {/* Wishlist Section */}
-          {wishlist.length > 0 && (
-            <section className="mt-12 mb-12">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                <span className="text-3xl">🦄</span>
-                Dream Destinations
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-purple-400 to-indigo-400">✨</span>
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {wishlist.map(item => (
-                  <div
-                    key={item.id}
-                    className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 relative overflow-hidden group"
-                  >
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-purple-400 to-indigo-400" />
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="text-3xl mb-2">{item.emoji}</div>
-                        <h3 className="text-xl font-bold text-white mb-1">{item.destination}</h3>
-                        {item.notes && (
-                          <p className="text-slate-400 text-sm">{item.notes}</p>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => convertToAdventure(item)}
-                        className="px-3 py-1.5 bg-gradient-to-r from-teal-400 to-purple-400 text-white text-sm font-medium rounded-full opacity-0 group-hover:opacity-100 transition"
-                      >
-                        Book it! 🎉
-                      </button>
-                    </div>
-                    <Starburst className="absolute -right-4 -bottom-4 w-16 h-16 text-white/5" />
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
           {/* Travel Quote */}
           <div className="mt-12 mb-8 text-center">
             <div className="max-w-2xl mx-auto px-6 py-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
@@ -3913,34 +4567,246 @@ export default function TripPlanner() {
           </div>
           </>
           )}
+          {/* End Main Adventures View */}
+
+          {/* Random Adventure View */}
+          {travelViewMode === 'random' && (
+            <div className="mt-8">
+              {/* Mobile Back Button */}
+              <button
+                onClick={() => setTravelViewMode('main')}
+                className="md:hidden flex items-center gap-2 text-teal-400 hover:text-teal-300 mb-4 active:scale-95 transition min-h-[44px]"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                <span className="font-medium">Back to Adventures</span>
+              </button>
+              <div className="max-w-2xl mx-auto">
+                {/* Random Experience Generator */}
+                <div className="bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 rounded-3xl p-8 border border-amber-500/30 text-center mb-8">
+                  <div className="text-6xl mb-4">🎲</div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Random Adventure Generator</h2>
+                  <p className="text-slate-300 mb-6">Let fate decide your next destination!</p>
+
+                  <button
+                    onClick={() => setShowRandomExperience(true)}
+                    className="px-8 py-4 bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold text-xl rounded-2xl hover:opacity-90 transition shadow-lg"
+                  >
+                    🎰 Spin the Wheel!
+                  </button>
+                </div>
+
+                {/* Experience Categories */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+                  {[
+                    { emoji: '🏖️', label: 'Beach / Warm', color: 'from-cyan-500/20 to-blue-500/20' },
+                    { emoji: '🏔️', label: 'Mountain Escape', color: 'from-emerald-500/20 to-green-500/20' },
+                    { emoji: '🏛️', label: 'Cultural', color: 'from-purple-500/20 to-indigo-500/20' },
+                    { emoji: '🎢', label: 'Adventure', color: 'from-orange-500/20 to-red-500/20' },
+                    { emoji: '🏃', label: 'Fitness / Active', color: 'from-red-500/20 to-orange-500/20' },
+                    { emoji: '🧘', label: 'Relaxing / Spa', color: 'from-teal-500/20 to-cyan-500/20' },
+                    { emoji: '🍷', label: 'Food & Wine', color: 'from-rose-500/20 to-pink-500/20' },
+                    { emoji: '🌆', label: 'City Break', color: 'from-slate-500/20 to-zinc-500/20' },
+                    { emoji: '🏕️', label: 'Nature / Outdoors', color: 'from-green-500/20 to-lime-500/20' },
+                  ].map((cat, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setShowRandomExperience(true)}
+                      className={`bg-gradient-to-br ${cat.color} rounded-2xl p-4 sm:p-6 border border-white/10 hover:border-white/30 transition text-center active:scale-95`}
+                    >
+                      <div className="text-3xl sm:text-4xl mb-2">{cat.emoji}</div>
+                      <div className="text-white font-medium text-sm sm:text-base">{cat.label}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Recent Random Picks */}
+                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+                  <h3 className="text-lg font-bold text-white mb-4">💡 How it works</h3>
+                  <ul className="space-y-3 text-slate-300">
+                    <li className="flex items-start gap-3">
+                      <span className="text-teal-400">1.</span>
+                      <span>Click "Spin the Wheel" to get a random destination suggestion</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-teal-400">2.</span>
+                      <span>Love it? Add it to your adventures or wishlist</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-teal-400">3.</span>
+                      <span>Not feeling it? Spin again for a new suggestion</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* End Random Adventure View */}
+
+          {/* Wishlist View */}
+          {travelViewMode === 'wishlist' && (
+            <div className="mt-8">
+              {/* Mobile Back Button */}
+              <button
+                onClick={() => setTravelViewMode('main')}
+                className="md:hidden flex items-center gap-2 text-teal-400 hover:text-teal-300 mb-4 active:scale-95 transition min-h-[44px]"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                <span className="font-medium">Back to Adventures</span>
+              </button>
+              {/* Add to Wishlist Button */}
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <span className="text-3xl">🦄</span>
+                  Dream Destinations
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-purple-400 to-indigo-400">✨</span>
+                </h2>
+                {isOwner && (
+                  <button
+                    onClick={() => setShowNewTripModal('wishlist')}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 border border-violet-500/30"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Dream
+                  </button>
+                )}
+              </div>
+
+              {wishlist.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {wishlist.map(item => (
+                    <div
+                      key={item.id}
+                      className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 relative overflow-hidden group hover:border-purple-500/50 transition"
+                    >
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-purple-400 to-indigo-400" />
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="text-4xl mb-3">{item.emoji}</div>
+                          <h3 className="text-xl font-bold text-white mb-1">{item.destination}</h3>
+                          {item.notes && (
+                            <p className="text-slate-400 text-sm">{item.notes}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={() => convertToAdventure(item)}
+                            className="px-3 py-1.5 bg-gradient-to-r from-teal-400 to-purple-400 text-white text-sm font-medium rounded-full hover:opacity-80 transition"
+                          >
+                            Book it! 🎉
+                          </button>
+                          {isOwner && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remove ${item.destination} from wishlist?`)) {
+                                  const newWishlist = wishlist.filter(w => w.id !== item.id);
+                                  setWishlist(newWishlist);
+                                  saveToFirestore(null, newWishlist, null);
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-white/10 text-slate-300 text-sm rounded-full hover:bg-red-500/20 hover:text-red-300 transition"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <Starburst className="absolute -right-4 -bottom-4 w-16 h-16 text-white/5" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16 bg-white/5 rounded-3xl border border-white/10">
+                  <div className="text-6xl mb-4">🌟</div>
+                  <h3 className="text-xl font-bold text-white mb-2">No dream destinations yet</h3>
+                  <p className="text-slate-400 mb-6">Start adding places you'd love to visit!</p>
+                  {isOwner && (
+                    <button
+                      onClick={() => setShowNewTripModal('wishlist')}
+                      className="px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-500 text-white font-semibold rounded-xl hover:opacity-90 transition"
+                    >
+                      Add Your First Dream ✨
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Inspiration Section */}
+              <div className="mt-12">
+                <h3 className="text-xl font-bold text-white mb-4">🌈 Need Inspiration?</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { destination: 'Santorini', emoji: '🇬🇷', notes: 'Stunning sunsets' },
+                    { destination: 'Kyoto', emoji: '🇯🇵', notes: 'Cherry blossoms' },
+                    { destination: 'Reykjavik', emoji: '🇮🇸', notes: 'Northern lights' },
+                    { destination: 'Bali', emoji: '🇮🇩', notes: 'Tropical paradise' },
+                  ].map((idea, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        if (isOwner) {
+                          const newItem = {
+                            id: Date.now(),
+                            destination: idea.destination,
+                            emoji: idea.emoji,
+                            notes: idea.notes,
+                            color: 'from-violet-400 to-purple-400',
+                            isWishlist: true
+                          };
+                          const newWishlist = [...wishlist, newItem];
+                          setWishlist(newWishlist);
+                          saveToFirestore(null, newWishlist, null);
+                          showToast(`${idea.destination} added to wishlist!`, 'success');
+                        }
+                      }}
+                      className="bg-white/5 rounded-xl p-4 border border-white/10 hover:border-purple-500/50 transition text-left"
+                    >
+                      <div className="text-2xl mb-1">{idea.emoji}</div>
+                      <div className="text-white font-medium">{idea.destination}</div>
+                      <div className="text-slate-400 text-xs">{idea.notes}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {/* End Wishlist View */}
+
+          </div>
+          )}
           {/* ========== END TRAVEL SECTION ========== */}
 
           {/* ========== FITNESS SECTION ========== */}
           {activeSection === 'fitness' && (
             <div className="mt-8">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-white mb-2">🏃 Fitness Training</h2>
-                <p className="text-slate-400">Train together, achieve together</p>
-              </div>
-
               {/* Fitness View Mode Toggle */}
-              <div className="flex gap-2 mb-6 justify-center">
+              <div className="flex gap-1.5 md:gap-2 mb-6 items-center flex-wrap">
+                {/* New Event Button - First */}
+                <button
+                  onClick={() => setShowAddFitnessEventModal(true)}
+                  className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 rounded-xl font-medium transition bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 border border-orange-500/30 text-sm md:text-base"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">New Event</span>
+                  <span className="sm:hidden">New</span>
+                </button>
+
+                {/* View Switcher - compact on mobile */}
                 {[
                   { id: 'events', label: 'Events', emoji: '🎯' },
-                  { id: 'training', label: 'Training Plan', emoji: '📋' },
+                  { id: 'training', label: 'Training', emoji: '📋' },
                   { id: 'stats', label: 'Stats', emoji: '📊' }
                 ].map(mode => (
                   <button
                     key={mode.id}
                     onClick={() => setFitnessViewMode(mode.id)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${
+                    className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base ${
                       fitnessViewMode === mode.id
-                        ? 'bg-gradient-to-r from-orange-400 to-red-500 text-white'
-                        : 'bg-white/10 text-white/70 hover:bg-white/20'
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-white/10 text-slate-300 hover:bg-white/20'
                     }`}
                   >
                     <span>{mode.emoji}</span>
-                    {mode.label}
+                    <span className="hidden sm:inline">{mode.label}</span>
                   </button>
                 ))}
               </div>
@@ -4060,22 +4926,36 @@ export default function TripPlanner() {
               {fitnessViewMode === 'training' && (
                 <div>
                   {/* Event Selector */}
-                  <div className="flex gap-2 mb-6 flex-wrap">
+                  <div className="flex gap-2 mb-6 flex-wrap items-center">
                     {fitnessEvents.map(event => (
-                      <button
-                        key={event.id}
-                        onClick={() => {
-                          setSelectedFitnessEvent(event);
-                        }}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${
-                          selectedFitnessEvent?.id === event.id
-                            ? `bg-gradient-to-r ${event.color} text-white`
-                            : 'bg-white/10 text-white/70 hover:bg-white/20'
-                        }`}
-                      >
-                        <span>{event.emoji}</span>
-                        {event.name}
-                      </button>
+                      <div key={event.id} className="relative group">
+                        <button
+                          onClick={() => {
+                            setSelectedFitnessEvent(event);
+                          }}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition ${
+                            selectedFitnessEvent?.id === event.id
+                              ? `bg-gradient-to-r ${event.color} text-white`
+                              : 'bg-white/10 text-white/70 hover:bg-white/20'
+                          }`}
+                        >
+                          <span>{event.emoji}</span>
+                          {event.name}
+                        </button>
+                        {/* Edit button - only show for non-hardcoded events */}
+                        {!['indy-half-2026', 'triathlon-2026'].includes(event.id) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingFitnessEvent(event);
+                            }}
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                            title="Edit event"
+                          >
+                            <Pencil className="w-3 h-3 text-white" />
+                          </button>
+                        )}
+                      </div>
                     ))}
                   </div>
 
@@ -4084,17 +4964,89 @@ export default function TripPlanner() {
                       {/* Stats and Encouragement */}
                       {(() => {
                         const plan = getActiveTrainingPlan(selectedFitnessEvent.id);
-                        // A week is "done" if both Mike and Adam completed all workouts
-                        const completedWeeks = plan.filter(w =>
-                          w.runs?.every(r => r.mike && r.adam) && w.crossTraining?.every(c => c.mike && c.adam)
-                        ).length;
-                        // Calculate miles for Mike and Adam separately
+                        const isTriathlon = selectedFitnessEvent.id === 'triathlon-2026';
+                        const isMikeOnlyPlan = plan[0]?.runs?.[0] && !('adam' in plan[0].runs[0]);
+
+                        // A week is "done" based on plan type
+                        const completedWeeks = plan.filter(w => {
+                          if (isMikeOnlyPlan) {
+                            return w.runs?.every(r => r.mike) && w.crossTraining?.every(c => c.mike);
+                          }
+                          return w.runs?.every(r => r.mike && r.adam) && w.crossTraining?.every(c => c.mike && c.adam);
+                        }).length;
+
+                        // For triathlon, separate by activity type
+                        if (isTriathlon) {
+                          const mikeSwimYards = plan.reduce((acc, w) => {
+                            return acc + (w.runs?.filter(r => r.mike && r.label?.toLowerCase().includes('swim'))
+                              .reduce((sum, r) => sum + (parseFloat(String(r.distance).replace(/[^\d.]/g, '')) || 0), 0) || 0);
+                          }, 0);
+                          const mikeBikeMiles = plan.reduce((acc, w) => {
+                            return acc + (w.runs?.filter(r => r.mike && r.label?.toLowerCase().includes('bike'))
+                              .reduce((sum, r) => sum + (parseFloat(String(r.distance).replace(/[^\d.]/g, '')) || 0), 0) || 0);
+                          }, 0);
+                          const mikeRunMiles = plan.reduce((acc, w) => {
+                            return acc + (w.runs?.filter(r => r.mike && r.label?.toLowerCase().includes('run'))
+                              .reduce((sum, r) => sum + (parseFloat(String(r.distance).replace(/[^\d.]/g, '')) || 0), 0) || 0);
+                          }, 0);
+                          const mikeWorkouts = plan.reduce((acc, w) => acc + (w.runs?.filter(r => r.mike).length || 0) + (w.crossTraining?.filter(c => c.mike).length || 0), 0);
+
+                          return (
+                            <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 rounded-2xl p-6 border border-orange-500/30 mb-6">
+                              {/* Mike Only Legend */}
+                              <div className="flex justify-center gap-6 mb-4 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+                                  <span className="text-blue-400">Mike</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-4 h-4 rounded bg-green-500/40"></div>
+                                  <span className="text-green-400">Complete ✓</span>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-5 gap-3 text-center mb-4">
+                                <div>
+                                  <div className="text-2xl font-bold text-orange-400">{completedWeeks}</div>
+                                  <div className="text-white/60 text-xs">Weeks Done</div>
+                                </div>
+                                <div>
+                                  <div className="text-2xl font-bold text-blue-400">{mikeSwimYards.toLocaleString()}</div>
+                                  <div className="text-white/60 text-xs">🏊 Yards Swam</div>
+                                </div>
+                                <div>
+                                  <div className="text-2xl font-bold text-green-400">{mikeBikeMiles.toFixed(1)}</div>
+                                  <div className="text-white/60 text-xs">🚴 Miles Biked</div>
+                                </div>
+                                <div>
+                                  <div className="text-2xl font-bold text-orange-400">{mikeRunMiles.toFixed(1)}</div>
+                                  <div className="text-white/60 text-xs">🏃 Miles Run</div>
+                                </div>
+                                <div>
+                                  <div className="text-2xl font-bold text-purple-400">{mikeWorkouts}</div>
+                                  <div className="text-white/60 text-xs">Workouts</div>
+                                </div>
+                              </div>
+                              <div className="text-center text-lg text-white/80">
+                                Go Mike! You're training for a triathlon! 🏊🚴🏃
+                              </div>
+                              <button
+                                onClick={() => shareProgress(selectedFitnessEvent, { mikeSwimYards, mikeBikeMiles, mikeRunMiles, completedWeeks, totalWeeks: plan.length })}
+                                className="mt-4 w-full py-2 bg-orange-500/30 hover:bg-orange-500/40 text-orange-300 rounded-lg transition flex items-center justify-center gap-2"
+                              >
+                                <Share2 className="w-4 h-4" />
+                                Share Progress
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        // Calculate miles for Mike and Adam separately (half marathon and other plans)
                         const mikeMiles = plan.reduce((acc, w) => {
-                          const weekMiles = w.runs?.filter(r => r.mike).reduce((sum, r) => sum + (parseFloat(r.distance) || 0), 0) || 0;
+                          const weekMiles = w.runs?.filter(r => r.mike).reduce((sum, r) => sum + (parseFloat(String(r.distance).replace(/[^\d.]/g, '')) || 0), 0) || 0;
                           return acc + weekMiles;
                         }, 0);
                         const adamMiles = plan.reduce((acc, w) => {
-                          const weekMiles = w.runs?.filter(r => r.adam).reduce((sum, r) => sum + (parseFloat(r.distance) || 0), 0) || 0;
+                          const weekMiles = w.runs?.filter(r => r.adam).reduce((sum, r) => sum + (parseFloat(String(r.distance).replace(/[^\d.]/g, '')) || 0), 0) || 0;
                           return acc + weekMiles;
                         }, 0);
                         const mikeWorkouts = plan.reduce((acc, w) => acc + (w.runs?.filter(r => r.mike).length || 0) + (w.crossTraining?.filter(c => c.mike).length || 0), 0);
@@ -4231,19 +5183,19 @@ export default function TripPlanner() {
                               )}
 
                               <div className="grid md:grid-cols-2 gap-4">
-                                {/* Runs */}
+                                {/* Activities (Runs/Swims/Bikes for triathlon) */}
                                 <div className="bg-white/10 rounded-xl p-4">
                                   <h4 className="text-lg font-semibold text-orange-300 mb-3 flex items-center gap-2">
-                                    <span>🏃</span> Runs
+                                    <span>🏃</span> {selectedFitnessEvent?.id === 'triathlon-2026' ? 'Activities' : 'Runs'}
                                   </h4>
                                   <div className="space-y-2">
                                     {currentWeek.runs?.map(run => (
                                       <div
                                         key={run.id}
                                         className={`flex items-center gap-3 p-3 rounded-lg ${
-                                          ('adam' in run)
-                                            ? ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
-                                            : (run.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                          selectedFitnessEvent?.id === 'triathlon-2026'
+                                            ? (run.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                            : ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
                                         }`}
                                       >
                                         <div className="flex gap-2">
@@ -4256,7 +5208,7 @@ export default function TripPlanner() {
                                           >
                                             {run.mike && <Check className="w-4 h-4 text-white" />}
                                           </button>
-                                          {'adam' in run && (
+                                          {selectedFitnessEvent?.id !== 'triathlon-2026' && (
                                             <button
                                               onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { adam: !run.adam })}
                                               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
@@ -4271,14 +5223,14 @@ export default function TripPlanner() {
                                         <div className="flex-1">
                                           <div className="text-white font-medium">{run.label || run.day}</div>
                                           <div className="text-xs text-white/50">
-                                            {'adam' in run ? (
+                                            {selectedFitnessEvent?.id === 'triathlon-2026' ? (
+                                              <span className={run.mike ? 'text-blue-400' : 'text-white/30'}>Mike</span>
+                                            ) : (
                                               <>
                                                 <span className={run.mike ? 'text-blue-400' : 'text-white/30'}>M</span>
                                                 {' / '}
                                                 <span className={run.adam ? 'text-purple-400' : 'text-white/30'}>A</span>
                                               </>
-                                            ) : (
-                                              <span className={run.mike ? 'text-blue-400' : 'text-white/30'}>Mike</span>
                                             )}
                                           </div>
                                         </div>
@@ -4298,9 +5250,9 @@ export default function TripPlanner() {
                                       <div
                                         key={ct.id}
                                         className={`flex items-center gap-3 p-3 rounded-lg ${
-                                          ('adam' in ct)
-                                            ? ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
-                                            : (ct.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                          selectedFitnessEvent?.id === 'triathlon-2026'
+                                            ? (ct.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                            : ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
                                         }`}
                                       >
                                         <div className="flex gap-2">
@@ -4313,7 +5265,7 @@ export default function TripPlanner() {
                                           >
                                             {ct.mike && <Check className="w-4 h-4 text-white" />}
                                           </button>
-                                          {'adam' in ct && (
+                                          {selectedFitnessEvent?.id !== 'triathlon-2026' && (
                                             <button
                                               onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { adam: !ct.adam })}
                                               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
@@ -4328,14 +5280,14 @@ export default function TripPlanner() {
                                         <div className="flex-1">
                                           <div className="text-white font-medium">{ct.label || ct.day}</div>
                                           <div className="text-xs text-white/50">
-                                            {'adam' in ct ? (
+                                            {selectedFitnessEvent?.id === 'triathlon-2026' ? (
+                                              <span className={ct.mike ? 'text-blue-400' : 'text-white/30'}>Mike</span>
+                                            ) : (
                                               <>
                                                 <span className={ct.mike ? 'text-blue-400' : 'text-white/30'}>M</span>
                                                 {' / '}
                                                 <span className={ct.adam ? 'text-purple-400' : 'text-white/30'}>A</span>
                                               </>
-                                            ) : (
-                                              <span className={ct.mike ? 'text-blue-400' : 'text-white/30'}>Mike</span>
                                             )}
                                           </div>
                                         </div>
@@ -4369,14 +5321,19 @@ export default function TripPlanner() {
                           const todayStr = today.toISOString().split('T')[0];
                           const isCurrent = week.startDate <= todayStr && week.endDate >= todayStr;
                           const isPast = week.endDate < todayStr;
-                          const completedCount = (week.runs?.filter(r => r.mike && r.adam).length || 0) + (week.crossTraining?.filter(c => c.mike && c.adam).length || 0);
+                          const isTriathlon = selectedFitnessEvent?.id === 'triathlon-2026';
+                          const completedCount = isTriathlon
+                            ? (week.runs?.filter(r => r.mike).length || 0) + (week.crossTraining?.filter(c => c.mike).length || 0)
+                            : (week.runs?.filter(r => r.mike && r.adam).length || 0) + (week.crossTraining?.filter(c => c.mike && c.adam).length || 0);
                           const totalCount = (week.runs?.length || 0) + (week.crossTraining?.length || 0);
 
                           return (
                             <details
                               key={week.id}
-                              className={`group bg-white/5 rounded-xl border transition ${
-                                isCurrent ? 'border-orange-500/50' : 'border-white/10 hover:border-white/20'
+                              className={`group rounded-xl border transition ${
+                                isCurrent ? 'border-orange-500/50 bg-white/5' :
+                                isPast ? 'border-white/10 bg-gray-600/20 opacity-70' :
+                                'border-white/10 hover:border-white/20 bg-white/5'
                               } ${week.isRecovery ? 'bg-green-500/10' : ''}`}
                               open={isCurrent}
                             >
@@ -4425,17 +5382,19 @@ export default function TripPlanner() {
 
                               <div className="px-4 pb-4 pt-2 border-t border-white/10">
                                 <div className="grid md:grid-cols-2 gap-4">
-                                  {/* Runs */}
+                                  {/* Activities (Runs/Swims/Bikes for triathlon) */}
                                   <div>
-                                    <h4 className="text-sm font-semibold text-orange-300 mb-2">🏃 Runs</h4>
+                                    <h4 className="text-sm font-semibold text-orange-300 mb-2">
+                                      {selectedFitnessEvent?.id === 'triathlon-2026' ? '🏃 Activities' : '🏃 Runs'}
+                                    </h4>
                                     <div className="space-y-1">
                                       {week.runs?.map(run => (
                                         <div
                                           key={run.id}
                                           className={`flex items-center gap-2 p-2 rounded ${
-                                            ('adam' in run)
-                                              ? ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
-                                              : (run.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                            selectedFitnessEvent?.id === 'triathlon-2026'
+                                              ? (run.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                              : ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
                                           }`}
                                         >
                                           <div className="flex gap-1">
@@ -4448,7 +5407,7 @@ export default function TripPlanner() {
                                             >
                                               {run.mike && <Check className="w-3 h-3 text-white" />}
                                             </button>
-                                            {'adam' in run && (
+                                            {selectedFitnessEvent?.id !== 'triathlon-2026' && (
                                               <button
                                                 onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { adam: !run.adam })}
                                                 className={`w-5 h-5 rounded-full border flex items-center justify-center ${
@@ -4475,9 +5434,9 @@ export default function TripPlanner() {
                                         <div
                                           key={ct.id}
                                           className={`flex items-center gap-2 p-2 rounded ${
-                                            ('adam' in ct)
-                                              ? ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
-                                              : (ct.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                            selectedFitnessEvent?.id === 'triathlon-2026'
+                                              ? (ct.mike ? 'bg-green-500/20' : 'bg-white/5')
+                                              : ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
                                           }`}
                                         >
                                           <div className="flex gap-1">
@@ -4490,7 +5449,7 @@ export default function TripPlanner() {
                                             >
                                               {ct.mike && <Check className="w-3 h-3 text-white" />}
                                             </button>
-                                            {'adam' in ct && (
+                                            {selectedFitnessEvent?.id !== 'triathlon-2026' && (
                                               <button
                                                 onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { adam: !ct.adam })}
                                                 className={`w-5 h-5 rounded-full border flex items-center justify-center ${
@@ -4542,27 +5501,59 @@ export default function TripPlanner() {
                 <div className="grid md:grid-cols-3 gap-6">
                   {/* Total Stats */}
                   {(() => {
-                    let totalRuns = 0;
-                    let mikeRuns = 0;
-                    let adamRuns = 0;
-                    let totalCross = 0;
-                    let mikeCross = 0;
-                    let adamCross = 0;
-                    let mikeMiles = 0;
-                    let adamMiles = 0;
+                    // Initialize counters
+                    let totalRuns = 0, mikeRuns = 0, adamRuns = 0;
+                    let totalSwims = 0, mikeSwims = 0, adamSwims = 0;
+                    let totalBikes = 0, mikeBikes = 0, adamBikes = 0;
+                    let totalCross = 0, mikeCross = 0, adamCross = 0;
+                    let mikeRunMiles = 0, adamRunMiles = 0;
+                    let mikeSwimYards = 0, adamSwimYards = 0;
+                    let mikeBikeMiles = 0, adamBikeMiles = 0;
 
-                    Object.values(fitnessTrainingPlans).forEach(plan => {
+                    // Helper to detect activity type from label
+                    const isSwim = (label) => label?.toLowerCase().includes('swim') || label?.includes('🏊');
+                    const isBike = (label) => label?.toLowerCase().includes('bike') || label?.toLowerCase().includes('cycle') || label?.includes('🚴');
+
+                    // Use getActiveTrainingPlan to get merged hardcoded + Firebase data
+                    fitnessEvents.forEach(event => {
+                      const plan = getActiveTrainingPlan(event.id);
                       plan.forEach(week => {
-                        week.runs?.forEach(run => {
-                          totalRuns++;
-                          const miles = parseFloat(run.distance) || 0;
-                          if (run.mike) {
-                            mikeRuns++;
-                            mikeMiles += miles;
-                          }
-                          if (run.adam) {
-                            adamRuns++;
-                            adamMiles += miles;
+                        week.runs?.forEach(activity => {
+                          const label = activity.label || '';
+                          const distanceStr = activity.distance || '';
+                          const distanceNum = parseFloat(distanceStr) || 0;
+
+                          if (isSwim(label)) {
+                            totalSwims++;
+                            if (activity.mike) {
+                              mikeSwims++;
+                              mikeSwimYards += distanceNum;
+                            }
+                            if (activity.adam) {
+                              adamSwims++;
+                              adamSwimYards += distanceNum;
+                            }
+                          } else if (isBike(label)) {
+                            totalBikes++;
+                            if (activity.mike) {
+                              mikeBikes++;
+                              mikeBikeMiles += distanceNum;
+                            }
+                            if (activity.adam) {
+                              adamBikes++;
+                              adamBikeMiles += distanceNum;
+                            }
+                          } else {
+                            // Treat as run
+                            totalRuns++;
+                            if (activity.mike) {
+                              mikeRuns++;
+                              mikeRunMiles += distanceNum;
+                            }
+                            if (activity.adam) {
+                              adamRuns++;
+                              adamRunMiles += distanceNum;
+                            }
                           }
                         });
                         week.crossTraining?.forEach(ct => {
@@ -4575,6 +5566,7 @@ export default function TripPlanner() {
 
                     return (
                       <>
+                        {/* Runs */}
                         <div className="bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-2xl p-6 border border-orange-500/30">
                           <div className="text-4xl mb-2">🏃</div>
                           <div className="text-xl font-bold text-white mb-2">Runs Completed</div>
@@ -4582,15 +5574,56 @@ export default function TripPlanner() {
                             <div className="text-center">
                               <div className="text-2xl font-bold text-blue-400">{mikeRuns}</div>
                               <div className="text-xs text-white/60">Mike</div>
+                              <div className="text-xs text-blue-300">{mikeRunMiles.toFixed(1)} mi</div>
                             </div>
                             <div className="text-center">
                               <div className="text-2xl font-bold text-purple-400">{adamRuns}</div>
                               <div className="text-xs text-white/60">Adam</div>
+                              <div className="text-xs text-purple-300">{adamRunMiles.toFixed(1)} mi</div>
                             </div>
                           </div>
-                          <div className="mt-2 text-sm text-orange-300 text-center">{totalRuns} total runs in plan</div>
+                          <div className="mt-2 text-sm text-orange-300 text-center">{totalRuns} total in plan</div>
                         </div>
 
+                        {/* Swims */}
+                        <div className="bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-2xl p-6 border border-cyan-500/30">
+                          <div className="text-4xl mb-2">🏊</div>
+                          <div className="text-xl font-bold text-white mb-2">Swims Completed</div>
+                          <div className="flex justify-around">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-blue-400">{mikeSwims}</div>
+                              <div className="text-xs text-white/60">Mike</div>
+                              <div className="text-xs text-blue-300">{mikeSwimYards.toFixed(0)} yds</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-purple-400">{adamSwims}</div>
+                              <div className="text-xs text-white/60">Adam</div>
+                              <div className="text-xs text-purple-300">{adamSwimYards.toFixed(0)} yds</div>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-sm text-cyan-300 text-center">{totalSwims} total in plan</div>
+                        </div>
+
+                        {/* Bikes */}
+                        <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-2xl p-6 border border-green-500/30">
+                          <div className="text-4xl mb-2">🚴</div>
+                          <div className="text-xl font-bold text-white mb-2">Bike Rides</div>
+                          <div className="flex justify-around">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-blue-400">{mikeBikes}</div>
+                              <div className="text-xs text-white/60">Mike</div>
+                              <div className="text-xs text-blue-300">{mikeBikeMiles.toFixed(1)} mi</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-purple-400">{adamBikes}</div>
+                              <div className="text-xs text-white/60">Adam</div>
+                              <div className="text-xs text-purple-300">{adamBikeMiles.toFixed(1)} mi</div>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-sm text-green-300 text-center">{totalBikes} total in plan</div>
+                        </div>
+
+                        {/* Cross Training */}
                         <div className="bg-gradient-to-br from-red-500/20 to-pink-500/20 rounded-2xl p-6 border border-red-500/30">
                           <div className="text-4xl mb-2">💪</div>
                           <div className="text-xl font-bold text-white mb-2">Cross Training</div>
@@ -4604,59 +5637,127 @@ export default function TripPlanner() {
                               <div className="text-xs text-white/60">Adam</div>
                             </div>
                           </div>
-                          <div className="mt-2 text-sm text-red-300 text-center">{totalCross} total sessions in plan</div>
+                          <div className="mt-2 text-sm text-red-300 text-center">{totalCross} total in plan</div>
                         </div>
 
-                        <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-2xl p-6 border border-yellow-500/30">
+                        {/* Total Distance Summary */}
+                        <div className="md:col-span-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-2xl p-6 border border-yellow-500/30">
                           <div className="text-4xl mb-2">📏</div>
-                          <div className="text-xl font-bold text-white mb-2">Miles Logged</div>
-                          <div className="flex justify-around">
+                          <div className="text-xl font-bold text-white mb-4">Total Distance Logged</div>
+                          <div className="grid grid-cols-2 gap-4">
                             <div className="text-center">
-                              <div className="text-2xl font-bold text-blue-400">{mikeMiles.toFixed(1)}</div>
-                              <div className="text-xs text-white/60">Mike</div>
+                              <div className="text-lg font-bold text-blue-400 mb-1">Mike</div>
+                              <div className="space-y-1 text-sm">
+                                <div className="text-white/80">🏃 {mikeRunMiles.toFixed(1)} miles running</div>
+                                <div className="text-white/80">🏊 {mikeSwimYards.toFixed(0)} yards swimming</div>
+                                <div className="text-white/80">🚴 {mikeBikeMiles.toFixed(1)} miles biking</div>
+                              </div>
                             </div>
                             <div className="text-center">
-                              <div className="text-2xl font-bold text-purple-400">{adamMiles.toFixed(1)}</div>
-                              <div className="text-xs text-white/60">Adam</div>
+                              <div className="text-lg font-bold text-purple-400 mb-1">Adam</div>
+                              <div className="space-y-1 text-sm">
+                                <div className="text-white/80">🏃 {adamRunMiles.toFixed(1)} miles running</div>
+                                <div className="text-white/80">🏊 {adamSwimYards.toFixed(0)} yards swimming</div>
+                                <div className="text-white/80">🚴 {adamBikeMiles.toFixed(1)} miles biking</div>
+                              </div>
                             </div>
                           </div>
-                          <div className="mt-2 text-sm text-yellow-300 text-center">Keep going! 🔥</div>
+                          <div className="mt-4 text-sm text-yellow-300 text-center">Keep pushing! 🔥</div>
                         </div>
                       </>
                     );
                   })()}
 
-                  {/* Weekly Streak */}
-                  <div className="md:col-span-3 bg-white/5 rounded-2xl p-6 border border-white/10">
+                  {/* Weekly Streak - Mike */}
+                  <div className="md:col-span-3 bg-gradient-to-br from-blue-500/10 to-blue-600/10 rounded-2xl p-6 border border-blue-500/30">
                     <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                      <span>🔥</span> Training Consistency
+                      <span>🔥</span> Mike's Training Consistency
                     </h3>
-                    <div className="flex gap-2 flex-wrap">
-                      {fitnessEvents.map(event => {
-                        const plan = getActiveTrainingPlan(event.id);
-                        return plan.slice(0, 12).map((week, i) => {
-                          // Count workouts where both Mike AND Adam completed
-                          const completed = (week.runs?.filter(r => r.mike && r.adam).length || 0) + (week.crossTraining?.filter(c => c.mike && c.adam).length || 0);
-                          const total = (week.runs?.length || 0) + (week.crossTraining?.length || 0);
-                          const percentage = total > 0 ? (completed / total) * 100 : 0;
+                    {fitnessEvents.map(event => {
+                      const plan = getActiveTrainingPlan(event.id);
+                      return (
+                        <div key={event.id} className="mb-4">
+                          <div className="text-sm text-blue-300 mb-2">{event.emoji} {event.name}</div>
+                          <div className="flex gap-2 flex-wrap">
+                            {plan.map((week, i) => {
+                              const completed = (week.runs?.filter(r => r.mike).length || 0) + (week.crossTraining?.filter(c => c.mike).length || 0);
+                              const total = (week.runs?.length || 0) + (week.crossTraining?.length || 0);
+                              const percentage = total > 0 ? (completed / total) * 100 : 0;
 
-                          return (
-                            <div
-                              key={week.id}
-                              className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold ${
-                                percentage === 100 ? 'bg-green-500 text-white' :
-                                percentage >= 50 ? 'bg-yellow-500 text-white' :
-                                percentage > 0 ? 'bg-orange-500/50 text-white' :
-                                'bg-white/10 text-white/40'
-                              }`}
-                              title={`Week ${i + 1}: ${completed}/${total}`}
-                            >
-                              {i + 1}
-                            </div>
-                          );
-                        });
-                      })}
+                              return (
+                                <div
+                                  key={week.id || i}
+                                  className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold ${
+                                    percentage === 100 ? 'bg-green-500 text-white' :
+                                    percentage >= 50 ? 'bg-yellow-500 text-white' :
+                                    percentage > 0 ? 'bg-orange-500/50 text-white' :
+                                    'bg-white/10 text-white/40'
+                                  }`}
+                                  title={`Week ${i + 1}: ${completed}/${total}`}
+                                >
+                                  {i + 1}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex gap-4 mt-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 bg-green-500 rounded" />
+                        <span className="text-white/60">100%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 bg-yellow-500 rounded" />
+                        <span className="text-white/60">50-99%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 bg-orange-500/50 rounded" />
+                        <span className="text-white/60">1-49%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 bg-white/10 rounded" />
+                        <span className="text-white/60">0%</span>
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Weekly Streak - Adam */}
+                  <div className="md:col-span-3 bg-gradient-to-br from-purple-500/10 to-purple-600/10 rounded-2xl p-6 border border-purple-500/30">
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                      <span>🔥</span> Adam's Training Consistency
+                    </h3>
+                    {fitnessEvents.filter(e => e.id !== 'triathlon-2026').map(event => {
+                      const plan = getActiveTrainingPlan(event.id);
+                      return (
+                        <div key={event.id} className="mb-4">
+                          <div className="text-sm text-purple-300 mb-2">{event.emoji} {event.name}</div>
+                          <div className="flex gap-2 flex-wrap">
+                            {plan.map((week, i) => {
+                              const completed = (week.runs?.filter(r => r.adam).length || 0) + (week.crossTraining?.filter(c => c.adam).length || 0);
+                              const total = (week.runs?.length || 0) + (week.crossTraining?.length || 0);
+                              const percentage = total > 0 ? (completed / total) * 100 : 0;
+
+                              return (
+                                <div
+                                  key={week.id || i}
+                                  className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold ${
+                                    percentage === 100 ? 'bg-green-500 text-white' :
+                                    percentage >= 50 ? 'bg-yellow-500 text-white' :
+                                    percentage > 0 ? 'bg-orange-500/50 text-white' :
+                                    'bg-white/10 text-white/40'
+                                  }`}
+                                  title={`Week ${i + 1}: ${completed}/${total}`}
+                                >
+                                  {i + 1}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
                     <div className="flex gap-4 mt-4 text-sm">
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 bg-green-500 rounded" />
@@ -4690,40 +5791,6 @@ export default function TripPlanner() {
                 </div>
               </div>
 
-              {/* Install App Button - Only show when not in app mode */}
-              {!initialAppMode && (
-                <div className="text-center mt-8">
-                  <div className="bg-white/5 rounded-2xl p-6 border border-white/10 max-w-md mx-auto">
-                    <div className="text-4xl mb-3">📱</div>
-                    <h3 className="text-lg font-semibold text-white mb-2">Get the Fitness App</h3>
-                    <p className="text-slate-400 text-sm mb-4">
-                      Install our fitness tracker on your iPhone for quick access to your training plans
-                    </p>
-                    <button
-                      onClick={() => {
-                        const appUrl = `${window.location.origin}/?app=fitness`;
-                        if (navigator.share) {
-                          navigator.share({
-                            title: 'Mike & Adam\'s Fitness',
-                            text: 'Install the Fitness app: Open this link in Safari, tap Share, then "Add to Home Screen"',
-                            url: appUrl
-                          });
-                        } else {
-                          navigator.clipboard.writeText(appUrl);
-                          showToast('Link copied! Open in Safari and tap Share → Add to Home Screen', 'success');
-                        }
-                      }}
-                      className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-full hover:opacity-90 transition shadow-lg"
-                    >
-                      <span>🏃</span>
-                      Install Fitness App
-                    </button>
-                    <p className="text-slate-500 text-xs mt-3">
-                      Open in Safari → Share → Add to Home Screen
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
           )}
           {/* ========== END FITNESS SECTION ========== */}
@@ -5016,14 +6083,95 @@ export default function TripPlanner() {
           )}
           {/* ========== END CALENDAR SECTION ========== */}
 
+          {/* ========== APPS SECTION ========== */}
+          {activeSection === 'apps' && (
+            <div className="mt-8">
+              <div className="max-w-2xl mx-auto">
+                {/* Instructions */}
+                <div className="text-center mb-8">
+                  <p className="text-slate-300 mb-2">Add any of these mini apps to your iPhone home screen for quick access!</p>
+                  <p className="text-slate-400 text-sm">Tap an app, then use the share button and "Add to Home Screen"</p>
+                </div>
+
+                {/* Apps Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { id: 'fitness', name: 'Fitness', emoji: '🏃', color: 'from-orange-400 to-red-500', desc: 'Track workouts & training' },
+                    { id: 'travel', name: 'Travel', emoji: '✈️', color: 'from-teal-400 to-cyan-500', desc: 'Plan your adventures' },
+                    { id: 'events', name: 'Events', emoji: '🎉', color: 'from-amber-400 to-orange-500', desc: 'Manage parties & gatherings' },
+                    { id: 'memories', name: 'Memories', emoji: '💝', color: 'from-rose-400 to-pink-500', desc: 'Cherish special moments' },
+                  ].map((app) => (
+                    <button
+                      key={app.id}
+                      onClick={() => {
+                        const appUrl = `${window.location.origin}/?app=${app.id}`;
+                        if (navigator.share) {
+                          navigator.share({
+                            title: `Mike & Adam's ${app.name}`,
+                            text: `Open ${app.name} app`,
+                            url: appUrl
+                          });
+                        } else {
+                          navigator.clipboard.writeText(appUrl);
+                          showToast(`${app.name} app link copied! Open in Safari and add to home screen.`, 'success');
+                        }
+                      }}
+                      className="flex flex-col items-center gap-3 p-6 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition active:scale-95"
+                    >
+                      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${app.color} flex items-center justify-center text-3xl shadow-lg`}>
+                        {app.emoji}
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-white font-semibold text-lg">{app.name}</h3>
+                        <p className="text-slate-400 text-xs mt-1">{app.desc}</p>
+                      </div>
+                      <div className="flex items-center gap-1 text-purple-400 text-xs">
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Share / Add to Home</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* How To Instructions */}
+                <div className="mt-8 p-6 bg-white/5 rounded-2xl border border-white/10">
+                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                    <span className="text-lg">📲</span> How to Add to Home Screen
+                  </h3>
+                  <ol className="space-y-3 text-slate-300 text-sm">
+                    <li className="flex gap-3">
+                      <span className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold shrink-0">1</span>
+                      <span>Tap one of the apps above to open the share menu</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold shrink-0">2</span>
+                      <span>On iPhone: Tap "Add to Home Screen" in the share sheet</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold shrink-0">3</span>
+                      <span>Give it a name and tap "Add" - you'll have a dedicated app icon!</span>
+                    </li>
+                  </ol>
+                </div>
+
+                {/* Back Button */}
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={() => setActiveSection('home')}
+                    className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition inline-flex items-center gap-2"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Back to Home
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* ========== END APPS SECTION ========== */}
+
           {/* ========== NUTRITION SECTION ========== */}
           {activeSection === 'nutrition' && (
             <div className="mt-8">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-white mb-2">🥗 Nutrition</h2>
-                <p className="text-slate-400">Recipes, meal planning & grocery lists</p>
-              </div>
-
               {/* Coming Soon Placeholder */}
               <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-3xl p-8 text-center border border-green-500/30">
                 <div className="text-6xl mb-4">👨‍🍳</div>
@@ -5237,85 +6385,125 @@ export default function TripPlanner() {
 
                     {/* Hosts */}
                     <div className="flex flex-wrap gap-2 mb-4">
-                      <div className="flex items-center gap-2 bg-gradient-to-r from-purple-500/30 to-pink-500/30 px-3 py-2 rounded-full border border-purple-500/30">
-                        <div className="w-8 h-8 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center text-white font-bold text-sm">M</div>
+                      <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500/30 to-orange-500/30 px-3 py-2 rounded-full border border-amber-500/30">
+                        <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-sm">M</div>
                         <span className="text-white text-sm">Mike</span>
-                        <span className="text-xs bg-purple-500/50 text-purple-100 px-2 py-0.5 rounded-full">Host</span>
+                        <span className="text-xs bg-amber-500/50 text-amber-100 px-2 py-0.5 rounded-full">Host</span>
                       </div>
-                      <div className="flex items-center gap-2 bg-gradient-to-r from-blue-500/30 to-cyan-500/30 px-3 py-2 rounded-full border border-blue-500/30">
-                        <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full flex items-center justify-center text-white font-bold text-sm">A</div>
+                      <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500/30 to-orange-500/30 px-3 py-2 rounded-full border border-amber-500/30">
+                        <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-sm">A</div>
                         <span className="text-white text-sm">Adam</span>
-                        <span className="text-xs bg-blue-500/50 text-blue-100 px-2 py-0.5 rounded-full">Host</span>
+                        <span className="text-xs bg-amber-500/50 text-amber-100 px-2 py-0.5 rounded-full">Host</span>
                       </div>
                     </div>
 
-                    {/* Invited Guests */}
+                    {/* Invited Guests - With Swipe to Delete */}
                     {(selectedPartyEvent.guests || []).length > 0 && (
                       <div className="space-y-2 mb-4">
-                        {(selectedPartyEvent.guests || []).map(guest => (
-                          <div key={guest.id} className="flex items-center justify-between bg-white/5 px-3 py-2 rounded-xl">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                                {(guest.email || '?').charAt(0).toUpperCase()}
+                        {(selectedPartyEvent.guests || []).map(guest => {
+                          const isSwipingThis = swipeState.id === `guest-${guest.id}` && swipeState.swiping;
+                          const swipeOffset = isSwipingThis ? Math.min(0, swipeState.currentX - swipeState.startX) : 0;
+                          const deleteGuest = () => {
+                            const newEvents = partyEvents.map(ev =>
+                              ev.id === selectedPartyEvent.id
+                                ? { ...ev, guests: ev.guests.filter(g => g.id !== guest.id) }
+                                : ev
+                            );
+                            setPartyEvents(newEvents);
+                            setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                            savePartyEventsToFirestore(newEvents);
+                          };
+
+                          return (
+                            <div key={guest.id} className="relative overflow-hidden rounded-xl">
+                              {/* Delete action background */}
+                              <div className="absolute inset-y-0 right-0 w-20 bg-red-500 flex items-center justify-center">
+                                <Trash2 className="w-5 h-5 text-white" />
                               </div>
-                              <div>
-                                <div className="text-white text-sm">{guest.email}</div>
-                                <div className="text-slate-500 text-xs">
-                                  {guest.permission === 'edit' ? '✏️ Can edit' : '👁️ View only'}
+
+                              <div
+                                className="relative flex items-center justify-between bg-slate-800 px-3 py-2 rounded-xl"
+                                style={{
+                                  transform: `translateX(${swipeOffset}px)`,
+                                  transition: isSwipingThis ? 'none' : 'transform 0.2s ease-out'
+                                }}
+                                onTouchStart={(e) => {
+                                  if (!isOwner) return;
+                                  setSwipeState({
+                                    id: `guest-${guest.id}`,
+                                    startX: e.touches[0].clientX,
+                                    currentX: e.touches[0].clientX,
+                                    swiping: true
+                                  });
+                                }}
+                                onTouchMove={(e) => {
+                                  if (!isOwner || swipeState.id !== `guest-${guest.id}`) return;
+                                  setSwipeState(s => ({ ...s, currentX: e.touches[0].clientX }));
+                                }}
+                                onTouchEnd={() => {
+                                  if (!isOwner || swipeState.id !== `guest-${guest.id}`) return;
+                                  if (swipeState.startX - swipeState.currentX > 80) {
+                                    deleteGuest();
+                                  }
+                                  setSwipeState({ id: null, startX: 0, currentX: 0, swiping: false });
+                                }}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                    {(guest.email || '?').charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div className="text-white text-sm">{guest.email}</div>
+                                    <div className="text-slate-500 text-xs">
+                                      {guest.permission === 'edit' ? '✏️ Can edit' : '👁️ View only'}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {/* RSVP Status */}
+                                  <select
+                                    value={guest.rsvp || 'pending'}
+                                    onChange={(e) => {
+                                      const newEvents = partyEvents.map(ev =>
+                                        ev.id === selectedPartyEvent.id
+                                          ? {
+                                              ...ev,
+                                              guests: ev.guests.map(g =>
+                                                g.id === guest.id ? { ...g, rsvp: e.target.value } : g
+                                              )
+                                            }
+                                          : ev
+                                      );
+                                      setPartyEvents(newEvents);
+                                      setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                                      savePartyEventsToFirestore(newEvents);
+                                    }}
+                                    className={`text-xs px-2 py-1 rounded-full border-0 cursor-pointer ${
+                                      guest.rsvp === 'yes' ? 'bg-green-500/30 text-green-300' :
+                                      guest.rsvp === 'no' ? 'bg-red-500/30 text-red-300' :
+                                      guest.rsvp === 'maybe' ? 'bg-yellow-500/30 text-yellow-300' :
+                                      'bg-slate-500/30 text-slate-300'
+                                    }`}
+                                  >
+                                    <option value="pending">⏳ Pending</option>
+                                    <option value="yes">✅ Going</option>
+                                    <option value="no">❌ Not Going</option>
+                                    <option value="maybe">🤔 Maybe</option>
+                                  </select>
+                                  {/* Desktop delete button */}
+                                  {isOwner && (
+                                    <button
+                                      onClick={deleteGuest}
+                                      className="hidden md:block p-1 text-slate-400 hover:text-red-400 transition"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              {/* RSVP Status */}
-                              <select
-                                value={guest.rsvp || 'pending'}
-                                onChange={(e) => {
-                                  const newEvents = partyEvents.map(ev =>
-                                    ev.id === selectedPartyEvent.id
-                                      ? {
-                                          ...ev,
-                                          guests: ev.guests.map(g =>
-                                            g.id === guest.id ? { ...g, rsvp: e.target.value } : g
-                                          )
-                                        }
-                                      : ev
-                                  );
-                                  setPartyEvents(newEvents);
-                                  setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
-                                  savePartyEventsToFirestore(newEvents);
-                                }}
-                                className={`text-xs px-2 py-1 rounded-full border-0 cursor-pointer ${
-                                  guest.rsvp === 'yes' ? 'bg-green-500/30 text-green-300' :
-                                  guest.rsvp === 'no' ? 'bg-red-500/30 text-red-300' :
-                                  guest.rsvp === 'maybe' ? 'bg-yellow-500/30 text-yellow-300' :
-                                  'bg-slate-500/30 text-slate-300'
-                                }`}
-                              >
-                                <option value="pending">⏳ Pending</option>
-                                <option value="yes">✅ Going</option>
-                                <option value="no">❌ Not Going</option>
-                                <option value="maybe">🤔 Maybe</option>
-                              </select>
-                              {isOwner && (
-                                <button
-                                  onClick={() => {
-                                    const newEvents = partyEvents.map(ev =>
-                                      ev.id === selectedPartyEvent.id
-                                        ? { ...ev, guests: ev.guests.filter(g => g.id !== guest.id) }
-                                        : ev
-                                    );
-                                    setPartyEvents(newEvents);
-                                    setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
-                                    savePartyEventsToFirestore(newEvents);
-                                  }}
-                                  className="p-1 text-slate-400 hover:text-red-400 transition"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
 
@@ -5401,67 +6589,111 @@ export default function TripPlanner() {
                       </div>
                     </div>
 
-                    {/* Task Items */}
+                    {/* Task Items - With Swipe to Delete */}
                     <div className="space-y-2 mb-4">
-                      {(selectedPartyEvent.tasks || []).map(task => (
-                        <div key={task.id} className={`flex items-center gap-3 p-3 rounded-xl transition ${task.completed ? 'bg-green-500/10' : 'bg-white/5'}`}>
-                          <button
-                            onClick={() => {
-                              const newEvents = partyEvents.map(ev =>
-                                ev.id === selectedPartyEvent.id
-                                  ? {
-                                      ...ev,
-                                      tasks: ev.tasks.map(t =>
-                                        t.id === task.id ? { ...t, completed: !t.completed } : t
-                                      )
-                                    }
-                                  : ev
-                              );
-                              setPartyEvents(newEvents);
-                              setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
-                              savePartyEventsToFirestore(newEvents);
-                            }}
-                            className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition ${
-                              task.completed
-                                ? 'bg-green-500 border-green-500 text-white'
-                                : 'border-slate-500 hover:border-green-500'
-                            }`}
-                          >
-                            {task.completed && <Check className="w-4 h-4" />}
-                          </button>
-                          <div className="flex-1">
-                            <span className={`text-white ${task.completed ? 'line-through opacity-60' : ''}`}>
-                              {task.text}
-                            </span>
-                            {task.assignee && (
-                              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
-                                task.assignee === 'Mike' ? 'bg-purple-500/30 text-purple-300' :
-                                task.assignee === 'Adam' ? 'bg-blue-500/30 text-blue-300' :
-                                'bg-amber-500/30 text-amber-300'
-                              }`}>
-                                {task.assignee}
-                              </span>
-                            )}
-                          </div>
-                          {isOwner && (
-                            <button
-                              onClick={() => {
-                                const newEvents = partyEvents.map(ev =>
-                                  ev.id === selectedPartyEvent.id
-                                    ? { ...ev, tasks: ev.tasks.filter(t => t.id !== task.id) }
-                                    : ev
-                                );
-                                setPartyEvents(newEvents);
-                                setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
-                                savePartyEventsToFirestore(newEvents);
+                      {(selectedPartyEvent.tasks || []).map(task => {
+                        const isSwipingThis = swipeState.id === `task-${task.id}` && swipeState.swiping;
+                        const swipeOffset = isSwipingThis ? Math.min(0, swipeState.currentX - swipeState.startX) : 0;
+                        const deleteTask = () => {
+                          const newEvents = partyEvents.map(ev =>
+                            ev.id === selectedPartyEvent.id
+                              ? { ...ev, tasks: ev.tasks.filter(t => t.id !== task.id) }
+                              : ev
+                          );
+                          setPartyEvents(newEvents);
+                          setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                          savePartyEventsToFirestore(newEvents);
+                        };
+
+                        return (
+                          <div key={task.id} className="relative overflow-hidden rounded-xl">
+                            {/* Delete action background */}
+                            <div className="absolute inset-y-0 right-0 w-20 bg-red-500 flex items-center justify-center">
+                              <Trash2 className="w-5 h-5 text-white" />
+                            </div>
+
+                            {/* Swipeable content */}
+                            <div
+                              className={`relative flex items-center gap-3 p-3 rounded-xl transition-colors ${task.completed ? 'bg-green-500/10' : 'bg-slate-800'}`}
+                              style={{
+                                transform: `translateX(${swipeOffset}px)`,
+                                transition: isSwipingThis ? 'none' : 'transform 0.2s ease-out'
                               }}
-                              className="p-1 text-slate-400 hover:text-red-400 transition"
+                              onTouchStart={(e) => {
+                                if (!isOwner) return;
+                                setSwipeState({
+                                  id: `task-${task.id}`,
+                                  startX: e.touches[0].clientX,
+                                  currentX: e.touches[0].clientX,
+                                  swiping: true
+                                });
+                              }}
+                              onTouchMove={(e) => {
+                                if (!isOwner || swipeState.id !== `task-${task.id}`) return;
+                                setSwipeState(s => ({ ...s, currentX: e.touches[0].clientX }));
+                              }}
+                              onTouchEnd={() => {
+                                if (!isOwner || swipeState.id !== `task-${task.id}`) return;
+                                // If swiped more than 80px, delete
+                                if (swipeState.startX - swipeState.currentX > 80) {
+                                  deleteTask();
+                                }
+                                setSwipeState({ id: null, startX: 0, currentX: 0, swiping: false });
+                              }}
                             >
-                              <X className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                              <button
+                                onClick={() => {
+                                  const newEvents = partyEvents.map(ev =>
+                                    ev.id === selectedPartyEvent.id
+                                      ? {
+                                          ...ev,
+                                          tasks: ev.tasks.map(t =>
+                                            t.id === task.id ? { ...t, completed: !t.completed } : t
+                                          )
+                                        }
+                                      : ev
+                                  );
+                                  setPartyEvents(newEvents);
+                                  setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
+                                  savePartyEventsToFirestore(newEvents);
+                                }}
+                                className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition ${
+                                  task.completed
+                                    ? 'bg-green-500 border-green-500 text-white'
+                                    : 'border-slate-500 hover:border-green-500'
+                                }`}
+                              >
+                                {task.completed && <Check className="w-4 h-4" />}
+                              </button>
+                              <div className="flex-1 min-w-0">
+                                <span className={`text-white ${task.completed ? 'line-through opacity-60' : ''}`}>
+                                  {task.text}
+                                </span>
+                                {task.assignee && (
+                                  <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                                    task.assignee === 'Mike' ? 'bg-purple-500/30 text-purple-300' :
+                                    task.assignee === 'Adam' ? 'bg-blue-500/30 text-blue-300' :
+                                    'bg-amber-500/30 text-amber-300'
+                                  }`}>
+                                    {task.assignee}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Desktop delete button (hidden on mobile to favor swipe) */}
+                              {isOwner && (
+                                <button
+                                  onClick={deleteTask}
+                                  className="hidden md:block p-1 text-slate-400 hover:text-red-400 transition"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              )}
+                              {/* Mobile swipe hint */}
+                              <span className="md:hidden text-slate-600 text-xs">←</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                       {(selectedPartyEvent.tasks || []).length === 0 && (
                         <p className="text-slate-500 text-center py-4">No tasks yet</p>
                       )}
@@ -5546,35 +6778,33 @@ export default function TripPlanner() {
               ) : (
                 <>
                   {/* Events List View */}
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 className="text-3xl font-bold text-white">🎉 Events</h2>
-                      <p className="text-slate-400">Plan parties and gather friends</p>
-                    </div>
+                  {/* View Mode Toggle */}
+                  <div className="flex gap-1.5 md:gap-2 mb-6 items-center flex-wrap">
+                    {/* New Event Button - First */}
                     {isOwner && (
                       <button
                         onClick={() => setShowAddEventModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 transition"
+                        className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 rounded-xl font-medium transition bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 text-sm md:text-base"
                       >
-                        <Plus className="w-5 h-5" />
-                        New Event
+                        <Plus className="w-4 h-4" />
+                        <span className="hidden sm:inline">New Event</span>
+                        <span className="sm:hidden">New</span>
                       </button>
                     )}
-                  </div>
 
-                  {/* View Mode Toggle */}
-                  <div className="flex gap-2 mb-6">
+                    {/* View Switcher - compact on mobile */}
                     {['upcoming', 'past', 'all'].map(mode => (
                       <button
                         key={mode}
                         onClick={() => setEventViewMode(mode)}
-                        className={`px-4 py-2 rounded-xl font-medium transition ${
+                        className={`px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base ${
                           eventViewMode === mode
-                            ? 'bg-purple-500 text-white'
+                            ? 'bg-amber-500 text-white'
                             : 'bg-white/10 text-slate-300 hover:bg-white/20'
                         }`}
                       >
-                        {mode === 'upcoming' ? '📅 Upcoming' : mode === 'past' ? '📜 Past' : '📋 All'}
+                        {mode === 'upcoming' ? '📅' : mode === 'past' ? '📜' : '📋'}
+                        <span className="hidden sm:inline ml-1">{mode === 'upcoming' ? 'Upcoming' : mode === 'past' ? 'Past' : 'All'}</span>
                       </button>
                     ))}
                   </div>
@@ -5644,7 +6874,7 @@ export default function TripPlanner() {
                                 </div>
                               </div>
                             ) : (
-                              <div className={`bg-gradient-to-br ${event.color || 'from-purple-500/30 to-pink-500/30'} p-5`}>
+                              <div className={`bg-gradient-to-br ${event.color || 'from-amber-500/30 to-orange-500/30'} p-5`}>
                                 {/* Upload indicator */}
                                 {uploadingToEventId === event.id && (
                                   <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center z-10">
@@ -5735,7 +6965,7 @@ export default function TripPlanner() {
                         {isOwner && (
                           <button
                             onClick={() => setShowAddEventModal(true)}
-                            className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 transition"
+                            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:opacity-90 transition"
                           >
                             Create Event
                           </button>
@@ -5745,320 +6975,6 @@ export default function TripPlanner() {
                   </div>
                 </>
               )}
-
-              {/* Add/Edit Event Modal */}
-              {(showAddEventModal || editingEvent) && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                  <div className="bg-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto border border-white/20">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-2xl font-bold text-white">
-                        {editingEvent ? 'Edit Event' : 'New Event'}
-                      </h3>
-                      <button
-                        onClick={() => {
-                          setShowAddEventModal(false);
-                          setEditingEvent(null);
-                          setNewEventData({
-                            name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
-                            location: '', entryCode: '', description: '', color: 'from-purple-400 to-pink-500'
-                          });
-                        }}
-                        className="p-2 hover:bg-white/10 rounded-full transition"
-                      >
-                        <X className="w-5 h-5 text-white" />
-                      </button>
-                    </div>
-
-                    <div className="space-y-4">
-                      {/* Event Name & Emoji */}
-                      <div className="flex gap-3">
-                        <div className="relative">
-                          <button
-                            type="button"
-                            className="w-16 h-16 bg-white/10 rounded-xl flex items-center justify-center text-3xl hover:bg-white/20 transition border border-white/20"
-                            onClick={() => {
-                              const allEmojis = Object.values(eventCategories).flat();
-                              const currentIdx = allEmojis.indexOf(editingEvent ? editingEvent.emoji : newEventData.emoji);
-                              const nextIdx = (currentIdx + 1) % allEmojis.length;
-                              if (editingEvent) {
-                                setEditingEvent({ ...editingEvent, emoji: allEmojis[nextIdx] });
-                              } else {
-                                setNewEventData({ ...newEventData, emoji: allEmojis[nextIdx] });
-                              }
-                            }}
-                          >
-                            {editingEvent ? editingEvent.emoji : newEventData.emoji}
-                          </button>
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="Event name"
-                          value={editingEvent ? editingEvent.name : newEventData.name}
-                          onChange={(e) => {
-                            if (editingEvent) {
-                              setEditingEvent({ ...editingEvent, name: e.target.value });
-                            } else {
-                              setNewEventData({ ...newEventData, name: e.target.value });
-                            }
-                          }}
-                          className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-
-                      {/* Date & Time */}
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-sm text-slate-400 mb-1">Date</label>
-                          <input
-                            type="date"
-                            value={editingEvent ? editingEvent.date : newEventData.date}
-                            onChange={(e) => {
-                              if (editingEvent) {
-                                setEditingEvent({ ...editingEvent, date: e.target.value });
-                              } else {
-                                setNewEventData({ ...newEventData, date: e.target.value });
-                              }
-                            }}
-                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-purple-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-slate-400 mb-1">Start Time</label>
-                          <input
-                            type="time"
-                            value={editingEvent ? editingEvent.time : newEventData.time}
-                            onChange={(e) => {
-                              if (editingEvent) {
-                                setEditingEvent({ ...editingEvent, time: e.target.value });
-                              } else {
-                                setNewEventData({ ...newEventData, time: e.target.value });
-                              }
-                            }}
-                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-purple-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-slate-400 mb-1">End Time</label>
-                          <input
-                            type="time"
-                            value={editingEvent ? editingEvent.endTime : newEventData.endTime}
-                            onChange={(e) => {
-                              if (editingEvent) {
-                                setEditingEvent({ ...editingEvent, endTime: e.target.value });
-                              } else {
-                                setNewEventData({ ...newEventData, endTime: e.target.value });
-                              }
-                            }}
-                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-purple-500"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Location */}
-                      <div>
-                        <label className="block text-sm text-slate-400 mb-1">Location</label>
-                        <input
-                          type="text"
-                          placeholder="Address or location name"
-                          value={editingEvent ? editingEvent.location : newEventData.location}
-                          onChange={(e) => {
-                            if (editingEvent) {
-                              setEditingEvent({ ...editingEvent, location: e.target.value });
-                            } else {
-                              setNewEventData({ ...newEventData, location: e.target.value });
-                            }
-                          }}
-                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-
-                      {/* Entry Code */}
-                      <div>
-                        <label className="block text-sm text-slate-400 mb-1">Entry Instructions (optional)</label>
-                        <input
-                          type="text"
-                          placeholder="e.g., Buzzer #4B, Gate code 1234"
-                          value={editingEvent ? editingEvent.entryCode : newEventData.entryCode}
-                          onChange={(e) => {
-                            if (editingEvent) {
-                              setEditingEvent({ ...editingEvent, entryCode: e.target.value });
-                            } else {
-                              setNewEventData({ ...newEventData, entryCode: e.target.value });
-                            }
-                          }}
-                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-
-                      {/* Description */}
-                      <div>
-                        <label className="block text-sm text-slate-400 mb-1">Description</label>
-                        <textarea
-                          placeholder="What's this event about?"
-                          value={editingEvent ? editingEvent.description : newEventData.description}
-                          onChange={(e) => {
-                            if (editingEvent) {
-                              setEditingEvent({ ...editingEvent, description: e.target.value });
-                            } else {
-                              setNewEventData({ ...newEventData, description: e.target.value });
-                            }
-                          }}
-                          rows={3}
-                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 resize-none"
-                        />
-                      </div>
-
-                      {/* Color Picker */}
-                      <div>
-                        <label className="block text-sm text-slate-400 mb-2">Theme Color</label>
-                        <div className="flex flex-wrap gap-2">
-                          {[
-                            'from-purple-400 to-pink-500',
-                            'from-blue-400 to-cyan-500',
-                            'from-green-400 to-emerald-500',
-                            'from-amber-400 to-orange-500',
-                            'from-red-400 to-pink-500',
-                            'from-indigo-400 to-purple-500',
-                            'from-teal-400 to-blue-500',
-                            'from-yellow-400 to-amber-500',
-                          ].map(color => (
-                            <button
-                              key={color}
-                              type="button"
-                              onClick={() => {
-                                if (editingEvent) {
-                                  setEditingEvent({ ...editingEvent, color });
-                                } else {
-                                  setNewEventData({ ...newEventData, color });
-                                }
-                              }}
-                              className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} border-2 transition ${
-                                (editingEvent ? editingEvent.color : newEventData.color) === color
-                                  ? 'border-white scale-110'
-                                  : 'border-transparent hover:border-white/50'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Cover Image */}
-                      <div>
-                        <label className="block text-sm text-slate-400 mb-2">Cover Image (optional)</label>
-                        <input
-                          type="url"
-                          placeholder="Paste image URL (e.g., from Unsplash)"
-                          value={editingEvent ? (editingEvent.coverImage || '') : (newEventData.coverImage || '')}
-                          onChange={(e) => {
-                            if (editingEvent) {
-                              setEditingEvent({ ...editingEvent, coverImage: e.target.value });
-                            } else {
-                              setNewEventData({ ...newEventData, coverImage: e.target.value });
-                            }
-                          }}
-                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                        />
-                        {/* Image Preview */}
-                        {(editingEvent?.coverImage || newEventData.coverImage) && (
-                          <div className="mt-3 relative rounded-xl overflow-hidden">
-                            <img
-                              src={editingEvent ? editingEvent.coverImage : newEventData.coverImage}
-                              alt="Cover preview"
-                              className="w-full h-32 object-cover"
-                              onError={(e) => { e.target.style.display = 'none'; }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (editingEvent) {
-                                  setEditingEvent({ ...editingEvent, coverImage: '' });
-                                } else {
-                                  setNewEventData({ ...newEventData, coverImage: '' });
-                                }
-                              }}
-                              className="absolute top-2 right-2 p-1.5 bg-red-500/80 text-white rounded-full hover:bg-red-500 transition"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
-                        <p className="text-xs text-slate-500 mt-2">
-                          Tip: Find free images at <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">unsplash.com</a>
-                        </p>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex gap-3 pt-4">
-                        {editingEvent && (
-                          <button
-                            onClick={() => {
-                              if (confirm('Delete this event?')) {
-                                const newEvents = partyEvents.filter(e => e.id !== editingEvent.id);
-                                setPartyEvents(newEvents);
-                                savePartyEventsToFirestore(newEvents);
-                                setEditingEvent(null);
-                                setSelectedPartyEvent(null);
-                              }
-                            }}
-                            className="px-4 py-3 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition"
-                          >
-                            Delete
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            setShowAddEventModal(false);
-                            setEditingEvent(null);
-                            setNewEventData({
-                              name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
-                              location: '', entryCode: '', description: '', color: 'from-purple-400 to-pink-500'
-                            });
-                          }}
-                          className="flex-1 px-4 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20 transition"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (editingEvent) {
-                              // Update existing event
-                              const newEvents = partyEvents.map(e =>
-                                e.id === editingEvent.id ? { ...editingEvent, updatedAt: new Date().toISOString() } : e
-                              );
-                              setPartyEvents(newEvents);
-                              setSelectedPartyEvent(newEvents.find(e => e.id === editingEvent.id));
-                              savePartyEventsToFirestore(newEvents);
-                              setEditingEvent(null);
-                            } else {
-                              // Create new event
-                              const newEvent = {
-                                ...newEventData,
-                                id: `event-${Date.now()}`,
-                                guests: [],
-                                tasks: [],
-                                createdBy: currentUser,
-                                createdAt: new Date().toISOString()
-                              };
-                              const newEvents = [...partyEvents, newEvent];
-                              setPartyEvents(newEvents);
-                              savePartyEventsToFirestore(newEvents);
-                              setShowAddEventModal(false);
-                              setNewEventData({
-                                name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
-                                location: '', entryCode: '', description: '', color: 'from-purple-400 to-pink-500'
-                              });
-                            }
-                          }}
-                          disabled={!(editingEvent ? editingEvent.name && editingEvent.date : newEventData.name && newEventData.date)}
-                          className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {editingEvent ? 'Save Changes' : 'Create Event'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
           {/* ========== END EVENTS SECTION ========== */}
@@ -6066,11 +6982,6 @@ export default function TripPlanner() {
           {/* ========== LIFE PLANNING SECTION ========== */}
           {activeSection === 'lifePlanning' && (
             <div className="mt-8">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-white mb-2">🎯 Life Planning</h2>
-                <p className="text-slate-400">Dream big, plan together</p>
-              </div>
-
               {/* Coming Soon Placeholder */}
               <div className="bg-gradient-to-r from-purple-500/20 to-indigo-500/20 rounded-3xl p-8 text-center border border-purple-500/30">
                 <div className="text-6xl mb-4">🌟</div>
@@ -6095,11 +7006,6 @@ export default function TripPlanner() {
           {/* ========== BUSINESS SECTION ========== */}
           {activeSection === 'business' && (
             <div className="mt-8">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-white mb-2">💼 Business</h2>
-                <p className="text-slate-400">Build and grow together</p>
-              </div>
-
               {/* Coming Soon Placeholder */}
               <div className="bg-gradient-to-r from-slate-500/20 to-zinc-500/20 rounded-3xl p-8 text-center border border-slate-500/30">
                 <div className="text-6xl mb-4">🚀</div>
@@ -6127,13 +7033,19 @@ export default function TripPlanner() {
           {/* ========== MEMORIES SECTION ========== */}
           {activeSection === 'memories' && (
             <div className="mt-8">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-white mb-2">💝 Our Memories</h2>
-                <p className="text-slate-400">The story of us, one moment at a time</p>
-              </div>
+              {/* Controls Row - Responsive mobile buttons */}
+              <div className="flex gap-1.5 md:gap-2 mb-6 items-center flex-wrap">
+                {/* New Memory Button - First */}
+                <button
+                  onClick={() => setShowAddMemoryModal('milestone')}
+                  className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 rounded-xl font-medium transition bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/30 text-sm md:text-base"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">New Memory</span>
+                  <span className="sm:hidden">New</span>
+                </button>
 
-              {/* View Switcher */}
-              <div className="flex justify-center gap-2 mb-8">
+                {/* View Switcher - compact on mobile */}
                 {[
                   { id: 'timeline', label: 'Timeline', emoji: '📅' },
                   { id: 'events', label: 'Events', emoji: '🎭' },
@@ -6142,26 +7054,105 @@ export default function TripPlanner() {
                   <button
                     key={view.id}
                     onClick={() => setMemoriesView(view.id)}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition ${
+                    className={`px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base ${
                       memoriesView === view.id
-                        ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg'
-                        : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+                        ? 'bg-rose-500 text-white'
+                        : 'bg-white/10 text-slate-300 hover:bg-white/20'
                     }`}
                   >
-                    <span>{view.emoji}</span>
-                    {view.label}
+                    {view.emoji}<span className="hidden sm:inline ml-1">{view.label}</span>
                   </button>
                 ))}
+
+                {/* Spacer to push controls right */}
+                <div className="flex-1" />
+
+                {/* Timeline Controls - Right justified (only show for timeline view) */}
+                {memoriesView === 'timeline' && (
+                  <>
+                    {/* Sort Order Toggle - Just arrow icon */}
+                    <button
+                      onClick={() => setTimelineSortOrder(timelineSortOrder === 'newest' ? 'oldest' : 'newest')}
+                      className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-xl bg-white/10 text-slate-300 hover:bg-white/20 transition"
+                      title={timelineSortOrder === 'newest' ? 'Newest first - click for oldest' : 'Oldest first - click for newest'}
+                    >
+                      {timelineSortOrder === 'newest' ? (
+                        <ChevronDown className="w-4 h-4 md:w-5 md:h-5" />
+                      ) : (
+                        <ChevronUp className="w-4 h-4 md:w-5 md:h-5" />
+                      )}
+                    </button>
+
+                    {/* Year Filter Dropdown */}
+                    <div className="relative group">
+                      <button
+                        className={`px-3 md:px-4 py-2 rounded-xl font-medium transition flex items-center gap-1 text-sm md:text-base ${
+                          timelineYearFilter === 'all'
+                            ? 'bg-white/10 text-slate-300 hover:bg-white/20'
+                            : 'bg-rose-500 text-white'
+                        }`}
+                      >
+                        {timelineYearFilter === 'all' ? 'All' : timelineYearFilter}
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                      <div className="absolute right-0 top-full mt-1 bg-slate-800 rounded-xl shadow-xl border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 min-w-[100px]">
+                        <button
+                          onClick={() => setTimelineYearFilter('all')}
+                          className={`w-full px-4 py-2 text-left rounded-t-xl transition ${
+                            timelineYearFilter === 'all' ? 'bg-rose-500/20 text-rose-300' : 'text-white/70 hover:bg-white/10'
+                          }`}
+                        >
+                          All
+                        </button>
+                        {(() => {
+                          const years = new Set();
+                          memories.forEach(m => years.add(new Date(m.date).getFullYear()));
+                          trips.forEach(t => t.dates?.start && years.add(new Date(t.dates.start).getFullYear()));
+                          const yearArray = Array.from(years).sort((a, b) => b - a);
+                          return yearArray.map((year, idx) => (
+                            <button
+                              key={year}
+                              onClick={() => setTimelineYearFilter(year.toString())}
+                              className={`w-full px-4 py-2 text-left transition ${
+                                idx === yearArray.length - 1 ? 'rounded-b-xl' : ''
+                              } ${
+                                timelineYearFilter === year.toString() ? 'bg-rose-500/20 text-rose-300' : 'text-white/70 hover:bg-white/10'
+                              }`}
+                            >
+                              {year}
+                            </button>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Timeline View */}
               {memoriesView === 'timeline' && (
                 <div className="relative">
-                  {/* Timeline line */}
-                  <div className="absolute left-1/2 transform -translate-x-1/2 w-1 bg-gradient-to-b from-rose-500 via-pink-500 to-purple-500 h-full rounded-full" />
+                  {/* Top Banner Card */}
+                  <div className="mb-8 relative z-10">
+                    <div className="w-full bg-gradient-to-r from-rose-500/20 via-pink-500/20 to-purple-500/20 backdrop-blur-sm rounded-2xl px-6 py-3 border border-white/20 flex items-center justify-between">
+                      <span className="text-5xl">🌈</span>
+                      <div className="text-center flex-1 px-4">
+                        <h3 className="text-xl font-bold text-white">Building Our Story</h3>
+                        <p className="text-white/60 text-sm">And the adventure continues...</p>
+                      </div>
+                      <div className="flex gap-1">
+                        {['💕', '✨', '🦄', '🏳️‍🌈', '💜'].map((emoji, i) => (
+                          <span key={i} className="text-base">{emoji}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
 
-                  {/* Timeline events - dynamically built */}
-                  <div className="space-y-12">
+                  {/* Timeline line */}
+                  <div className="absolute left-1/2 transform -translate-x-1/2 w-1 bg-gradient-to-b from-rose-500 via-pink-500 to-purple-500 h-full rounded-full" style={{ top: '80px' }} />
+
+                  {/* Timeline events - dynamically built - overlapping cards */}
+                  <div className="flex flex-col">
                     {(() => {
                       const today = new Date();
                       const timelineEvents = [];
@@ -6237,24 +7228,25 @@ export default function TripPlanner() {
                         }
                       });
 
-                      // Add "present" marker
-                      timelineEvents.push({
-                        id: 'present',
-                        isPresent: true,
-                        date: today,
-                        year: today.getFullYear().toString(),
-                        month: 'Present',
-                        title: 'Building Our Story 🌈',
-                        description: 'And the adventure continues...',
-                        icon: '🚀'
-                      });
+                      // Filter by year if selected
+                      let filteredEvents = timelineEvents;
+                      if (timelineYearFilter !== 'all') {
+                        const filterYear = parseInt(timelineYearFilter);
+                        filteredEvents = timelineEvents.filter(e =>
+                          e.date.getFullYear() === filterYear
+                        );
+                      }
 
-                      // Sort by date and alternate sides
-                      return timelineEvents
-                        .sort((a, b) => a.date - b.date)
+                      // Sort by date based on sort order and alternate sides
+                      return filteredEvents
+                        .sort((a, b) => {
+                          return timelineSortOrder === 'newest'
+                            ? b.date - a.date
+                            : a.date - b.date;
+                        })
                         .map((event, idx) => ({ ...event, side: idx % 2 === 0 ? 'left' : 'right' }));
                     })().map((event, idx) => (
-                      <div key={event.id} className={`flex items-center gap-8 ${event.side === 'right' ? 'flex-row-reverse' : ''}`}>
+                      <div key={event.id} className={`flex items-center gap-8 ${event.side === 'right' ? 'flex-row-reverse' : ''} ${idx > 0 ? '-mt-24' : ''}`}>
                         <div className={`w-5/12 ${event.side === 'right' ? 'text-left' : 'text-right'}`}>
                           <div
                             onClick={() => event.isMemory && setEditingMemory(event.memory)}
@@ -6295,13 +7287,51 @@ export default function TripPlanner() {
                                 <Pencil className="w-4 h-4 text-white/70" />
                               </button>
                             )}
-                            {/* Image if exists (random from images array, or from link field if it's an image URL) */}
+                            {/* Video or Image if exists */}
                             {(() => {
+                              const videos = event.memory?.videos || [];
                               const isLinkImage = event.link && /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(event.link);
                               const imageUrl = (event.memory ? getRandomMemoryImage(event.memory) : event.image) || (isLinkImage ? event.link : null);
+                              const imgSettings = event.memory?.imageSettings?.[0] || { x: 50, y: 50, zoom: 100 };
+
+                              // Show video if exists
+                              if (videos.length > 0) {
+                                return (
+                                  <div className="mb-3 -mx-2 -mt-2 overflow-hidden rounded-lg relative group">
+                                    <video
+                                      src={videos[0]}
+                                      className="w-full h-32 object-cover"
+                                      muted
+                                      playsInline
+                                      loop
+                                      onMouseEnter={(e) => e.target.play()}
+                                      onMouseLeave={(e) => { e.target.pause(); e.target.currentTime = 0; }}
+                                    />
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                      <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center group-hover:opacity-0 transition">
+                                        <span className="text-white text-lg ml-1">▶</span>
+                                      </div>
+                                    </div>
+                                    <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/50 rounded text-white text-xs">
+                                      🎬 Video
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              // Fallback to image
                               return imageUrl ? (
-                                <div className="mb-3 -mx-2 -mt-2">
-                                  <img src={imageUrl} alt="" className="w-full h-32 object-cover rounded-lg" />
+                                <div className="mb-3 -mx-2 -mt-2 overflow-hidden rounded-lg">
+                                  <img
+                                    src={imageUrl}
+                                    alt=""
+                                    className="w-full h-32 object-cover"
+                                    style={{
+                                      objectPosition: `${imgSettings.x}% ${imgSettings.y}%`,
+                                      transform: `scale(${imgSettings.zoom / 100})`,
+                                      transformOrigin: `${imgSettings.x}% ${imgSettings.y}%`
+                                    }}
+                                  />
                                 </div>
                               ) : null;
                             })()}
@@ -6475,7 +7505,25 @@ export default function TripPlanner() {
                         <span className="text-3xl">{cat.emoji}</span>
                         <h3 className="text-xl font-bold text-white">{cat.category}</h3>
                         <span className="text-white/50 text-sm">({cat.events.length} memories)</span>
+                        {/* Spacer */}
+                        <div className="flex-1" />
+                        {/* Collapse/Expand Button */}
+                        <button
+                          onClick={() => setCollapsedMemorySections(prev => ({
+                            ...prev,
+                            [cat.id]: !prev[cat.id]
+                          }))}
+                          className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-white/70 hover:text-white"
+                          title={collapsedMemorySections[cat.id] ? 'Expand section' : 'Collapse section'}
+                        >
+                          {collapsedMemorySections[cat.id] ? (
+                            <ChevronDown className="w-5 h-5" />
+                          ) : (
+                            <ChevronUp className="w-5 h-5" />
+                          )}
+                        </button>
                       </div>
+                      {!collapsedMemorySections[cat.id] && (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {cat.events.map((event) => (
                           <div
@@ -6554,11 +7602,27 @@ export default function TripPlanner() {
                             {(() => {
                               const isLinkImage = event.link && /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(event.link);
                               const imageUrl = (event.isMemory ? getRandomMemoryImage(event) : event.image) || (isLinkImage ? event.link : null);
-                              return imageUrl ? (
-                                <div className="mb-2 -mx-2 -mt-2">
-                                  <img src={imageUrl} alt="" className="w-full h-20 object-cover rounded-t-lg" />
+                              const imgSettings = event.isMemory && event.imageSettings?.[0] || { x: 50, y: 50, zoom: 100 };
+                              return (
+                                <div className="mb-2 -mx-2 -mt-2 overflow-hidden rounded-t-lg h-20">
+                                  {imageUrl ? (
+                                    <img
+                                      src={imageUrl}
+                                      alt=""
+                                      className="w-full h-full object-cover"
+                                      style={{
+                                        objectPosition: `${imgSettings.x}% ${imgSettings.y}%`,
+                                        transform: `scale(${imgSettings.zoom / 100})`,
+                                        transformOrigin: `${imgSettings.x}% ${imgSettings.y}%`
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-white/5 flex items-center justify-center">
+                                      <span className="text-2xl opacity-30">📷</span>
+                                    </div>
+                                  )}
                                 </div>
-                              ) : null;
+                              );
                             })()}
                             <h4 className="font-semibold text-white mb-1">{event.title}</h4>
                             <p className="text-slate-400 text-sm">{event.date}</p>
@@ -6588,6 +7652,7 @@ export default function TripPlanner() {
                           Add Memory
                         </button>
                       </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -6824,6 +7889,426 @@ export default function TripPlanner() {
         />
       )}
 
+      {/* Add/Edit Fitness Event Modal */}
+      {(showAddFitnessEventModal || editingFitnessEvent) && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-white/10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">
+                  {editingFitnessEvent ? 'Edit Training Event' : 'New Training Event'}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowAddFitnessEventModal(false);
+                    setEditingFitnessEvent(null);
+                    setNewFitnessEventData({
+                      name: '', emoji: '🏃', date: '', type: 'running',
+                      url: '', trainingWeeks: 12, color: 'from-orange-400 to-red-500',
+                      description: '', participants: 'both', location: '', coverImage: null
+                    });
+                    setFitnessCoverImagePreview(null);
+                  }}
+                  className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Event Name & Emoji */}
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-white/70 mb-1">Event Name *</label>
+                  <input
+                    type="text"
+                    value={editingFitnessEvent?.name || newFitnessEventData.name}
+                    onChange={(e) => editingFitnessEvent
+                      ? setEditingFitnessEvent({ ...editingFitnessEvent, name: e.target.value })
+                      : setNewFitnessEventData({ ...newFitnessEventData, name: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40"
+                    placeholder="e.g., Chicago Marathon 2027"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Emoji</label>
+                  <select
+                    value={editingFitnessEvent?.emoji || newFitnessEventData.emoji}
+                    onChange={(e) => editingFitnessEvent
+                      ? setEditingFitnessEvent({ ...editingFitnessEvent, emoji: e.target.value })
+                      : setNewFitnessEventData({ ...newFitnessEventData, emoji: e.target.value })
+                    }
+                    className="px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-xl"
+                  >
+                    <option value="🏃">🏃 Running</option>
+                    <option value="🏊">🏊 Swimming</option>
+                    <option value="🚴">🚴 Cycling</option>
+                    <option value="🏋️">🏋️ Strength</option>
+                    <option value="🎯">🎯 Goal</option>
+                    <option value="🏆">🏆 Race</option>
+                    <option value="⛰️">⛰️ Trail</option>
+                    <option value="🧘">🧘 Yoga</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Event Type */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Event Type *</label>
+                <select
+                  value={editingFitnessEvent?.type || newFitnessEventData.type}
+                  onChange={(e) => editingFitnessEvent
+                    ? setEditingFitnessEvent({ ...editingFitnessEvent, type: e.target.value })
+                    : setNewFitnessEventData({ ...newFitnessEventData, type: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white"
+                >
+                  <option value="running">5K / 10K Run</option>
+                  <option value="half-marathon">Half Marathon</option>
+                  <option value="marathon">Marathon</option>
+                  <option value="triathlon">Triathlon</option>
+                  <option value="cycling">Cycling Event</option>
+                  <option value="swimming">Swimming Event</option>
+                  <option value="obstacle">Obstacle Course / Spartan</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              {/* Event Date */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Event Date *</label>
+                <input
+                  type="date"
+                  value={editingFitnessEvent?.date || newFitnessEventData.date}
+                  onChange={(e) => editingFitnessEvent
+                    ? setEditingFitnessEvent({ ...editingFitnessEvent, date: e.target.value })
+                    : setNewFitnessEventData({ ...newFitnessEventData, date: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white"
+                />
+              </div>
+
+              {/* Location */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Location</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Chicago, IL or Course Address"
+                  value={editingFitnessEvent?.location || newFitnessEventData.location}
+                  onChange={(e) => editingFitnessEvent
+                    ? setEditingFitnessEvent({ ...editingFitnessEvent, location: e.target.value })
+                    : setNewFitnessEventData({ ...newFitnessEventData, location: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40"
+                />
+              </div>
+
+              {/* Cover Image */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">Cover Photo (optional)</label>
+                {(editingFitnessEvent?.coverImage || newFitnessEventData.coverImage || fitnessCoverImagePreview) ? (
+                  <div className="relative rounded-xl overflow-hidden mb-3">
+                    <img
+                      src={fitnessCoverImagePreview || (editingFitnessEvent ? editingFitnessEvent.coverImage : newFitnessEventData.coverImage)}
+                      alt="Cover preview"
+                      className="w-full h-32 object-cover"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                    {uploadingFitnessCoverImage && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <Loader className="w-8 h-8 text-white animate-spin" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={removeFitnessCoverImage}
+                      className="absolute top-2 right-2 p-1.5 bg-red-500/80 text-white rounded-full hover:bg-red-500 transition"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-3 mb-3">
+                    {/* Camera capture button */}
+                    <button
+                      type="button"
+                      onClick={() => fitnessCoverCameraRef.current?.click()}
+                      className="flex-1 flex flex-col items-center gap-2 p-3 border border-dashed border-white/30 rounded-xl hover:border-orange-400 hover:bg-white/5 transition"
+                    >
+                      <Camera className="w-5 h-5 text-white/50" />
+                      <span className="text-xs text-white/50">Take Photo</span>
+                    </button>
+                    <input
+                      ref={fitnessCoverCameraRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleFitnessCoverImageSelect}
+                      className="hidden"
+                    />
+
+                    {/* Gallery upload button */}
+                    <button
+                      type="button"
+                      onClick={() => fitnessCoverFileRef.current?.click()}
+                      className="flex-1 flex flex-col items-center gap-2 p-3 border border-dashed border-white/30 rounded-xl hover:border-orange-400 hover:bg-white/5 transition"
+                    >
+                      <Image className="w-5 h-5 text-white/50" />
+                      <span className="text-xs text-white/50">Choose Photo</span>
+                    </button>
+                    <input
+                      ref={fitnessCoverFileRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFitnessCoverImageSelect}
+                      className="hidden"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Training Duration */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Training Duration (weeks)</label>
+                <input
+                  type="number"
+                  min="4"
+                  max="52"
+                  value={editingFitnessEvent?.trainingWeeks || newFitnessEventData.trainingWeeks}
+                  onChange={(e) => editingFitnessEvent
+                    ? setEditingFitnessEvent({ ...editingFitnessEvent, trainingWeeks: parseInt(e.target.value) || 12 })
+                    : setNewFitnessEventData({ ...newFitnessEventData, trainingWeeks: parseInt(e.target.value) || 12 })
+                  }
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white"
+                />
+                <p className="text-white/40 text-xs mt-1">Training will start this many weeks before the event</p>
+              </div>
+
+              {/* Participants */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Who's Training?</label>
+                <div className="flex gap-2">
+                  {[
+                    { value: 'both', label: 'Both Mike & Adam' },
+                    { value: 'mike', label: 'Mike Only' },
+                    { value: 'adam', label: 'Adam Only' }
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => editingFitnessEvent
+                        ? setEditingFitnessEvent({ ...editingFitnessEvent, participants: opt.value })
+                        : setNewFitnessEventData({ ...newFitnessEventData, participants: opt.value })
+                      }
+                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition ${
+                        (editingFitnessEvent?.participants || newFitnessEventData.participants) === opt.value
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-white/10 text-white/70 hover:bg-white/20'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Event URL */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Event URL (optional)</label>
+                <input
+                  type="url"
+                  value={editingFitnessEvent?.url || newFitnessEventData.url}
+                  onChange={(e) => editingFitnessEvent
+                    ? setEditingFitnessEvent({ ...editingFitnessEvent, url: e.target.value })
+                    : setNewFitnessEventData({ ...newFitnessEventData, url: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40"
+                  placeholder="https://race-registration.com/event"
+                />
+              </div>
+
+              {/* Color */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Color Theme</label>
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { value: 'from-orange-400 to-red-500', label: 'Orange/Red' },
+                    { value: 'from-blue-400 to-cyan-500', label: 'Blue/Cyan' },
+                    { value: 'from-green-400 to-emerald-500', label: 'Green' },
+                    { value: 'from-purple-400 to-pink-500', label: 'Purple/Pink' },
+                    { value: 'from-yellow-400 to-orange-500', label: 'Yellow/Orange' }
+                  ].map(color => (
+                    <button
+                      key={color.value}
+                      onClick={() => editingFitnessEvent
+                        ? setEditingFitnessEvent({ ...editingFitnessEvent, color: color.value })
+                        : setNewFitnessEventData({ ...newFitnessEventData, color: color.value })
+                      }
+                      className={`w-10 h-10 rounded-lg bg-gradient-to-r ${color.value} ${
+                        (editingFitnessEvent?.color || newFitnessEventData.color) === color.value
+                          ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-800'
+                          : ''
+                      }`}
+                      title={color.label}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Notes (optional)</label>
+                <textarea
+                  value={editingFitnessEvent?.description || newFitnessEventData.description}
+                  onChange={(e) => editingFitnessEvent
+                    ? setEditingFitnessEvent({ ...editingFitnessEvent, description: e.target.value })
+                    : setNewFitnessEventData({ ...newFitnessEventData, description: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 resize-none"
+                  rows={2}
+                  placeholder="Any notes about this event..."
+                />
+              </div>
+
+              {/* Invite Guests - Coming Soon */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Invite Guests</label>
+                <div className="p-4 bg-white/5 border border-dashed border-white/20 rounded-lg text-center">
+                  <UserPlus className="w-6 h-6 text-white/30 mx-auto mb-2" />
+                  <p className="text-white/40 text-sm">Guest invitations coming soon!</p>
+                  <p className="text-white/30 text-xs mt-1">You'll be able to invite friends to train together</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-white/10 flex justify-between">
+              {editingFitnessEvent && (
+                <button
+                  onClick={async () => {
+                    if (confirm('Are you sure you want to delete this event?')) {
+                      const updatedEvents = fitnessEvents.filter(e => e.id !== editingFitnessEvent.id);
+                      setFitnessEvents(updatedEvents);
+                      // Also remove the training plan
+                      const updatedPlans = { ...fitnessTrainingPlans };
+                      delete updatedPlans[editingFitnessEvent.id];
+                      setFitnessTrainingPlans(updatedPlans);
+                      await saveFitnessToFirestore(updatedEvents, updatedPlans);
+                      setEditingFitnessEvent(null);
+                      if (selectedFitnessEvent?.id === editingFitnessEvent.id) {
+                        setSelectedFitnessEvent(fitnessEvents[0] || null);
+                      }
+                      showToast('Event deleted', 'success');
+                    }
+                  }}
+                  className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition"
+                >
+                  Delete Event
+                </button>
+              )}
+              <div className="flex gap-3 ml-auto">
+                <button
+                  onClick={() => {
+                    setShowAddFitnessEventModal(false);
+                    setEditingFitnessEvent(null);
+                    setNewFitnessEventData({
+                      name: '', emoji: '🏃', date: '', type: 'running',
+                      url: '', trainingWeeks: 12, color: 'from-orange-400 to-red-500',
+                      description: '', participants: 'both', location: '', coverImage: null
+                    });
+                    setFitnessCoverImagePreview(null);
+                  }}
+                  className="px-5 py-2.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    const data = editingFitnessEvent || newFitnessEventData;
+                    if (!data.name || !data.date) {
+                      showToast('Please fill in event name and date', 'error');
+                      return;
+                    }
+
+                    if (editingFitnessEvent) {
+                      // Update existing event
+                      const updatedEvents = fitnessEvents.map(e =>
+                        e.id === editingFitnessEvent.id ? editingFitnessEvent : e
+                      );
+                      setFitnessEvents(updatedEvents);
+                      await saveFitnessToFirestore(updatedEvents, fitnessTrainingPlans);
+                      showToast('Event updated!', 'success');
+                    } else {
+                      // Create new event
+                      const eventId = `event-${Date.now()}`;
+                      const newEvent = {
+                        id: eventId,
+                        name: data.name,
+                        emoji: data.emoji,
+                        date: data.date,
+                        type: data.type,
+                        url: data.url,
+                        trainingWeeks: data.trainingWeeks,
+                        color: data.color,
+                        description: data.description,
+                        participants: data.participants,
+                        location: data.location || '',
+                        coverImage: data.coverImage || null
+                      };
+
+                      // Generate training plan based on event date and duration
+                      const eventDate = new Date(data.date);
+                      const startDate = new Date(eventDate);
+                      startDate.setDate(startDate.getDate() - (data.trainingWeeks * 7));
+                      const trainingPlan = generateTrainingWeeks(
+                        startDate.toISOString().split('T')[0],
+                        data.date,
+                        eventId
+                      );
+
+                      // Mark as Mike-only if applicable
+                      if (data.participants === 'mike') {
+                        trainingPlan.forEach(week => {
+                          week.runs.forEach(run => delete run.adam);
+                          week.crossTraining.forEach(ct => delete ct.adam);
+                        });
+                      } else if (data.participants === 'adam') {
+                        trainingPlan.forEach(week => {
+                          week.runs.forEach(run => delete run.mike);
+                          week.crossTraining.forEach(ct => delete ct.mike);
+                        });
+                      }
+
+                      const updatedEvents = [...fitnessEvents, newEvent];
+                      const updatedPlans = { ...fitnessTrainingPlans, [eventId]: trainingPlan };
+
+                      setFitnessEvents(updatedEvents);
+                      setFitnessTrainingPlans(updatedPlans);
+                      setSelectedFitnessEvent(newEvent);
+                      await saveFitnessToFirestore(updatedEvents, updatedPlans);
+                      showToast('Training event created!', 'success');
+                    }
+
+                    setShowAddFitnessEventModal(false);
+                    setEditingFitnessEvent(null);
+                    setNewFitnessEventData({
+                      name: '', emoji: '🏃', date: '', type: 'running',
+                      url: '', trainingWeeks: 12, color: 'from-orange-400 to-red-500',
+                      description: '', participants: 'both', location: '', coverImage: null
+                    });
+                    setFitnessCoverImagePreview(null);
+                  }}
+                  className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-lg hover:opacity-90 transition"
+                >
+                  {editingFitnessEvent ? 'Save Changes' : 'Create Event'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Training Week Modal */}
       {editingTrainingWeek && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -6846,83 +8331,150 @@ export default function TripPlanner() {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Runs Section */}
+              {/* Activities Section */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-orange-300">🏃 Runs</h3>
-                  <button
-                    onClick={() => {
-                      const newRun = {
-                        id: Date.now(),
-                        label: 'New Run',
-                        distance: '0',
-                        mike: false,
-                        adam: false,
-                        notes: ''
-                      };
-                      setEditingTrainingWeek(prev => ({
-                        ...prev,
-                        week: {
-                          ...prev.week,
-                          runs: [...(prev.week.runs || []), newRun]
-                        }
-                      }));
-                    }}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 text-orange-300 rounded-lg text-sm hover:bg-orange-500/30 transition"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Run
-                  </button>
+                  <h3 className="text-lg font-semibold text-orange-300">🏃 Activities</h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const isMikeOnly = editingTrainingWeek.eventId === 'triathlon-2026';
+                        const newRun = {
+                          id: Date.now(),
+                          label: 'Run',
+                          distance: '0 mi',
+                          mike: false,
+                          ...(isMikeOnly ? {} : { adam: false }),
+                          notes: ''
+                        };
+                        setEditingTrainingWeek(prev => ({
+                          ...prev,
+                          week: {
+                            ...prev.week,
+                            runs: [...(prev.week.runs || []), newRun]
+                          }
+                        }));
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 text-orange-300 rounded-lg text-sm hover:bg-orange-500/30 transition"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Run
+                    </button>
+                    <button
+                      onClick={() => {
+                        const isMikeOnly = editingTrainingWeek.eventId === 'triathlon-2026';
+                        const newSwim = {
+                          id: Date.now(),
+                          label: '🏊 Swim',
+                          distance: '0 yds',
+                          mike: false,
+                          ...(isMikeOnly ? {} : { adam: false }),
+                          notes: ''
+                        };
+                        setEditingTrainingWeek(prev => ({
+                          ...prev,
+                          week: {
+                            ...prev.week,
+                            runs: [...(prev.week.runs || []), newSwim]
+                          }
+                        }));
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-500/20 text-blue-300 rounded-lg text-sm hover:bg-blue-500/30 transition"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Swim
+                    </button>
+                    <button
+                      onClick={() => {
+                        const isMikeOnly = editingTrainingWeek.eventId === 'triathlon-2026';
+                        const newBike = {
+                          id: Date.now(),
+                          label: 'Bike',
+                          distance: '0 mi',
+                          mike: false,
+                          ...(isMikeOnly ? {} : { adam: false }),
+                          notes: ''
+                        };
+                        setEditingTrainingWeek(prev => ({
+                          ...prev,
+                          week: {
+                            ...prev.week,
+                            runs: [...(prev.week.runs || []), newBike]
+                          }
+                        }));
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-green-500/20 text-green-300 rounded-lg text-sm hover:bg-green-500/30 transition"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Bike
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  {editingTrainingWeek.week.runs?.map((run, idx) => (
-                    <div key={run.id} className="flex items-center gap-3 bg-white/5 rounded-lg p-3">
-                      <input
-                        type="text"
-                        value={run.label || ''}
-                        onChange={(e) => {
-                          const updatedRuns = [...editingTrainingWeek.week.runs];
-                          updatedRuns[idx] = { ...run, label: e.target.value };
-                          setEditingTrainingWeek(prev => ({
-                            ...prev,
-                            week: { ...prev.week, runs: updatedRuns }
-                          }));
-                        }}
-                        className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                        placeholder="Run name"
-                      />
-                      <div className="flex items-center gap-1">
+                  {editingTrainingWeek.week.runs?.map((run, idx) => {
+                    // Determine if this is a swim based on label
+                    const isSwim = run.label?.toLowerCase().includes('swim');
+                    const unit = isSwim ? 'yds' : 'mi';
+                    // Parse numeric value from distance string (e.g., "450 yds" → 450)
+                    const numericDistance = parseFloat(String(run.distance || '0').replace(/[^\d.]/g, '')) || 0;
+
+                    return (
+                      <div key={run.id} className="flex items-center gap-3 bg-white/5 rounded-lg p-3">
                         <input
-                          type="number"
-                          value={run.distance || ''}
+                          type="text"
+                          value={run.label || ''}
                           onChange={(e) => {
                             const updatedRuns = [...editingTrainingWeek.week.runs];
-                            updatedRuns[idx] = { ...run, distance: e.target.value };
+                            // Update unit when label changes
+                            const newIsSwim = e.target.value.toLowerCase().includes('swim');
+                            const newUnit = newIsSwim ? 'yds' : 'mi';
+                            const currentNum = parseFloat(String(run.distance || '0').replace(/[^\d.]/g, '')) || 0;
+                            updatedRuns[idx] = {
+                              ...run,
+                              label: e.target.value,
+                              distance: `${currentNum} ${newUnit}`
+                            };
                             setEditingTrainingWeek(prev => ({
                               ...prev,
                               week: { ...prev.week, runs: updatedRuns }
                             }));
                           }}
-                          className="w-20 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm text-center"
-                          placeholder="0"
-                          step="0.1"
+                          className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                          placeholder="Activity name"
                         />
-                        <span className="text-white/60 text-sm">mi</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={numericDistance || ''}
+                            onChange={(e) => {
+                              const updatedRuns = [...editingTrainingWeek.week.runs];
+                              updatedRuns[idx] = { ...run, distance: `${e.target.value} ${unit}` };
+                              setEditingTrainingWeek(prev => ({
+                                ...prev,
+                                week: { ...prev.week, runs: updatedRuns }
+                              }));
+                            }}
+                            className="w-20 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm text-center"
+                            placeholder="0"
+                            step={isSwim ? "25" : "0.1"}
+                          />
+                          <span className={`text-sm ${isSwim ? 'text-blue-400' : 'text-white/60'}`}>{unit}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const updatedRuns = editingTrainingWeek.week.runs.filter((_, i) => i !== idx);
+                            setEditingTrainingWeek(prev => ({
+                              ...prev,
+                              week: { ...prev.week, runs: updatedRuns }
+                            }));
+                          }}
+                          className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => {
-                          const updatedRuns = editingTrainingWeek.week.runs.filter((_, i) => i !== idx);
-                          setEditingTrainingWeek(prev => ({
-                            ...prev,
-                            week: { ...prev.week, runs: updatedRuns }
-                          }));
-                        }}
-                        className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -7040,6 +8592,99 @@ export default function TripPlanner() {
         </div>
       )}
 
+      {/* Partnership Quote Modal - Enhanced with Pride content */}
+      {showPartnershipQuote && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setShowPartnershipQuote(false)}
+        >
+          <div
+            className="relative max-w-lg w-full my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Floating hearts animation */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              {[...Array(12)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute text-2xl animate-bounce"
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    top: `${Math.random() * 100}%`,
+                    animationDelay: `${i * 0.2}s`,
+                    animationDuration: `${1.5 + Math.random()}s`
+                  }}
+                >
+                  {['💕', '💖', '💗', '💝', '🌈', '✨', '💜', '💙'][i % 8]}
+                </div>
+              ))}
+            </div>
+
+            {/* Quote card */}
+            <div className="relative bg-gradient-to-br from-pink-500/20 via-purple-500/20 to-blue-500/20 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+              {/* Rainbow top border */}
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500 rounded-t-3xl" />
+
+              {/* Close button */}
+              <button
+                onClick={() => setShowPartnershipQuote(false)}
+                className="absolute top-4 right-4 p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Embracing Who We Are Section */}
+              <div className="text-center mb-6">
+                <div className="text-5xl mb-3">🏳️‍🌈</div>
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
+                  Embracing Who We Are
+                </h3>
+                <p className="text-white/70 text-sm mt-2 max-w-sm mx-auto">
+                  Living authentically, celebrating our love, and building a life filled with pride, joy, and adventure.
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className="flex items-center gap-4 my-6">
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                <span className="text-white/40 text-xs uppercase tracking-wider">Our Promise</span>
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+              </div>
+
+              {/* Quote */}
+              <div className="relative">
+                <span className="absolute -top-4 -left-2 text-5xl text-pink-500/30">"</span>
+                <p className="text-white/90 text-base leading-relaxed pl-6 pr-4 italic">
+                  We should create a partnership. We should lift each other up when we are down, encourage each other to grow and learn. We should support each other through successes and failures. We should treat each other with respect, even when we fight (which we will.) We should make up and make out when that does happen. We should create something special just for the two of us and celebrate it.
+                </p>
+                <span className="absolute -bottom-6 right-0 text-5xl text-purple-500/30">"</span>
+              </div>
+
+              {/* Footer */}
+              <div className="mt-8 pt-4 border-t border-white/10">
+                <div className="flex items-center justify-center gap-4">
+                  <div className="flex gap-2 text-2xl">
+                    {['🏳️‍🌈', '💜', '💙', '💖', '🦄'].map((emoji, i) => (
+                      <span
+                        key={i}
+                        className="hover:scale-125 transition cursor-default"
+                        style={{ animationDelay: `${i * 0.1}s` }}
+                      >
+                        {emoji}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-center text-purple-300/60 text-sm mt-3 font-medium">
+                  Love is love 💕
+                </p>
+                <p className="text-white/40 text-xs mt-2 text-center">Click anywhere to close</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Memory Modal */}
       {editingMemory && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -7104,10 +8749,10 @@ export default function TripPlanner() {
                 />
               </div>
 
-              {/* Images */}
+              {/* Photos & Videos */}
               <div>
                 <label className="block text-sm font-medium text-white/70 mb-1">
-                  Images ({getMemoryImages(editingMemory).length})
+                  Photos ({getMemoryImages(editingMemory).length}) & Videos ({(editingMemory.videos || []).length})
                 </label>
                 <div
                   className={`border-2 border-dashed rounded-xl p-4 transition ${
@@ -7117,48 +8762,302 @@ export default function TripPlanner() {
                   onDragLeave={() => setDragOver(false)}
                   onDrop={(e) => handleDrop(e, true)}
                 >
+                  {/* Existing videos grid */}
+                  {(editingMemory.videos || []).length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs text-white/50 mb-2">🎬 Videos</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(editingMemory.videos || []).map((video, idx) => (
+                          <div key={idx} className="relative group aspect-video">
+                            <video
+                              src={video}
+                              className="w-full h-full object-cover rounded-lg"
+                              muted
+                              playsInline
+                              onMouseEnter={(e) => e.target.play()}
+                              onMouseLeave={(e) => { e.target.pause(); e.target.currentTime = 0; }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center group-hover:opacity-0 transition">
+                                <span className="text-white text-lg ml-1">▶</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                const newVideos = (editingMemory.videos || []).filter((_, i) => i !== idx);
+                                setEditingMemory(prev => ({ ...prev, videos: newVideos }));
+                              }}
+                              className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition"
+                              title="Remove video"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Existing images grid */}
                   {getMemoryImages(editingMemory).length > 0 && (
                     <div className="grid grid-cols-3 gap-2 mb-3">
-                      {getMemoryImages(editingMemory).map((img, idx) => (
-                        <div key={idx} className="relative group aspect-square">
-                          <img src={img} alt="" className="w-full h-full object-cover rounded-lg" />
-                          <button
-                            onClick={() => {
-                              const allImages = getMemoryImages(editingMemory);
-                              const newImages = allImages.filter((_, i) => i !== idx);
-                              setEditingMemory(prev => ({ ...prev, images: newImages, image: '' }));
-                            }}
-                            className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition"
-                            title="Remove image"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
+                      {(editingMemory.videos || []).length > 0 && <p className="text-xs text-white/50 mb-2 col-span-3">📷 Photos</p>}
+                      {getMemoryImages(editingMemory).map((img, idx) => {
+                        const imgSettings = editingMemory.imageSettings?.[idx] || { x: 50, y: 50, zoom: 100 };
+                        return (
+                          <div key={idx} className="relative group aspect-square">
+                            <div
+                              className={`w-full h-full overflow-hidden rounded-lg cursor-pointer ${
+                                editingPhotoIndex === idx ? 'ring-2 ring-orange-500' : ''
+                              }`}
+                              onClick={() => {
+                                setEditingPhotoIndex(editingPhotoIndex === idx ? null : idx);
+                                setPhotoPosition(imgSettings);
+                              }}
+                            >
+                              <img
+                                src={img}
+                                alt=""
+                                className="w-full h-full object-cover transition-transform"
+                                style={{
+                                  objectPosition: `${imgSettings.x}% ${imgSettings.y}%`,
+                                  transform: `scale(${imgSettings.zoom / 100})`
+                                }}
+                              />
+                            </div>
+                            {/* Adjust button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingPhotoIndex(editingPhotoIndex === idx ? null : idx);
+                                setPhotoPosition(imgSettings);
+                              }}
+                              className={`absolute bottom-1 left-1 px-2 py-1 text-xs rounded-full transition ${
+                                editingPhotoIndex === idx
+                                  ? 'bg-orange-500 text-white'
+                                  : 'bg-black/50 text-white/80 opacity-0 group-hover:opacity-100 hover:bg-black/70'
+                              }`}
+                            >
+                              {editingPhotoIndex === idx ? '✓ Editing' : '📐 Adjust'}
+                            </button>
+                            {/* Delete button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const allImages = getMemoryImages(editingMemory);
+                                const newImages = allImages.filter((_, i) => i !== idx);
+                                const newSettings = { ...(editingMemory.imageSettings || {}) };
+                                delete newSettings[idx];
+                                setEditingMemory(prev => ({ ...prev, images: newImages, image: '', imageSettings: newSettings }));
+                                if (editingPhotoIndex === idx) setEditingPhotoIndex(null);
+                              }}
+                              className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition"
+                              title="Remove image"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
+
+                  {/* Hint to adjust photos */}
+                  {getMemoryImages(editingMemory).length > 0 && editingPhotoIndex === null && (
+                    <div className="mb-3 p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg text-center">
+                      <p className="text-orange-300 text-sm">
+                        💡 Click "Adjust" on any photo to position and zoom it for the card
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Photo Position/Zoom Controls */}
+                  {editingPhotoIndex !== null && getMemoryImages(editingMemory)[editingPhotoIndex] && (
+                    <div className="mb-4 p-4 bg-white/5 rounded-xl border border-white/10">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-white/70">📐 Adjust Photo Position</span>
+                        <button
+                          onClick={() => setEditingPhotoIndex(null)}
+                          className="text-xs px-2 py-1 bg-white/10 hover:bg-white/20 text-white/60 rounded transition"
+                        >
+                          Done
+                        </button>
+                      </div>
+
+                      {/* Horizontal Position */}
+                      <div className="mb-3">
+                        <div className="flex items-center justify-between text-xs text-white/50 mb-1">
+                          <span>← Left</span>
+                          <span>Horizontal: {photoPosition.x}%</span>
+                          <span>Right →</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={photoPosition.x}
+                          onChange={(e) => {
+                            const newX = parseInt(e.target.value);
+                            setPhotoPosition(prev => ({ ...prev, x: newX }));
+                            setEditingMemory(prev => ({
+                              ...prev,
+                              imageSettings: {
+                                ...(prev.imageSettings || {}),
+                                [editingPhotoIndex]: { ...photoPosition, x: newX }
+                              }
+                            }));
+                          }}
+                          className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                        />
+                      </div>
+
+                      {/* Vertical Position */}
+                      <div className="mb-3">
+                        <div className="flex items-center justify-between text-xs text-white/50 mb-1">
+                          <span>↑ Top</span>
+                          <span>Vertical: {photoPosition.y}%</span>
+                          <span>Bottom ↓</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={photoPosition.y}
+                          onChange={(e) => {
+                            const newY = parseInt(e.target.value);
+                            setPhotoPosition(prev => ({ ...prev, y: newY }));
+                            setEditingMemory(prev => ({
+                              ...prev,
+                              imageSettings: {
+                                ...(prev.imageSettings || {}),
+                                [editingPhotoIndex]: { ...photoPosition, y: newY }
+                              }
+                            }));
+                          }}
+                          className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                        />
+                      </div>
+
+                      {/* Zoom */}
+                      <div>
+                        <div className="flex items-center justify-between text-xs text-white/50 mb-1">
+                          <span>🔍 Zoom Out</span>
+                          <span>Zoom: {photoPosition.zoom}%</span>
+                          <span>Zoom In 🔍</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="100"
+                          max="200"
+                          value={photoPosition.zoom}
+                          onChange={(e) => {
+                            const newZoom = parseInt(e.target.value);
+                            setPhotoPosition(prev => ({ ...prev, zoom: newZoom }));
+                            setEditingMemory(prev => ({
+                              ...prev,
+                              imageSettings: {
+                                ...(prev.imageSettings || {}),
+                                [editingPhotoIndex]: { ...photoPosition, zoom: newZoom }
+                              }
+                            }));
+                          }}
+                          className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                        />
+                      </div>
+
+                      {/* Reset button */}
+                      <button
+                        onClick={() => {
+                          const defaultPos = { x: 50, y: 50, zoom: 100 };
+                          setPhotoPosition(defaultPos);
+                          setEditingMemory(prev => ({
+                            ...prev,
+                            imageSettings: {
+                              ...(prev.imageSettings || {}),
+                              [editingPhotoIndex]: defaultPos
+                            }
+                          }));
+                        }}
+                        className="mt-3 w-full px-3 py-2 bg-white/10 hover:bg-white/20 text-white/70 text-sm rounded-lg transition"
+                      >
+                        Reset to Center
+                      </button>
+                    </div>
+                  )}
+
                   {/* Upload area */}
                   <div className="flex gap-2">
                     <label className={`flex-1 px-4 py-3 rounded-lg cursor-pointer flex items-center justify-center gap-2 transition border-2 border-dashed ${
                       uploadingPhoto ? 'bg-white/5 text-white/40 border-white/10' : 'bg-white/5 hover:bg-white/10 text-white/70 border-white/20 hover:border-orange-500'
                     }`}>
                       {uploadingPhoto ? <Loader className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-                      <span>{uploadingPhoto ? 'Uploading...' : 'Add Photo'}</span>
+                      <span>{uploadingPhoto ? 'Uploading...' : 'Add Photo/Video'}</span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,.heic,.heif,video/*,.mp4,.mov,.m4v"
                         className="hidden"
                         disabled={uploadingPhoto}
-                        onChange={(e) => e.target.files?.[0] && uploadMemoryPhoto(e.target.files[0], true)}
+                        onChange={(e) => e.target.files?.[0] && uploadMemoryMedia(e.target.files[0], true)}
                       />
                     </label>
                   </div>
+                  <p className="text-center text-white/40 text-xs mt-2">
+                    📱 Drag photos/videos from Apple Photos • HEIC auto-converts • Videos up to 50MB
+                  </p>
                   {dragOver && (
-                    <div className="text-center text-orange-400 mt-2 text-sm">Drop image here to add</div>
+                    <div className="text-center text-orange-400 mt-2 text-sm font-medium">Drop media here to add</div>
                   )}
                 </div>
               </div>
+
+              {/* Card Preview */}
+              {getMemoryImages(editingMemory).length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-2">Card Preview</label>
+                  <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                    <div className="backdrop-blur-sm rounded-2xl overflow-hidden border-2 border-white/20 bg-white/10">
+                      {/* Preview Image */}
+                      <div className="relative h-32 overflow-hidden">
+                        {(() => {
+                          const previewIdx = editingPhotoIndex !== null ? editingPhotoIndex : 0;
+                          const img = getMemoryImages(editingMemory)[previewIdx];
+                          const settings = editingMemory.imageSettings?.[previewIdx] || { x: 50, y: 50, zoom: 100 };
+                          return img ? (
+                            <img
+                              src={img}
+                              alt="Preview"
+                              className="w-full h-full object-cover"
+                              style={{
+                                objectPosition: `${settings.x}% ${settings.y}%`,
+                                transform: `scale(${settings.zoom / 100})`,
+                                transformOrigin: `${settings.x}% ${settings.y}%`
+                              }}
+                            />
+                          ) : null;
+                        })()}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                        <div className="absolute bottom-2 left-3 right-3">
+                          <div className="text-white font-semibold text-sm truncate">
+                            {editingMemory.title || 'Memory Title'}
+                          </div>
+                          <div className="text-white/70 text-xs">
+                            {editingMemory.location || 'Location'}
+                          </div>
+                        </div>
+                      </div>
+                      {/* Preview Info */}
+                      <div className="p-3">
+                        <p className="text-white/60 text-xs line-clamp-2">
+                          {editingMemory.description || 'Description will appear here...'}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-center text-white/30 text-xs mt-2">
+                      This is how your memory card will look in the timeline
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Link / Video */}
               <div>
@@ -7382,8 +9281,8 @@ export default function TripPlanner() {
                   Images ({(newMemoryData.images || []).length})
                 </label>
                 <div
-                  className={`border-2 border-dashed rounded-xl p-4 transition ${
-                    dragOver ? 'border-orange-500 bg-orange-500/10' : 'border-white/20'
+                  className={`border border-dashed rounded-xl p-4 transition ${
+                    dragOver ? 'border-rose-500 bg-rose-500/10' : 'border-white/20'
                   }`}
                   onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                   onDragLeave={() => setDragOver(false)}
@@ -7409,13 +9308,29 @@ export default function TripPlanner() {
                       ))}
                     </div>
                   )}
-                  {/* Upload area */}
-                  <div className="flex gap-2">
-                    <label className={`flex-1 px-4 py-3 rounded-lg cursor-pointer flex items-center justify-center gap-2 transition border-2 border-dashed ${
-                      uploadingPhoto ? 'bg-white/5 text-white/40 border-white/10' : 'bg-white/5 hover:bg-white/10 text-white/70 border-white/20 hover:border-orange-500'
+                  {/* Camera and Upload buttons */}
+                  <div className="flex gap-3">
+                    {/* Camera capture button */}
+                    <label className={`flex-1 flex flex-col items-center gap-2 p-3 border border-dashed rounded-xl cursor-pointer transition ${
+                      uploadingPhoto ? 'border-white/10 bg-white/5 text-white/40' : 'border-white/30 hover:border-rose-400 hover:bg-white/5 text-white/50'
                     }`}>
-                      {uploadingPhoto ? <Loader className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-                      <span>{uploadingPhoto ? 'Uploading...' : 'Add Photo'}</span>
+                      {uploadingPhoto ? <Loader className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+                      <span className="text-xs">{uploadingPhoto ? 'Uploading...' : 'Take Photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        disabled={uploadingPhoto}
+                        onChange={(e) => e.target.files?.[0] && uploadMemoryPhoto(e.target.files[0], false)}
+                      />
+                    </label>
+                    {/* Gallery upload button */}
+                    <label className={`flex-1 flex flex-col items-center gap-2 p-3 border border-dashed rounded-xl cursor-pointer transition ${
+                      uploadingPhoto ? 'border-white/10 bg-white/5 text-white/40' : 'border-white/30 hover:border-rose-400 hover:bg-white/5 text-white/50'
+                    }`}>
+                      <Image className="w-5 h-5" />
+                      <span className="text-xs">Choose Photo</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -7426,7 +9341,7 @@ export default function TripPlanner() {
                     </label>
                   </div>
                   {dragOver && (
-                    <div className="text-center text-orange-400 mt-2 text-sm">Drop image here to add</div>
+                    <div className="text-center text-rose-400 mt-2 text-sm">Drop image here to add</div>
                   )}
                 </div>
               </div>
@@ -7481,7 +9396,7 @@ export default function TripPlanner() {
               <button
                 onClick={() => {
                   if (!newMemoryData.title || !newMemoryData.date) {
-                    alert('Title and Date are required');
+                    showToast('Title and Date are required', 'error');
                     return;
                   }
 
@@ -7504,8 +9419,10 @@ export default function TripPlanner() {
                   saveMemoriesToFirestore(newMemories);
                   setNewMemoryData({ title: '', date: '', location: '', description: '', image: '', images: [], link: '', comment: '' });
                   setShowAddMemoryModal(null);
+                  showToast('Memory added!', 'success');
                 }}
-                className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white font-semibold rounded-lg hover:opacity-90 transition"
+                disabled={!newMemoryData.title || !newMemoryData.date}
+                className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white font-semibold rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Add Memory
               </button>
@@ -7526,6 +9443,332 @@ export default function TripPlanner() {
           updateItem={updateItem}
           editItem={showAddModal.editItem}
         />
+      )}
+
+      {/* Add/Edit Event Modal - rendered at root level for use from any section */}
+      {(showAddEventModal || editingEvent) && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto border border-white/20">
+            <div className="p-6 border-b border-white/10">
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-bold text-white">
+                  {editingEvent ? 'Edit Event' : 'New Event'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowAddEventModal(false);
+                    setEditingEvent(null);
+                    setEventCoverImagePreview(null);
+                    setNewEventData({
+                      name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
+                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500'
+                    });
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-full transition"
+                >
+                  <X className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Event Name & Emoji */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  className="w-16 h-16 bg-white/10 rounded-xl flex items-center justify-center text-3xl hover:bg-white/20 transition border border-white/20"
+                  onClick={() => {
+                    const allEmojis = Object.values(eventCategories).flat();
+                    const currentIdx = allEmojis.indexOf(editingEvent ? editingEvent.emoji : newEventData.emoji);
+                    const nextIdx = (currentIdx + 1) % allEmojis.length;
+                    if (editingEvent) {
+                      setEditingEvent({ ...editingEvent, emoji: allEmojis[nextIdx] });
+                    } else {
+                      setNewEventData({ ...newEventData, emoji: allEmojis[nextIdx] });
+                    }
+                  }}
+                >
+                  {editingEvent ? editingEvent.emoji : newEventData.emoji}
+                </button>
+                <input
+                  type="text"
+                  placeholder="Event name"
+                  value={editingEvent ? editingEvent.name : newEventData.name}
+                  onChange={(e) => {
+                    if (editingEvent) {
+                      setEditingEvent({ ...editingEvent, name: e.target.value });
+                    } else {
+                      setNewEventData({ ...newEventData, name: e.target.value });
+                    }
+                  }}
+                  className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              {/* Date & Time */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm text-white/50 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={editingEvent ? editingEvent.date : newEventData.date}
+                    onChange={(e) => {
+                      if (editingEvent) {
+                        setEditingEvent({ ...editingEvent, date: e.target.value });
+                      } else {
+                        setNewEventData({ ...newEventData, date: e.target.value });
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-white/50 mb-1">Start Time</label>
+                  <input
+                    type="time"
+                    value={editingEvent ? editingEvent.time : newEventData.time}
+                    onChange={(e) => {
+                      if (editingEvent) {
+                        setEditingEvent({ ...editingEvent, time: e.target.value });
+                      } else {
+                        setNewEventData({ ...newEventData, time: e.target.value });
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-white/50 mb-1">End Time</label>
+                  <input
+                    type="time"
+                    value={editingEvent ? editingEvent.endTime : newEventData.endTime}
+                    onChange={(e) => {
+                      if (editingEvent) {
+                        setEditingEvent({ ...editingEvent, endTime: e.target.value });
+                      } else {
+                        setNewEventData({ ...newEventData, endTime: e.target.value });
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* Location */}
+              <div>
+                <label className="block text-sm text-white/50 mb-1">Location</label>
+                <input
+                  type="text"
+                  placeholder="Address or location name"
+                  value={editingEvent ? editingEvent.location : newEventData.location}
+                  onChange={(e) => {
+                    if (editingEvent) {
+                      setEditingEvent({ ...editingEvent, location: e.target.value });
+                    } else {
+                      setNewEventData({ ...newEventData, location: e.target.value });
+                    }
+                  }}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm text-white/50 mb-1">Description</label>
+                <textarea
+                  placeholder="What's this event about?"
+                  value={editingEvent ? editingEvent.description : newEventData.description}
+                  onChange={(e) => {
+                    if (editingEvent) {
+                      setEditingEvent({ ...editingEvent, description: e.target.value });
+                    } else {
+                      setNewEventData({ ...newEventData, description: e.target.value });
+                    }
+                  }}
+                  rows={2}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-amber-400 resize-none"
+                />
+              </div>
+
+              {/* Color Picker */}
+              <div>
+                <label className="block text-sm text-white/50 mb-2">Theme Color</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    'from-purple-400 to-pink-500',
+                    'from-blue-400 to-cyan-500',
+                    'from-green-400 to-emerald-500',
+                    'from-amber-400 to-orange-500',
+                    'from-red-400 to-pink-500',
+                    'from-indigo-400 to-purple-500',
+                  ].map(color => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => {
+                        if (editingEvent) {
+                          setEditingEvent({ ...editingEvent, color });
+                        } else {
+                          setNewEventData({ ...newEventData, color });
+                        }
+                      }}
+                      className={`w-10 h-10 rounded-lg bg-gradient-to-br ${color} border-2 transition ${
+                        (editingEvent ? editingEvent.color : newEventData.color) === color
+                          ? 'border-white scale-110'
+                          : 'border-transparent hover:border-white/50'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Cover Image */}
+              <div>
+                <label className="block text-sm text-white/50 mb-2">Cover Photo (optional)</label>
+                {(editingEvent?.coverImage || newEventData.coverImage || eventCoverImagePreview) ? (
+                  <div className="relative rounded-xl overflow-hidden">
+                    <img
+                      src={eventCoverImagePreview || (editingEvent ? editingEvent.coverImage : newEventData.coverImage)}
+                      alt="Cover preview"
+                      className="w-full h-32 object-cover"
+                    />
+                    {uploadingEventCoverImage && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <Loader className="w-8 h-8 text-white animate-spin" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={removeEventCoverImage}
+                      className="absolute top-2 right-2 p-1.5 bg-red-500/80 text-white rounded-full hover:bg-red-500 transition"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => eventCoverCameraRef.current?.click()}
+                      className="flex-1 flex flex-col items-center gap-2 p-3 border border-dashed border-white/30 rounded-xl hover:border-amber-400 hover:bg-white/5 transition"
+                    >
+                      <Camera className="w-5 h-5 text-white/50" />
+                      <span className="text-xs text-white/50">Take Photo</span>
+                    </button>
+                    <input
+                      ref={eventCoverCameraRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleEventCoverImageSelect}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => eventCoverFileRef.current?.click()}
+                      className="flex-1 flex flex-col items-center gap-2 p-3 border border-dashed border-white/30 rounded-xl hover:border-amber-400 hover:bg-white/5 transition"
+                    >
+                      <Image className="w-5 h-5 text-white/50" />
+                      <span className="text-xs text-white/50">Choose Photo</span>
+                    </button>
+                    <input
+                      ref={eventCoverFileRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleEventCoverImageSelect}
+                      className="hidden"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Invite Guests - Coming Soon */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">Invite Guests</label>
+                <div className="p-4 bg-white/5 border border-dashed border-white/20 rounded-xl text-center">
+                  <UserPlus className="w-6 h-6 text-white/30 mx-auto mb-2" />
+                  <p className="text-white/40 text-sm">Guest invitations coming soon!</p>
+                  <p className="text-white/30 text-xs mt-1">You'll be able to invite friends to your event</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-white/10 flex justify-between">
+              {editingEvent && (
+                <button
+                  onClick={() => {
+                    if (confirm('Delete this event?')) {
+                      const newEvents = partyEvents.filter(e => e.id !== editingEvent.id);
+                      setPartyEvents(newEvents);
+                      savePartyEventsToFirestore(newEvents);
+                      setEditingEvent(null);
+                      setSelectedPartyEvent(null);
+                      showToast('Event deleted', 'success');
+                    }
+                  }}
+                  className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition"
+                >
+                  Delete Event
+                </button>
+              )}
+              <div className="flex gap-3 ml-auto">
+                <button
+                  onClick={() => {
+                    setShowAddEventModal(false);
+                    setEditingEvent(null);
+                    setEventCoverImagePreview(null);
+                    setNewEventData({
+                      name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
+                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500'
+                    });
+                  }}
+                  className="px-5 py-2.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (editingEvent) {
+                      const newEvents = partyEvents.map(e =>
+                        e.id === editingEvent.id ? { ...editingEvent, updatedAt: new Date().toISOString() } : e
+                      );
+                      setPartyEvents(newEvents);
+                      setSelectedPartyEvent(newEvents.find(e => e.id === editingEvent.id));
+                      savePartyEventsToFirestore(newEvents);
+                      setEditingEvent(null);
+                      setEventCoverImagePreview(null);
+                      showToast('Event updated!', 'success');
+                    } else {
+                      const newEvent = {
+                        ...newEventData,
+                        id: `event-${Date.now()}`,
+                        guests: [],
+                        tasks: [],
+                        createdBy: currentUser,
+                        createdAt: new Date().toISOString()
+                      };
+                      const newEvents = [...partyEvents, newEvent];
+                      setPartyEvents(newEvents);
+                      savePartyEventsToFirestore(newEvents);
+                      setShowAddEventModal(false);
+                      setEventCoverImagePreview(null);
+                      setNewEventData({
+                        name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
+                        location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500'
+                      });
+                      showToast('Event created!', 'success');
+                    }
+                  }}
+                  disabled={!(editingEvent ? editingEvent.name && editingEvent.date : newEventData.name && newEventData.date)}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {editingEvent ? 'Save Changes' : 'Create Event'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Calendar Picker Modal */}
@@ -7703,8 +9946,108 @@ export default function TripPlanner() {
         }
       `}</style>
 
-      {/* Bottom rainbow bar */}
-      <div className="h-1.5 w-full bg-gradient-to-r from-red-500 via-orange-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500" />
+      {/* Floating Action Button (FAB) - Quick Add */}
+      {isOwner && !initialAppMode && !showAddMemoryModal && !editingMemory && !showOpenDateModal && !showCompanionsModal && !showAddModal && !showNewTripModal && !showLinkModal && !showImportModal && !showGuestModal && !showMyProfileModal && !showAddFitnessEventModal && !editingFitnessEvent && !showAddEventModal && !editingEvent && !editingTrainingWeek && (
+        <div className="fixed bottom-20 md:bottom-8 right-4 md:right-8 z-[90]">
+          {/* FAB Menu - Radial on mobile, list on desktop */}
+          {showAddNewMenu && (
+            <>
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[89]" onClick={() => setShowAddNewMenu(false)} />
+              <div className="absolute bottom-16 right-0 z-[91] flex flex-col-reverse gap-3 items-end">
+                {[
+                  { action: () => setShowNewTripModal('adventure'), icon: '✈️', label: 'Trip', gradient: 'from-teal-400 to-cyan-500' },
+                  { action: () => setShowAddEventModal(true), icon: '🎉', label: 'Event', gradient: 'from-amber-400 to-orange-500' },
+                  { action: () => setShowAddMemoryModal('milestone'), icon: '💝', label: 'Memory', gradient: 'from-rose-400 to-pink-500' },
+                  { action: () => setShowAddFitnessEventModal(true), icon: '🏃', label: 'Fitness', gradient: 'from-orange-400 to-red-500' },
+                ].map((item, idx) => (
+                  <button
+                    key={item.label}
+                    onClick={() => { setShowAddNewMenu(false); item.action(); }}
+                    className={`flex items-center gap-3 pl-4 pr-2 py-2 rounded-full bg-slate-800 border border-white/20 shadow-2xl transform transition-all duration-200 hover:scale-105`}
+                    style={{
+                      animation: `fabItemIn 0.2s ease-out ${idx * 0.05}s both`,
+                    }}
+                  >
+                    <span className="text-white font-medium text-sm">{item.label}</span>
+                    <span className={`w-10 h-10 rounded-full bg-gradient-to-br ${item.gradient} flex items-center justify-center text-lg shadow-lg`}>
+                      {item.icon}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <style>{`
+                @keyframes fabItemIn {
+                  from { opacity: 0; transform: translateY(20px) scale(0.8); }
+                  to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+              `}</style>
+            </>
+          )}
+
+          {/* Main FAB Button */}
+          <button
+            onClick={() => setShowAddNewMenu(!showAddNewMenu)}
+            className={`w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 active:scale-90 ${
+              showAddNewMenu
+                ? 'bg-gradient-to-r from-purple-500 to-pink-500 rotate-45'
+                : 'bg-gradient-to-r from-teal-400 to-cyan-500 hover:shadow-teal-500/30'
+            }`}
+            style={{ boxShadow: showAddNewMenu ? '0 8px 32px rgba(168, 85, 247, 0.4)' : '0 8px 32px rgba(45, 212, 191, 0.3)' }}
+          >
+            <Plus className="w-7 h-7 text-white transition-transform duration-200" />
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Bottom Navigation - Only show on mobile, when not in app mode, and when no modal is open */}
+      {!initialAppMode && !showAddMemoryModal && !editingMemory && !showOpenDateModal && !showCompanionsModal && !showAddModal && !showNewTripModal && !showLinkModal && !showImportModal && !showGuestModal && !showMyProfileModal && !showAddFitnessEventModal && !editingFitnessEvent && !showAddEventModal && !editingEvent && !editingTrainingWeek && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-white/10 z-[100]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          <div className="flex items-center justify-around py-2 px-1">
+            {[
+              { id: 'home', label: 'Home', emoji: '🏠', gradient: 'from-pink-500 to-purple-500' },
+              { id: 'travel', label: 'Travel', emoji: '✈️', gradient: 'from-teal-400 to-cyan-500' },
+              { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
+              { id: 'events', label: 'Events', emoji: '🎉', gradient: 'from-amber-400 to-orange-500' },
+              { id: 'memories', label: 'Memories', emoji: '💝', gradient: 'from-rose-400 to-pink-500' },
+            ].map(section => (
+              <button
+                key={section.id}
+                onClick={() => {
+                  setActiveSection(section.id);
+                  if (section.id === 'travel') setTravelViewMode('main');
+                  // Close any open dropdowns
+                  setShowComingSoonMenu(false);
+                }}
+                className={`relative flex flex-col items-center justify-center min-w-[56px] min-h-[48px] py-1 px-2 rounded-xl transition-all active:scale-95 ${
+                  activeSection === section.id
+                    ? 'bg-white/10'
+                    : 'active:bg-white/10'
+                }`}
+              >
+                <span className={`text-xl mb-0.5 transition-transform ${activeSection === section.id ? 'scale-110' : ''}`}>
+                  {section.emoji}
+                </span>
+                <span className={`text-[10px] font-medium transition-colors ${
+                  activeSection === section.id
+                    ? 'text-white'
+                    : 'text-white/50'
+                }`}>
+                  {section.label}
+                </span>
+                {activeSection === section.id && (
+                  <div className={`absolute -bottom-0.5 w-6 h-0.5 rounded-full bg-gradient-to-r ${section.gradient}`} />
+                )}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+
+      {/* Spacer for mobile bottom nav to prevent content being hidden behind it */}
+      {!initialAppMode && <div className="md:hidden h-32 bg-slate-900" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} />}
+
+      {/* Bottom rainbow bar - hidden on mobile when bottom nav is showing */}
+      <div className={`h-1.5 w-full bg-gradient-to-r from-red-500 via-orange-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500 ${!initialAppMode ? 'hidden md:block' : ''}`} />
     </div>
   );
 }
