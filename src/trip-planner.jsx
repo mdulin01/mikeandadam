@@ -11387,7 +11387,7 @@ export default function TripPlanner() {
               {[
                 { id: 'home', label: 'Hub', emoji: '⚛️', gradient: 'from-pink-500 to-purple-500' },
                 { id: 'travel', label: 'Travel', emoji: '✈️', gradient: 'from-teal-400 to-cyan-500' },
-                { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
+                { id: 'fitness', label: 'Fitness', emoji: null, gradient: 'from-orange-400 to-red-500' },
                 { id: 'events', label: 'Events', emoji: '🎉', gradient: 'from-amber-400 to-orange-500' },
                 { id: 'memories', label: 'Memories', emoji: '💝', gradient: 'from-rose-400 to-pink-500' },
               ].map((section, idx) => (
@@ -11399,13 +11399,35 @@ export default function TripPlanner() {
                     if (section.id === 'home') setHubSubView('home');
                     setShowComingSoonMenu(false);
                   }}
-                  className={`relative flex flex-col items-center justify-center py-1.5 rounded-xl transition-all active:scale-95 ${idx === 2 ? 'min-w-[52px] pt-1' : 'min-w-[52px]'} ${
+                  className={`relative flex flex-col items-center justify-center py-1.5 rounded-xl transition-all active:scale-95 ${idx === 2 ? 'min-w-[56px] -mt-4' : 'min-w-[52px]'} ${
                     activeSection === section.id ? '' : ''
                   }`}
                 >
-                  <span className={`text-lg mb-0.5 transition-transform ${activeSection === section.id ? 'scale-110' : ''}`}>
-                    {section.emoji}
-                  </span>
+                  {idx === 2 ? (
+                    /* Atlas figure holding up the FAB */
+                    <svg width="28" height="36" viewBox="0 0 28 36" fill="none" xmlns="http://www.w3.org/2000/svg" className={`mb-0 transition-transform ${activeSection === section.id ? 'scale-110' : ''}`}>
+                      {/* Arms reaching up */}
+                      <path d="M8 2 L11 10 L14 8 L17 10 L20 2" stroke={activeSection === section.id ? '#f97316' : 'rgba(255,255,255,0.4)'} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+                      {/* Hands */}
+                      <circle cx="8" cy="2" r="1.2" fill={activeSection === section.id ? '#f97316' : 'rgba(255,255,255,0.4)'} />
+                      <circle cx="20" cy="2" r="1.2" fill={activeSection === section.id ? '#f97316' : 'rgba(255,255,255,0.4)'} />
+                      {/* Head */}
+                      <circle cx="14" cy="11.5" r="2.5" fill={activeSection === section.id ? '#f97316' : 'rgba(255,255,255,0.4)'} />
+                      {/* Torso */}
+                      <path d="M14 14 L14 22" stroke={activeSection === section.id ? '#f97316' : 'rgba(255,255,255,0.4)'} strokeWidth="2.2" strokeLinecap="round" />
+                      {/* Shoulders */}
+                      <path d="M9 16 L19 16" stroke={activeSection === section.id ? '#f97316' : 'rgba(255,255,255,0.4)'} strokeWidth="1.8" strokeLinecap="round" />
+                      {/* Kneeling legs */}
+                      <path d="M14 22 L9 28 L6 34" stroke={activeSection === section.id ? '#f97316' : 'rgba(255,255,255,0.4)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M14 22 L19 28 L22 26" stroke={activeSection === section.id ? '#f97316' : 'rgba(255,255,255,0.4)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      {/* Back knee on ground */}
+                      <path d="M22 26 L24 30" stroke={activeSection === section.id ? '#f97316' : 'rgba(255,255,255,0.4)'} strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                  ) : (
+                    <span className={`text-lg mb-0.5 transition-transform ${activeSection === section.id ? 'scale-110' : ''}`}>
+                      {section.emoji}
+                    </span>
+                  )}
                   <span className={`text-[10px] font-medium transition-colors ${activeSection === section.id ? 'text-white' : 'text-white/40'}`}>
                     {section.label}
                   </span>
