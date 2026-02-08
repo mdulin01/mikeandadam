@@ -11354,12 +11354,12 @@ export default function TripPlanner() {
             {isOwner && (
               <button
                 onClick={() => setShowAddNewMenu(!showAddNewMenu)}
-                className={`absolute left-1/2 -translate-x-1/2 -top-6 w-12 h-12 rounded-full shadow-xl flex items-center justify-center transition-all duration-200 active:scale-90 z-[101] ${
+                className={`absolute left-1/2 -translate-x-1/2 -top-8 w-13 h-13 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 z-[101] ${
                   showAddNewMenu
                     ? 'bg-gradient-to-r from-pink-500 to-rose-500 rotate-45'
                     : 'bg-gradient-to-r from-purple-500 to-violet-600'
                 }`}
-                style={{ boxShadow: showAddNewMenu ? '0 4px 20px rgba(236, 72, 153, 0.5)' : '0 4px 20px rgba(139, 92, 246, 0.5)' }}
+                style={{ boxShadow: showAddNewMenu ? '0 0 24px rgba(236, 72, 153, 0.6), 0 0 0 3px rgba(236, 72, 153, 0.15)' : '0 0 24px rgba(139, 92, 246, 0.6), 0 0 0 3px rgba(139, 92, 246, 0.15)', width: '3.25rem', height: '3.25rem' }}
               >
                 <Plus className="w-6 h-6 text-white transition-transform duration-200" />
               </button>
@@ -11381,7 +11381,7 @@ export default function TripPlanner() {
                     if (section.id === 'home') setHubSubView('home');
                     setShowComingSoonMenu(false);
                   }}
-                  className={`relative flex flex-col items-center justify-center py-1.5 rounded-xl transition-all active:scale-95 ${idx === 2 ? 'min-w-[52px] pt-3' : 'min-w-[52px]'} ${
+                  className={`relative flex flex-col items-center justify-center py-1.5 rounded-xl transition-all active:scale-95 ${idx === 2 ? 'min-w-[52px] pt-2' : 'min-w-[52px]'} ${
                     activeSection === section.id ? '' : ''
                   }`}
                 >
