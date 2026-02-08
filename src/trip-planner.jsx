@@ -4341,7 +4341,7 @@ export default function TripPlanner() {
 
             return (
               <div
-                onClick={() => setSelectedTrip(nextTrip)}
+                onClick={() => setEditingTrip(nextTrip)}
                 className={`mt-6 bg-gradient-to-r ${nextTrip.color} rounded-2xl p-4 md:p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] transition-transform`}>
                 <div className="absolute inset-0 bg-black/10" />
                 <div className="relative flex flex-col md:flex-row items-start justify-between gap-4">
@@ -4669,6 +4669,23 @@ export default function TripPlanner() {
                     <p className="text-white/80 text-sm">
                       {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
                     </p>
+                    {(() => {
+                      const tripStart = parseLocalDate(trip.dates.start);
+                      const tripEnd = parseLocalDate(trip.dates.end);
+                      const daysTo = Math.ceil((tripStart - today) / (1000 * 60 * 60 * 24));
+                      const isOngoing = today >= tripStart && today <= tripEnd;
+                      if (isOngoing) return (
+                        <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
+                          🎉 Happening now!
+                        </div>
+                      );
+                      if (daysTo > 0) return (
+                        <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
+                          {daysTo <= 7 ? '🔥' : daysTo <= 30 ? '✨' : '🗓️'} {daysTo} {daysTo === 1 ? 'day' : 'days'} to go!
+                        </div>
+                      );
+                      return null;
+                    })()}
                     {trip.special && (
                       <div className="mt-3 text-sm font-semibold bg-white/20 inline-block px-3 py-1 rounded-full">
                         {trip.special}
@@ -4759,7 +4776,7 @@ export default function TripPlanner() {
                 {planningTrips.map(trip => (
                   <div
                     key={trip.id}
-                    onClick={() => setSelectedTrip(trip)}
+                    onClick={() => setEditingTrip(trip)}
                     className={`bg-gradient-to-br ${trip.color} rounded-3xl text-white text-left relative overflow-hidden group hover:scale-105 transition-transform duration-300 shadow-xl border-2 border-dashed border-white/40 cursor-pointer`}
                   >
                     {/* Stripe pattern overlay */}
@@ -4869,7 +4886,7 @@ export default function TripPlanner() {
                     return (
                       <div
                         key={trip.id}
-                        onClick={() => setSelectedTrip(trip)}
+                        onClick={() => setEditingTrip(trip)}
                         className={`bg-gradient-to-r ${trip.color} ${trip.isPlanning ? 'opacity-70 border-2 border-dashed border-white/40' : ''} rounded-xl p-3 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform relative overflow-hidden`}
                       >
                         {trip.isPlanning && (
@@ -4952,7 +4969,7 @@ export default function TripPlanner() {
                     } ${isWeekend && !tripOnDate ? 'bg-white/[0.02]' : 'bg-white/5'} ${
                       openDateOnDay && !tripOnDate ? 'bg-green-500/10' : ''
                     }`}
-                    onClick={() => tripOnDate ? setSelectedTrip(tripOnDate) : openDateOnDay ? setShowOpenDateModal(true) : null}
+                    onClick={() => tripOnDate ? setEditingTrip(tripOnDate) : openDateOnDay ? setShowOpenDateModal(true) : null}
                   >
                     {/* Date number */}
                     <div className={`text-xs font-medium mb-1 flex items-center justify-between ${
@@ -5079,7 +5096,7 @@ export default function TripPlanner() {
                 return (
                   <div
                     key={trip.id}
-                    onClick={() => setSelectedTrip(trip)}
+                    onClick={() => setEditingTrip(trip)}
                     className="flex items-center gap-2 bg-white/5 hover:bg-white/10 px-3 py-2 rounded-full cursor-pointer transition"
                   >
                     <span className="text-lg">{trip.emoji}</span>
@@ -5209,7 +5226,7 @@ export default function TripPlanner() {
                   {[...trips, ...wishlist].map(trip => (
                     <div
                       key={trip.id}
-                      onClick={() => !trip.isWishlist && setSelectedTrip(trip)}
+                      onClick={() => !trip.isWishlist && setEditingTrip(trip)}
                       className={`p-3 rounded-xl ${trip.isWishlist ? 'bg-white/5 border border-dashed border-white/20' : `bg-gradient-to-br ${trip.color}`} cursor-pointer hover:scale-105 transition-transform`}
                     >
                       <div className="text-2xl mb-1">{trip.emoji}</div>
