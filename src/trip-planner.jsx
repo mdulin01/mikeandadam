@@ -6129,10 +6129,10 @@ export default function TripPlanner() {
                               {/* Week Notes */}
                               <div className="mt-4">
                                 <textarea
-                                  value={currentWeek.weekNotes}
+                                  value={currentWeek.weekNotes || ''}
                                   onChange={(e) => updateTrainingWeek(selectedFitnessEvent.id, currentWeek.id, { weekNotes: e.target.value })}
                                   placeholder="Add notes for this week..."
-                                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 resize-none"
+                                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 resize-y"
                                   rows={2}
                                 />
                               </div>
@@ -6344,10 +6344,10 @@ export default function TripPlanner() {
                                 {/* Week Notes */}
                                 <div className="mt-3">
                                   <textarea
-                                    value={week.weekNotes}
+                                    value={week.weekNotes || ''}
                                     onChange={(e) => updateTrainingWeek(selectedFitnessEvent.id, week.id, { weekNotes: e.target.value })}
                                     placeholder="Notes for this week..."
-                                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 text-sm resize-none"
+                                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 text-sm resize-y"
                                     rows={1}
                                   />
                                 </div>
