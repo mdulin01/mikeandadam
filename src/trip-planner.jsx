@@ -3537,7 +3537,7 @@ export default function TripPlanner() {
             <SharedHubProvider value={sharedHub}>
             <div className="mt-8">
               {/* Hub Sub-Navigation */}
-              <div className="flex gap-1.5 md:gap-2 mb-6 items-center justify-between md:justify-start ml-14 md:ml-0">
+              <div className="flex gap-1.5 md:gap-2 mb-6 items-center justify-start">
                 {[
                   { id: 'home', emoji: '📊' },
                   { id: 'tasks', emoji: '✅' },
@@ -11370,14 +11370,14 @@ export default function TripPlanner() {
           {/* Main FAB Button */}
           <button
             onClick={() => setShowAddNewMenu(!showAddNewMenu)}
-            className={`w-10 h-10 md:w-12 md:h-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 active:scale-90 ${
+            className={`w-14 h-14 md:w-12 md:h-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 active:scale-90 ${
               showAddNewMenu
                 ? 'bg-gradient-to-r from-pink-500 to-rose-500 rotate-45'
                 : 'bg-gradient-to-r from-purple-500 to-violet-600 hover:shadow-purple-500/30'
             }`}
             style={{ boxShadow: showAddNewMenu ? '0 8px 32px rgba(236, 72, 153, 0.4)' : '0 8px 32px rgba(139, 92, 246, 0.4)' }}
           >
-            <Plus className="w-5 h-5 md:w-6 md:h-6 text-white transition-transform duration-200" />
+            <Plus className="w-6 h-6 text-white transition-transform duration-200" />
           </button>
         </div>
       )}
