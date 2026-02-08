@@ -106,13 +106,6 @@ const TaskCard = React.memo(({ task, onNavigateToLinked, getLinkedLabel }) => {
             <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${priority.bg} ${priority.text}`}>
               {priority.label}
             </span>
-            {/* Event link indicator */}
-            {isLinkedToEvent && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 flex items-center gap-1">
-                <Link className="w-2.5 h-2.5" />
-                Linked to Event
-              </span>
-            )}
             {/* Assignee */}
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/50">
               {assigneeLabel}
