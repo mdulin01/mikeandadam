@@ -1,11 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { Check, Pencil, Trash2, ExternalLink, Users, MoreVertical, Star } from 'lucide-react';
+import { Check, Pencil, Trash2, ExternalLink, Users, MoreVertical, Star, Share2 } from 'lucide-react';
 import { getDomainFromUrl } from '../../utils';
 import PortalMenu from './PortalMenu';
 import { useSharedHub } from '../../contexts/SharedHubContext';
 
 const SocialCard = React.memo(({ social, onNavigateToEvent, getEventLabel }) => {
-  const { completeSocial, deleteSocial, highlightSocial, setShowAddSocialModal } = useSharedHub();
+  const { completeSocial, deleteSocial, highlightSocial, setShowAddSocialModal, showToast } = useSharedHub();
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -145,6 +145,21 @@ const SocialCard = React.memo(({ social, onNavigateToEvent, getEventLabel }) => 
             >
               <Star className={`w-3.5 h-3.5 ${social.highlighted ? 'text-amber-400 fill-amber-400' : ''}`} />
               {social.highlighted ? 'Unhighlight' : 'Highlight'}
+            </button>
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                const url = `${window.location.origin}/?hub=social&id=${social.id}`;
+                if (navigator.share) {
+                  navigator.share({ title: social.person || social.title, url }).catch(() => {});
+                } else {
+                  navigator.clipboard.writeText(url);
+                  showToast('Link copied!', 'success');
+                }
+              }}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-teal-400 hover:bg-teal-500/10 transition text-left"
+            >
+              <Share2 className="w-3.5 h-3.5" /> Share
             </button>
             <button
               onClick={() => { setShowMenu(false); deleteSocial(social.id); }}

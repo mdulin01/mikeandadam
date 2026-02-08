@@ -438,8 +438,22 @@ export default function TripPlanner() {
   }, []);
 
   // Main section navigation
+  // Check URL for deep link to a specific Hub item (?hub=task&id=123)
+  const initialDeepLink = (() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hubType = urlParams.get('hub');
+    const hubId = urlParams.get('id');
+    const validTypes = ['task', 'list', 'idea', 'social', 'habit'];
+    if (hubType && validTypes.includes(hubType) && hubId) {
+      window.history.replaceState({}, '', window.location.pathname);
+      return { type: hubType, id: hubId };
+    }
+    return null;
+  })();
+
   // Check URL for app mode at initialization - supports multiple app types
   const initialAppMode = (() => {
+    if (initialDeepLink) return null; // Deep links always go to Hub
     const urlParams = new URLSearchParams(window.location.search);
     const appParam = urlParams.get('app');
     const validApps = ['fitness', 'travel', 'events', 'memories'];
@@ -489,6 +503,9 @@ export default function TripPlanner() {
     showAddSocialModal, setShowAddSocialModal,
     showAddHabitModal, setShowAddHabitModal,
   } = sharedHub;
+
+  // Deep link state — opens a specific Hub item when the URL contains ?hub=type&id=itemId
+  const [pendingDeepLink, setPendingDeepLink] = useState(initialDeepLink);
 
   // Refs for dependencies defined later
   const saveToFirestoreRef = useRef(() => {});
@@ -1895,6 +1912,39 @@ export default function TripPlanner() {
       hubUnsubscribe();
     };
   }, [user]);
+
+  // Deep link handler — auto-open a Hub item when ?hub=type&id=itemId is in URL
+  useEffect(() => {
+    if (!pendingDeepLink || !hubDataLoadedRef.current) return;
+    const { type, id } = pendingDeepLink;
+    const numId = Number(id);
+
+    const typeMap = {
+      task: { data: sharedTasks, tab: 'tasks', open: setShowAddTaskModal },
+      list: { data: sharedLists, tab: 'lists', open: setShowSharedListModal },
+      idea: { data: sharedIdeas, tab: 'ideas', open: setShowAddIdeaModal },
+      social: { data: sharedSocial, tab: 'social', open: setShowAddSocialModal },
+      habit: { data: sharedHabits, tab: 'habits', open: setShowAddHabitModal },
+    };
+
+    const config = typeMap[type];
+    if (!config) { setPendingDeepLink(null); return; }
+
+    const item = config.data.find(i => i.id === numId);
+    if (item) {
+      setActiveSection('home');
+      setHubSubView(config.tab);
+      config.open(item);
+      setPendingDeepLink(null);
+    } else if (config.data.length > 0) {
+      // Data loaded but item not found
+      showToast('Item not found — it may have been deleted', 'info');
+      setActiveSection('home');
+      setHubSubView(config.tab);
+      setPendingDeepLink(null);
+    }
+    // If data is still empty, wait for next render (Firebase may still be loading)
+  }, [pendingDeepLink, sharedTasks, sharedLists, sharedIdeas, sharedSocial, sharedHabits]);
 
   // Compute visible open dates based on user role
   const visibleOpenDates = isOwner
@@ -3528,8 +3578,16 @@ export default function TripPlanner() {
                             <span>✅</span> Today's Tasks
                             {todayTasks.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-400">{todayTasks.length}</span>}
                           </h3>
-                          <div className="text-white/40">
-                            {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setShowAddTaskModal('create'); }}
+                              className="w-7 h-7 rounded-full bg-teal-500/20 hover:bg-teal-500/40 flex items-center justify-center transition text-teal-400"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                            <div className="text-white/40">
+                              {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                            </div>
                           </div>
                         </button>
                         {!isCollapsed && (
@@ -3582,8 +3640,16 @@ export default function TripPlanner() {
                             <span>🛒</span> Lists
                             {activeLists.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">{activeLists.length}</span>}
                           </h3>
-                          <div className="text-white/40">
-                            {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setShowSharedListModal('create'); }}
+                              className="w-7 h-7 rounded-full bg-emerald-500/20 hover:bg-emerald-500/40 flex items-center justify-center transition text-emerald-400"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                            <div className="text-white/40">
+                              {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                            </div>
                           </div>
                         </button>
                         {!isCollapsed && (
@@ -3621,7 +3687,7 @@ export default function TripPlanner() {
                   {(() => {
                     const recentIdeas = sharedIdeas.filter(i => i.status === 'inbox' || i.status === 'saved').slice(0, 4);
                     const isCollapsed = collapsedSections.ideas;
-                    return recentIdeas.length > 0 && (
+                    return (
                       <div className="mb-6 rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(245,158,11,0.06)]">
                         <button
                           onClick={() => toggleDashSection('ideas')}
@@ -3630,8 +3696,16 @@ export default function TripPlanner() {
                           <h3 className="text-base font-bold text-white flex items-center gap-2">
                             <span>💡</span> Ideas
                           </h3>
-                          <div className="text-white/40">
-                            {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setShowAddIdeaModal('create'); }}
+                              className="w-7 h-7 rounded-full bg-amber-500/20 hover:bg-amber-500/40 flex items-center justify-center transition text-amber-400"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                            <div className="text-white/40">
+                              {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                            </div>
                           </div>
                         </button>
                         {!isCollapsed && (
@@ -3640,14 +3714,22 @@ export default function TripPlanner() {
                               <button onClick={() => setHubSubView('ideas')} className="text-xs text-teal-400 hover:text-teal-300 transition">See All →</button>
                             </div>
                             <div className="p-4 pt-2 grid grid-cols-2 gap-3">
-                              {recentIdeas.map(idea => (
-                                <IdeaCard
-                                  key={idea.id}
-                                  idea={idea}
-                                 
-                                  onPromoteToTask={promoteIdeaToTask}
-                                />
-                              ))}
+                              {recentIdeas.length === 0 ? (
+                                <div className="col-span-2 text-center py-6">
+                                  <span className="text-3xl mb-2 block">💡</span>
+                                  <p className="text-white/40 text-sm">No ideas yet</p>
+                                  <button onClick={() => setShowAddIdeaModal('create')} className="mt-3 text-xs text-teal-400 hover:text-teal-300 transition">+ Add an idea</button>
+                                </div>
+                              ) : (
+                                recentIdeas.map(idea => (
+                                  <IdeaCard
+                                    key={idea.id}
+                                    idea={idea}
+
+                                    onPromoteToTask={promoteIdeaToTask}
+                                  />
+                                ))
+                              )}
                             </div>
                           </>
                         )}
@@ -3659,7 +3741,7 @@ export default function TripPlanner() {
                   {(() => {
                     const upcomingSocial = sharedSocial.filter(s => s.status !== 'done').slice(0, 4);
                     const isCollapsed = collapsedSections.social;
-                    return upcomingSocial.length > 0 && (
+                    return (
                       <div className="mb-6 rounded-3xl border border-purple-500/20 bg-gradient-to-br from-purple-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(168,85,247,0.06)]">
                         <button
                           onClick={() => toggleDashSection('social')}
@@ -3668,8 +3750,16 @@ export default function TripPlanner() {
                           <h3 className="text-base font-bold text-white flex items-center gap-2">
                             <span>👥</span> Social
                           </h3>
-                          <div className="text-white/40">
-                            {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setShowAddSocialModal('create'); }}
+                              className="w-7 h-7 rounded-full bg-purple-500/20 hover:bg-purple-500/40 flex items-center justify-center transition text-purple-400"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                            <div className="text-white/40">
+                              {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                            </div>
                           </div>
                         </button>
                         {!isCollapsed && (
@@ -3678,15 +3768,23 @@ export default function TripPlanner() {
                               <button onClick={() => setHubSubView('social')} className="text-xs text-purple-400 hover:text-purple-300 transition">See All →</button>
                             </div>
                             <div className="p-4 pt-2 space-y-2">
-                              {upcomingSocial.map(social => (
-                                <SocialCard
-                                  key={social.id}
-                                  social={social}
-                                 
-                                  onNavigateToEvent={navigateToEvent}
-                                  getEventLabel={getEventLabel}
-                                />
-                              ))}
+                              {upcomingSocial.length === 0 ? (
+                                <div className="text-center py-6">
+                                  <span className="text-3xl mb-2 block">👥</span>
+                                  <p className="text-white/40 text-sm">No upcoming social items</p>
+                                  <button onClick={() => setShowAddSocialModal('create')} className="mt-3 text-xs text-teal-400 hover:text-teal-300 transition">+ Add a social item</button>
+                                </div>
+                              ) : (
+                                upcomingSocial.map(social => (
+                                  <SocialCard
+                                    key={social.id}
+                                    social={social}
+
+                                    onNavigateToEvent={navigateToEvent}
+                                    getEventLabel={getEventLabel}
+                                  />
+                                ))
+                              )}
                             </div>
                           </>
                         )}
@@ -3700,7 +3798,7 @@ export default function TripPlanner() {
                     const todayKey = new Date().toISOString().split('T')[0];
                     const doneToday = activeHabits.filter(h => h.log?.[todayKey] === true).length;
                     const isCollapsed = collapsedSections.habits;
-                    return activeHabits.length > 0 && (
+                    return (
                       <div className="mb-6 rounded-3xl border border-rose-500/20 bg-gradient-to-br from-rose-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(244,63,94,0.06)]">
                         <button
                           onClick={() => toggleDashSection('habits')}
@@ -3708,10 +3806,18 @@ export default function TripPlanner() {
                         >
                           <h3 className="text-base font-bold text-white flex items-center gap-2">
                             <span>🔄</span> Habits
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">{doneToday}/{activeHabits.length}</span>
+                            {activeHabits.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">{doneToday}/{activeHabits.length}</span>}
                           </h3>
-                          <div className="text-white/40">
-                            {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setShowAddHabitModal('create'); }}
+                              className="w-7 h-7 rounded-full bg-rose-500/20 hover:bg-rose-500/40 flex items-center justify-center transition text-rose-400"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                            <div className="text-white/40">
+                              {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                            </div>
                           </div>
                         </button>
                         {!isCollapsed && (
@@ -3720,15 +3826,24 @@ export default function TripPlanner() {
                               <button onClick={() => setHubSubView('habits')} className="text-xs text-emerald-400 hover:text-emerald-300 transition">See All →</button>
                             </div>
                             <div className="p-4 pt-2 space-y-2">
-                              {activeHabits.slice(0, 5).map(habit => (
-                                <HabitCard
-                                  key={habit.id}
-                                  habit={habit}
-                                  currentUser={currentUser}
-                                 
-                                />
-                              ))}
-                              {activeHabits.length > 5 && <div className="text-xs text-white/30 text-center pt-1">+{activeHabits.length - 5} more</div>}
+                              {activeHabits.length === 0 ? (
+                                <div className="text-center py-6">
+                                  <span className="text-3xl mb-2 block">🔄</span>
+                                  <p className="text-white/40 text-sm">No habits yet</p>
+                                  <button onClick={() => setShowAddHabitModal('create')} className="mt-3 text-xs text-teal-400 hover:text-teal-300 transition">+ Add a habit</button>
+                                </div>
+                              ) : (
+                                <>
+                                  {activeHabits.slice(0, 5).map(habit => (
+                                    <HabitCard
+                                      key={habit.id}
+                                      habit={habit}
+                                      currentUser={currentUser}
+                                    />
+                                  ))}
+                                  {activeHabits.length > 5 && <div className="text-xs text-white/30 text-center pt-1">+{activeHabits.length - 5} more</div>}
+                                </>
+                              )}
                             </div>
                           </>
                         )}

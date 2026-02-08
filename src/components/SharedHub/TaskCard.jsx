@@ -1,11 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { Check, Pencil, Trash2, Link, ExternalLink, Flag, MoreVertical, Star } from 'lucide-react';
+import { Check, Pencil, Trash2, Link, ExternalLink, Flag, MoreVertical, Star, Share2 } from 'lucide-react';
 import { getDomainFromUrl } from '../../utils';
 import PortalMenu from './PortalMenu';
 import { useSharedHub } from '../../contexts/SharedHubContext';
 
 const TaskCard = React.memo(({ task, onNavigateToLinked, getLinkedLabel }) => {
-  const { completeTask, deleteTask, updateTask, highlightTask, setShowAddTaskModal } = useSharedHub();
+  const { completeTask, deleteTask, updateTask, highlightTask, setShowAddTaskModal, showToast } = useSharedHub();
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -192,6 +192,21 @@ const TaskCard = React.memo(({ task, onNavigateToLinked, getLinkedLabel }) => {
                 {task.priority === 'high' ? 'Urgency → Med' : 'Urgency → Low'}
               </button>
             )}
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                const url = `${window.location.origin}/?hub=task&id=${task.id}`;
+                if (navigator.share) {
+                  navigator.share({ title: task.title, url }).catch(() => {});
+                } else {
+                  navigator.clipboard.writeText(url);
+                  showToast('Link copied!', 'success');
+                }
+              }}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-teal-400 hover:bg-teal-500/10 transition text-left"
+            >
+              <Share2 className="w-3.5 h-3.5" /> Share
+            </button>
             <button
               onClick={() => { setShowMenu(false); deleteTask(task.id); }}
               className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition text-left"

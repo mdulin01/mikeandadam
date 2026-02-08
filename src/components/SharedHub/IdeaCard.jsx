@@ -1,11 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { ExternalLink, Zap, Pencil, Trash2, MoreVertical, Star } from 'lucide-react';
+import { ExternalLink, Zap, Pencil, Trash2, MoreVertical, Star, Share2 } from 'lucide-react';
 import { getDomainFromUrl } from '../../utils';
 import PortalMenu from './PortalMenu';
 import { useSharedHub } from '../../contexts/SharedHubContext';
 
 const IdeaCard = React.memo(({ idea, onPromoteToTask }) => {
-  const { deleteIdea, highlightIdea, setShowAddIdeaModal } = useSharedHub();
+  const { deleteIdea, highlightIdea, setShowAddIdeaModal, showToast } = useSharedHub();
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
 
@@ -88,6 +88,21 @@ const IdeaCard = React.memo(({ idea, onPromoteToTask }) => {
                 >
                   <Star className={`w-3.5 h-3.5 ${idea.highlighted ? 'text-amber-400 fill-amber-400' : ''}`} />
                   {idea.highlighted ? 'Unhighlight' : 'Highlight'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    const url = `${window.location.origin}/?hub=idea&id=${idea.id}`;
+                    if (navigator.share) {
+                      navigator.share({ title: idea.title, url }).catch(() => {});
+                    } else {
+                      navigator.clipboard.writeText(url);
+                      showToast('Link copied!', 'success');
+                    }
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-teal-400 hover:bg-teal-500/10 transition text-left"
+                >
+                  <Share2 className="w-3.5 h-3.5" /> Share
                 </button>
                 <button
                   onClick={() => { setShowMenu(false); deleteIdea(idea.id); }}

@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Check, Plus, Trash2, ChevronDown, ChevronUp, Pencil, MoreVertical, Star } from 'lucide-react';
+import { Check, Plus, Trash2, ChevronDown, ChevronUp, Pencil, MoreVertical, Star, Share2 } from 'lucide-react';
 import PortalMenu from './PortalMenu';
 import { useSharedHub } from '../../contexts/SharedHubContext';
 
 const ListCard = React.memo(({ list, currentUser, onNavigateToLinked, getLinkedLabel }) => {
-  const { toggleListItem, addListItem, deleteListItem, deleteList, highlightList, setShowSharedListModal } = useSharedHub();
+  const { toggleListItem, addListItem, deleteListItem, deleteList, highlightList, setShowSharedListModal, showToast } = useSharedHub();
   const [expanded, setExpanded] = useState(false);
   const [newItemText, setNewItemText] = useState('');
   const [showMenu, setShowMenu] = useState(false);
@@ -112,6 +112,21 @@ const ListCard = React.memo(({ list, currentUser, onNavigateToLinked, getLinkedL
             >
               <Star className={`w-3.5 h-3.5 ${list.highlighted ? 'text-amber-400 fill-amber-400' : ''}`} />
               {list.highlighted ? 'Unhighlight' : 'Highlight'}
+            </button>
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                const url = `${window.location.origin}/?hub=list&id=${list.id}`;
+                if (navigator.share) {
+                  navigator.share({ title: list.name, url }).catch(() => {});
+                } else {
+                  navigator.clipboard.writeText(url);
+                  showToast('Link copied!', 'success');
+                }
+              }}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-teal-400 hover:bg-teal-500/10 transition text-left"
+            >
+              <Share2 className="w-3.5 h-3.5" /> Share
             </button>
             <button
               onClick={() => { setShowMenu(false); deleteList(list.id); }}

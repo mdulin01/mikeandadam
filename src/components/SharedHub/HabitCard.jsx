@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Check, Pencil, Trash2, MoreVertical, Star, Zap, Target, Gift, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Pencil, Trash2, MoreVertical, Star, Zap, Target, Gift, ChevronDown, ChevronUp, Share2 } from 'lucide-react';
 import PortalMenu from './PortalMenu';
 import { useSharedHub } from '../../contexts/SharedHubContext';
 
 const HabitCard = React.memo(({ habit, currentUser }) => {
-  const { toggleHabitDay, deleteHabit, highlightHabit, setShowAddHabitModal } = useSharedHub();
+  const { toggleHabitDay, deleteHabit, highlightHabit, setShowAddHabitModal, showToast } = useSharedHub();
   const [showMenu, setShowMenu] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const menuRef = useRef(null);
@@ -156,6 +156,21 @@ const HabitCard = React.memo(({ habit, currentUser }) => {
             >
               <Star className={`w-3.5 h-3.5 ${habit.highlighted ? 'text-amber-400 fill-amber-400' : ''}`} />
               {habit.highlighted ? 'Unhighlight' : 'Highlight'}
+            </button>
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                const url = `${window.location.origin}/?hub=habit&id=${habit.id}`;
+                if (navigator.share) {
+                  navigator.share({ title: habit.name, url }).catch(() => {});
+                } else {
+                  navigator.clipboard.writeText(url);
+                  showToast('Link copied!', 'success');
+                }
+              }}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-teal-400 hover:bg-teal-500/10 transition text-left"
+            >
+              <Share2 className="w-3.5 h-3.5" /> Share
             </button>
             <button
               onClick={() => { setShowMenu(false); deleteHabit(habit.id); }}

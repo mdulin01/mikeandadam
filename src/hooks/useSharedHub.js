@@ -328,6 +328,9 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
     setShowAddSocialModal,
     showAddHabitModal,
     setShowAddHabitModal,
+
+    // Utilities
+    showToast,
   };
 };
 
