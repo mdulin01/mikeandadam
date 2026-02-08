@@ -6763,6 +6763,7 @@ export default function TripPlanner() {
                 {/* Apps Grid */}
                 <div className="grid grid-cols-2 gap-4">
                   {[
+                    { id: 'home', name: 'Hub', emoji: '🏠', color: 'from-pink-500 to-purple-500', desc: 'Tasks, lists, habits & more' },
                     { id: 'fitness', name: 'Fitness', emoji: '🏃', color: 'from-orange-400 to-red-500', desc: 'Track workouts & training' },
                     { id: 'travel', name: 'Travel', emoji: '✈️', color: 'from-teal-400 to-cyan-500', desc: 'Plan your adventures' },
                     { id: 'events', name: 'Events', emoji: '🎉', color: 'from-amber-400 to-orange-500', desc: 'Manage parties & gatherings' },

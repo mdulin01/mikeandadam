@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 /**
  * useSharedHub Hook
@@ -7,6 +7,11 @@ import { useState, useCallback } from 'react';
  */
 
 export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
+  // Keep a ref to saveSharedHub so callbacks always use the latest version
+  // without needing it in their dependency arrays (avoids stale closure bugs)
+  const saveRef = useRef(saveSharedHub);
+  saveRef.current = saveSharedHub;
+
   // ========== STATE ==========
   const [sharedTasks, setSharedTasks] = useState([]);
   const [sharedLists, setSharedLists] = useState([]);
@@ -36,20 +41,20 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
   const addTask = useCallback((task) => {
     const newTasks = [...sharedTasks, task];
     setSharedTasks(newTasks);
-    saveSharedHub(null, newTasks, null);
+    saveRef.current(null, newTasks, null);
     showToast('Task added', 'success');
   }, [sharedTasks, showToast]);
 
   const updateTask = useCallback((taskId, updates) => {
     const newTasks = sharedTasks.map(t => t.id === taskId ? { ...t, ...updates } : t);
     setSharedTasks(newTasks);
-    saveSharedHub(null, newTasks, null);
+    saveRef.current(null, newTasks, null);
   }, [sharedTasks]);
 
   const deleteTask = useCallback((taskId) => {
     const newTasks = sharedTasks.filter(t => t.id !== taskId);
     setSharedTasks(newTasks);
-    saveSharedHub(null, newTasks, null);
+    saveRef.current(null, newTasks, null);
     showToast('Task removed', 'info');
   }, [sharedTasks, showToast]);
 
@@ -64,40 +69,40 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
       completedAt: newStatus === 'done' ? new Date().toISOString() : null,
     } : t);
     setSharedTasks(newTasks);
-    saveSharedHub(null, newTasks, null);
+    saveRef.current(null, newTasks, null);
   }, [sharedTasks, currentUser]);
 
   const highlightTask = useCallback((taskId) => {
     const newTasks = sharedTasks.map(t => t.id === taskId ? { ...t, highlighted: !t.highlighted } : t);
     setSharedTasks(newTasks);
-    saveSharedHub(null, newTasks, null);
+    saveRef.current(null, newTasks, null);
   }, [sharedTasks]);
 
   // ========== LIST CRUD ==========
   const addList = useCallback((list) => {
     const newLists = [...sharedLists, list];
     setSharedLists(newLists);
-    saveSharedHub(newLists, null, null);
+    saveRef.current(newLists, null, null);
     showToast('List created', 'success');
   }, [sharedLists, showToast]);
 
   const updateList = useCallback((listId, updates) => {
     const newLists = sharedLists.map(l => l.id === listId ? { ...l, ...updates } : l);
     setSharedLists(newLists);
-    saveSharedHub(newLists, null, null);
+    saveRef.current(newLists, null, null);
   }, [sharedLists]);
 
   const deleteList = useCallback((listId) => {
     const newLists = sharedLists.filter(l => l.id !== listId);
     setSharedLists(newLists);
-    saveSharedHub(newLists, null, null);
+    saveRef.current(newLists, null, null);
     showToast('List removed', 'info');
   }, [sharedLists, showToast]);
 
   const addListItem = useCallback((listId, item) => {
     const newLists = sharedLists.map(l => l.id === listId ? { ...l, items: [...(l.items || []), item] } : l);
     setSharedLists(newLists);
-    saveSharedHub(newLists, null, null);
+    saveRef.current(newLists, null, null);
   }, [sharedLists]);
 
   const toggleListItem = useCallback((listId, itemId) => {
@@ -114,7 +119,7 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
       };
     });
     setSharedLists(newLists);
-    saveSharedHub(newLists, null, null);
+    saveRef.current(newLists, null, null);
   }, [sharedLists, currentUser]);
 
   const deleteListItem = useCallback((listId, itemId) => {
@@ -123,60 +128,60 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
       return { ...l, items: l.items.filter(i => i.id !== itemId) };
     });
     setSharedLists(newLists);
-    saveSharedHub(newLists, null, null);
+    saveRef.current(newLists, null, null);
   }, [sharedLists]);
 
   const highlightList = useCallback((listId) => {
     const newLists = sharedLists.map(l => l.id === listId ? { ...l, highlighted: !l.highlighted } : l);
     setSharedLists(newLists);
-    saveSharedHub(newLists, null, null);
+    saveRef.current(newLists, null, null);
   }, [sharedLists]);
 
   // ========== IDEA CRUD ==========
   const addIdea = useCallback((idea) => {
     const newIdeas = [...sharedIdeas, idea];
     setSharedIdeas(newIdeas);
-    saveSharedHub(null, null, newIdeas);
+    saveRef.current(null, null, newIdeas);
     showToast('Idea saved', 'success');
   }, [sharedIdeas, showToast]);
 
   const updateIdea = useCallback((ideaId, updates) => {
     const newIdeas = sharedIdeas.map(i => i.id === ideaId ? { ...i, ...updates } : i);
     setSharedIdeas(newIdeas);
-    saveSharedHub(null, null, newIdeas);
+    saveRef.current(null, null, newIdeas);
   }, [sharedIdeas]);
 
   const deleteIdea = useCallback((ideaId) => {
     const newIdeas = sharedIdeas.filter(i => i.id !== ideaId);
     setSharedIdeas(newIdeas);
-    saveSharedHub(null, null, newIdeas);
+    saveRef.current(null, null, newIdeas);
     showToast('Idea removed', 'info');
   }, [sharedIdeas, showToast]);
 
   const highlightIdea = useCallback((ideaId) => {
     const newIdeas = sharedIdeas.map(i => i.id === ideaId ? { ...i, highlighted: !i.highlighted } : i);
     setSharedIdeas(newIdeas);
-    saveSharedHub(null, null, newIdeas);
+    saveRef.current(null, null, newIdeas);
   }, [sharedIdeas]);
 
   // ========== SOCIAL CRUD ==========
   const addSocial = useCallback((social) => {
     const newSocial = [...sharedSocial, social];
     setSharedSocial(newSocial);
-    saveSharedHub(null, null, null, newSocial);
+    saveRef.current(null, null, null, newSocial);
     showToast('Social planned', 'success');
   }, [sharedSocial, showToast]);
 
   const updateSocial = useCallback((socialId, updates) => {
     const newSocial = sharedSocial.map(s => s.id === socialId ? { ...s, ...updates } : s);
     setSharedSocial(newSocial);
-    saveSharedHub(null, null, null, newSocial);
+    saveRef.current(null, null, null, newSocial);
   }, [sharedSocial]);
 
   const deleteSocial = useCallback((socialId) => {
     const newSocial = sharedSocial.filter(s => s.id !== socialId);
     setSharedSocial(newSocial);
-    saveSharedHub(null, null, null, newSocial);
+    saveRef.current(null, null, null, newSocial);
     showToast('Social removed', 'info');
   }, [sharedSocial, showToast]);
 
@@ -191,27 +196,27 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
   const highlightSocial = useCallback((socialId) => {
     const newSocial = sharedSocial.map(s => s.id === socialId ? { ...s, highlighted: !s.highlighted } : s);
     setSharedSocial(newSocial);
-    saveSharedHub(null, null, null, newSocial);
+    saveRef.current(null, null, null, newSocial);
   }, [sharedSocial]);
 
   // ========== HABIT CRUD ==========
   const addHabit = useCallback((habit) => {
     const newHabits = [...sharedHabits, habit];
     setSharedHabits(newHabits);
-    saveSharedHub(null, null, null, null, newHabits);
+    saveRef.current(null, null, null, null, newHabits);
     showToast('Habit created', 'success');
   }, [sharedHabits, showToast]);
 
   const updateHabit = useCallback((habitId, updates) => {
     const newHabits = sharedHabits.map(h => h.id === habitId ? { ...h, ...updates } : h);
     setSharedHabits(newHabits);
-    saveSharedHub(null, null, null, null, newHabits);
+    saveRef.current(null, null, null, null, newHabits);
   }, [sharedHabits]);
 
   const deleteHabit = useCallback((habitId) => {
     const newHabits = sharedHabits.filter(h => h.id !== habitId);
     setSharedHabits(newHabits);
-    saveSharedHub(null, null, null, null, newHabits);
+    saveRef.current(null, null, null, null, newHabits);
     showToast('Habit removed', 'info');
   }, [sharedHabits, showToast]);
 
@@ -223,13 +228,13 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
       return { ...h, log: newLog };
     });
     setSharedHabits(newHabits);
-    saveSharedHub(null, null, null, null, newHabits);
+    saveRef.current(null, null, null, null, newHabits);
   }, [sharedHabits]);
 
   const highlightHabit = useCallback((habitId) => {
     const newHabits = sharedHabits.map(h => h.id === habitId ? { ...h, highlighted: !h.highlighted } : h);
     setSharedHabits(newHabits);
-    saveSharedHub(null, null, null, null, newHabits);
+    saveRef.current(null, null, null, null, newHabits);
   }, [sharedHabits]);
 
   // ========== UI HELPERS ==========

@@ -355,7 +355,7 @@ const AddTaskModal = React.memo(({
                 value={formData.linkedTo?.itemId || ''}
                 onChange={(e) => {
                   if (e.target.value) {
-                    const selected = sectionOptions.find(opt => opt.value === e.target.value);
+                    const selected = sectionOptions.find(opt => String(opt.value) === e.target.value);
                     if (selected) {
                       updateField('linkedTo', {
                         section: selected.section,
