@@ -5977,220 +5977,18 @@ export default function TripPlanner() {
                         );
                       })()}
 
-                      {/* Current Week Highlight */}
-                      {(() => {
-                        const today = new Date();
-                        const todayStr = today.toISOString().split('T')[0];
-                        const currentWeek = getActiveTrainingPlan(selectedFitnessEvent.id).find(
-                          week => week.startDate <= todayStr && week.endDate >= todayStr
-                        );
-                        const currentWeekIndex = getActiveTrainingPlan(selectedFitnessEvent.id).findIndex(
-                          week => week.startDate <= todayStr && week.endDate >= todayStr
-                        );
-
-                        if (currentWeek) {
-                          return (
-                            <div className="bg-gradient-to-r from-orange-500/30 to-red-500/30 rounded-2xl p-6 border-2 border-orange-500/50 mb-6">
-                              <div className="flex items-center gap-2 mb-4">
-                                <span className="text-2xl">📅</span>
-                                <h3 className="text-xl font-bold text-white">This Week - Week {currentWeek.weekNumber || currentWeekIndex + 1}</h3>
-                                <span className="px-3 py-1 bg-orange-500 text-white text-sm font-bold rounded-full">CURRENT</span>
-                                {currentWeek.totalMiles && (
-                                  <span className="px-3 py-1 bg-white/20 text-white text-sm rounded-full">{currentWeek.totalMiles} mi goal</span>
-                                )}
-                                <button
-                                  onClick={() => setEditingTrainingWeek({ eventId: selectedFitnessEvent.id, week: { ...currentWeek } })}
-                                  className="ml-auto p-2 text-white/60 hover:text-white hover:bg-white/20 rounded-lg transition"
-                                  title="Edit week"
-                                >
-                                  <Pencil className="w-5 h-5" />
-                                </button>
-                              </div>
-                              {currentWeek.weekNotes && (
-                                <div className="mb-4 px-4 py-2 bg-white/10 rounded-lg text-white/90">{currentWeek.weekNotes}</div>
-                              )}
-
-                              <div className="grid md:grid-cols-2 gap-4">
-                                {/* Activities (Runs/Swims/Bikes for triathlon) */}
-                                <div className="bg-white/10 rounded-xl p-4">
-                                  <h4 className="text-lg font-semibold text-orange-300 mb-3 flex items-center gap-2">
-                                    <span>🏃</span> {selectedFitnessEvent?.id === 'triathlon-2026' ? 'Activities' : 'Runs'}
-                                  </h4>
-                                  <div className="space-y-2">
-                                    {currentWeek.runs?.map(run => (
-                                      <div
-                                        key={run.id}
-                                        className={`flex items-center gap-3 p-3 rounded-lg ${
-                                          selectedFitnessEvent?.id === 'triathlon-2026'
-                                            ? (run.mike ? 'bg-green-500/20' : 'bg-white/5')
-                                            : ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
-                                        }`}
-                                      >
-                                        <div className="flex gap-2">
-                                          <button
-                                            onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { mike: !run.mike })}
-                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
-                                              run.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40 hover:border-white'
-                                            }`}
-                                            title="Mike"
-                                          >
-                                            {run.mike && <Check className="w-4 h-4 text-white" />}
-                                          </button>
-                                          {selectedFitnessEvent?.id !== 'triathlon-2026' && (
-                                            <button
-                                              onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { adam: !run.adam })}
-                                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
-                                                run.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'
-                                              }`}
-                                              title="Adam"
-                                            >
-                                              {run.adam && <Check className="w-4 h-4 text-white" />}
-                                            </button>
-                                          )}
-                                        </div>
-                                        <div className="flex-1">
-                                          <div className="text-white font-medium">{run.label || run.day}</div>
-                                          <div className="text-xs text-white/50">
-                                            {selectedFitnessEvent?.id === 'triathlon-2026' ? (
-                                              <span className={run.mike ? 'text-blue-400' : 'text-white/30'}>Mike</span>
-                                            ) : (
-                                              <>
-                                                <span className={run.mike ? 'text-blue-400' : 'text-white/30'}>M</span>
-                                                {' / '}
-                                                <span className={run.adam ? 'text-purple-400' : 'text-white/30'}>A</span>
-                                              </>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div className="text-white font-bold">{run.distance}</div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Cross Training */}
-                                <div className="bg-white/10 rounded-xl p-4">
-                                  <h4 className="text-lg font-semibold text-red-300 mb-3 flex items-center gap-2">
-                                    <span>💪</span> Cross Training
-                                  </h4>
-                                  <div className="space-y-2">
-                                    {currentWeek.crossTraining?.map(ct => (
-                                      <div
-                                        key={ct.id}
-                                        className={`flex items-center gap-3 p-3 rounded-lg ${
-                                          selectedFitnessEvent?.id === 'triathlon-2026'
-                                            ? (ct.mike ? 'bg-green-500/20' : 'bg-white/5')
-                                            : ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
-                                        }`}
-                                      >
-                                        <div className="flex gap-2">
-                                          <button
-                                            onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { mike: !ct.mike })}
-                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
-                                              ct.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40 hover:border-white'
-                                            }`}
-                                            title="Mike"
-                                          >
-                                            {ct.mike && <Check className="w-4 h-4 text-white" />}
-                                          </button>
-                                          {selectedFitnessEvent?.id !== 'triathlon-2026' && (
-                                            <button
-                                              onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { adam: !ct.adam })}
-                                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
-                                                ct.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'
-                                              }`}
-                                              title="Adam"
-                                            >
-                                              {ct.adam && <Check className="w-4 h-4 text-white" />}
-                                            </button>
-                                          )}
-                                        </div>
-                                        <div className="flex-1">
-                                          <div className="text-white font-medium">{ct.label || ct.day}</div>
-                                          <div className="text-xs text-white/50">
-                                            {selectedFitnessEvent?.id === 'triathlon-2026' ? (
-                                              <span className={ct.mike ? 'text-blue-400' : 'text-white/30'}>Mike</span>
-                                            ) : (
-                                              <>
-                                                <span className={ct.mike ? 'text-blue-400' : 'text-white/30'}>M</span>
-                                                {' / '}
-                                                <span className={ct.adam ? 'text-purple-400' : 'text-white/30'}>A</span>
-                                              </>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <span className="text-white/60 text-sm">30+ min</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Week Notes */}
-                              <div className="mt-4">
-                                <textarea
-                                  value={currentWeek.weekNotes || ''}
-                                  onChange={(e) => updateTrainingWeek(selectedFitnessEvent.id, currentWeek.id, { weekNotes: e.target.value })}
-                                  placeholder="Add notes for this week..."
-                                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 resize-y"
-                                  rows={2}
-                                />
-                              </div>
-
-                              {/* Current Week Photos */}
-                              <div className="mt-4">
-                                {(currentWeek.photos || []).length > 0 && (
-                                  <div className="flex flex-wrap gap-2 mb-2">
-                                    {(currentWeek.photos || []).map(photo => (
-                                      <div key={photo.id} className="relative group/photo">
-                                        <img src={photo.url} alt="" className="w-24 h-24 rounded-xl object-cover border border-white/20" />
-                                        <button
-                                          onClick={() => handleWeekPhotoRemove(selectedFitnessEvent.id, currentWeek.id, currentWeek.photos, photo.id)}
-                                          className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition"
-                                        >
-                                          <X className="w-3 h-3 text-white" />
-                                        </button>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                <div
-                                  onDrop={(e) => { e.preventDefault(); setWeekPhotoDrag(null); const file = e.dataTransfer?.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, currentWeek.id, currentWeek.photos || [], file); }}
-                                  onDragOver={(e) => { e.preventDefault(); setWeekPhotoDrag(currentWeek.id); }}
-                                  onDragLeave={() => setWeekPhotoDrag(null)}
-                                  className={`flex items-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition ${
-                                    weekPhotoDrag === currentWeek.id ? 'border-orange-400 bg-orange-500/10 text-orange-300' : 'border-white/20 text-white/40 hover:text-white/60 hover:border-white/30'
-                                  }`}
-                                  onClick={() => {
-                                    const input = document.createElement('input');
-                                    input.type = 'file';
-                                    input.accept = 'image/*';
-                                    input.onchange = (e) => { const file = e.target.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, currentWeek.id, currentWeek.photos || [], file); };
-                                    input.click();
-                                  }}
-                                >
-                                  <ImagePlus className="w-5 h-5" />
-                                  <span className="text-sm">Add photo</span>
-                                  <span className="text-xs text-white/20 hidden md:inline ml-auto">or drag & drop</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-
-                      {/* All Weeks Accordion */}
+                      {/* Training Weeks - Past (collapsed) → Current (highlight) → Future (accordion) */}
                       {(() => {
                         const allWeeks = getActiveTrainingPlan(selectedFitnessEvent.id);
                         const today = new Date();
                         const todayStr = today.toISOString().split('T')[0];
                         const pastWeeks = allWeeks.filter(w => w.endDate < todayStr);
-                        const currentAndFutureWeeks = allWeeks.filter(w => w.endDate >= todayStr);
+                        const currentWeek = allWeeks.find(w => w.startDate <= todayStr && w.endDate >= todayStr);
+                        const currentWeekIndex = allWeeks.findIndex(w => w.startDate <= todayStr && w.endDate >= todayStr);
+                        const futureWeeks = allWeeks.filter(w => w.startDate > todayStr);
                         const isTriathlon = selectedFitnessEvent?.id === 'triathlon-2026';
 
-                        const renderWeekCard = (week, index) => {
-                          const isCurrent = week.startDate <= todayStr && week.endDate >= todayStr;
+                        const renderWeekAccordion = (week, index, opts = {}) => {
                           const isPast = week.endDate < todayStr;
                           const completedCount = isTriathlon
                             ? (week.runs?.filter(r => r.mike).length || 0) + (week.crossTraining?.filter(c => c.mike).length || 0)
@@ -6202,16 +6000,14 @@ export default function TripPlanner() {
                             <details
                               key={week.id}
                               className={`group rounded-xl border transition ${
-                                isCurrent ? 'border-orange-500/50 bg-white/5' :
                                 isPast ? 'border-white/10 bg-gray-600/20 opacity-70' :
                                 'border-white/10 hover:border-white/20 bg-white/5'
                               } ${week.isRecovery ? 'bg-green-500/10' : ''}`}
-                              open={isCurrent}
                             >
                               <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
                                 <div className="flex items-center gap-3">
                                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                    isCurrent ? 'bg-orange-500 text-white' : isPast ? 'bg-white/20 text-white/60' : 'bg-white/10 text-white/80'
+                                    isPast ? 'bg-white/20 text-white/60' : 'bg-white/10 text-white/80'
                                   }`}>
                                     {index + 1}
                                   </div>
@@ -6219,7 +6015,6 @@ export default function TripPlanner() {
                                     <div className="text-white font-medium flex items-center gap-2">
                                       Week {index + 1}
                                       {week.isRecovery && <span className="text-xs px-2 py-0.5 bg-green-500/30 text-green-300 rounded-full">Recovery</span>}
-                                      {isCurrent && <span className="text-xs px-2 py-0.5 bg-orange-500 text-white rounded-full">Current</span>}
                                       {weekPhotos.length > 0 && <span className="text-xs text-white/40">📷 {weekPhotos.length}</span>}
                                     </div>
                                     <div className="text-white/60 text-sm">
@@ -6228,68 +6023,28 @@ export default function TripPlanner() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                  <div className="text-white/60 text-sm">
-                                    {completedCount}/{totalCount} done
-                                  </div>
+                                  <div className="text-white/60 text-sm">{completedCount}/{totalCount} done</div>
                                   <div className="w-20 h-2 bg-white/10 rounded-full overflow-hidden">
-                                    <div
-                                      className={`h-full rounded-full ${completedCount === totalCount ? 'bg-green-500' : 'bg-orange-400'}`}
-                                      style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
-                                    />
+                                    <div className={`h-full rounded-full ${completedCount === totalCount ? 'bg-green-500' : 'bg-orange-400'}`} style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }} />
                                   </div>
-                                  <button
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      setEditingTrainingWeek({ eventId: selectedFitnessEvent.id, week: { ...week } });
-                                    }}
-                                    className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition"
-                                    title="Edit week"
-                                  >
+                                  <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingTrainingWeek({ eventId: selectedFitnessEvent.id, week: { ...week } }); }} className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition" title="Edit week">
                                     <Pencil className="w-4 h-4" />
                                   </button>
                                   <ChevronRight className="w-5 h-5 text-white/40 transition-transform group-open:rotate-90" />
                                 </div>
                               </summary>
-
                               <div className="px-4 pb-4 pt-2 border-t border-white/10">
                                 <div className="grid md:grid-cols-2 gap-4">
-                                  {/* Activities */}
                                   <div>
-                                    <h4 className="text-sm font-semibold text-orange-300 mb-2">
-                                      {isTriathlon ? '🏃 Activities' : '🏃 Runs'}
-                                    </h4>
+                                    <h4 className="text-sm font-semibold text-orange-300 mb-2">{isTriathlon ? '🏃 Activities' : '🏃 Runs'}</h4>
                                     <div className="space-y-1">
                                       {week.runs?.map(run => (
-                                        <div
-                                          key={run.id}
-                                          className={`flex items-center gap-2 p-2 rounded ${
-                                            isTriathlon
-                                              ? (run.mike ? 'bg-green-500/20' : 'bg-white/5')
-                                              : ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
-                                          }`}
-                                        >
+                                        <div key={run.id} className={`flex items-center gap-2 p-2 rounded ${isTriathlon ? (run.mike ? 'bg-green-500/20' : 'bg-white/5') : ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')}`}>
                                           <div className="flex gap-1">
-                                            <button
-                                              onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { mike: !run.mike })}
-                                              className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                                run.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40'
-                                              }`}
-                                              title="Mike"
-                                            >
+                                            <button onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { mike: !run.mike })} className={`w-5 h-5 rounded-full border flex items-center justify-center ${run.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40'}`} title="Mike">
                                               {run.mike && <Check className="w-3 h-3 text-white" />}
                                             </button>
-                                            {!isTriathlon && (
-                                              <button
-                                                onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { adam: !run.adam })}
-                                                className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                                  run.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40'
-                                                }`}
-                                                title="Adam"
-                                              >
-                                                {run.adam && <Check className="w-3 h-3 text-white" />}
-                                              </button>
-                                            )}
+                                            {!isTriathlon && <button onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { adam: !run.adam })} className={`w-5 h-5 rounded-full border flex items-center justify-center ${run.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40'}`} title="Adam">{run.adam && <Check className="w-3 h-3 text-white" />}</button>}
                                           </div>
                                           <span className="text-white/80 text-sm flex-1">{run.label || run.day}</span>
                                           <span className="text-white font-medium text-sm">{run.distance}</span>
@@ -6297,41 +6052,16 @@ export default function TripPlanner() {
                                       ))}
                                     </div>
                                   </div>
-
-                                  {/* Cross Training */}
                                   <div>
                                     <h4 className="text-sm font-semibold text-red-300 mb-2">💪 Cross Training</h4>
                                     <div className="space-y-1">
                                       {week.crossTraining?.map(ct => (
-                                        <div
-                                          key={ct.id}
-                                          className={`flex items-center gap-2 p-2 rounded ${
-                                            isTriathlon
-                                              ? (ct.mike ? 'bg-green-500/20' : 'bg-white/5')
-                                              : ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')
-                                          }`}
-                                        >
+                                        <div key={ct.id} className={`flex items-center gap-2 p-2 rounded ${isTriathlon ? (ct.mike ? 'bg-green-500/20' : 'bg-white/5') : ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')}`}>
                                           <div className="flex gap-1">
-                                            <button
-                                              onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { mike: !ct.mike })}
-                                              className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                                ct.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40'
-                                              }`}
-                                              title="Mike"
-                                            >
+                                            <button onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { mike: !ct.mike })} className={`w-5 h-5 rounded-full border flex items-center justify-center ${ct.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40'}`} title="Mike">
                                               {ct.mike && <Check className="w-3 h-3 text-white" />}
                                             </button>
-                                            {!isTriathlon && (
-                                              <button
-                                                onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { adam: !ct.adam })}
-                                                className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                                  ct.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40'
-                                                }`}
-                                                title="Adam"
-                                              >
-                                                {ct.adam && <Check className="w-3 h-3 text-white" />}
-                                              </button>
-                                            )}
+                                            {!isTriathlon && <button onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { adam: !ct.adam })} className={`w-5 h-5 rounded-full border flex items-center justify-center ${ct.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40'}`} title="Adam">{ct.adam && <Check className="w-3 h-3 text-white" />}</button>}
                                           </div>
                                           <span className="text-white/80 text-sm flex-1">{ct.label || ct.day}</span>
                                           <span className="text-white/60 text-xs">30+ min</span>
@@ -6340,54 +6070,31 @@ export default function TripPlanner() {
                                     </div>
                                   </div>
                                 </div>
-
-                                {/* Week Notes */}
                                 <div className="mt-3">
-                                  <textarea
-                                    value={week.weekNotes || ''}
-                                    onChange={(e) => updateTrainingWeek(selectedFitnessEvent.id, week.id, { weekNotes: e.target.value })}
-                                    placeholder="Notes for this week..."
-                                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 text-sm resize-y"
-                                    rows={1}
-                                  />
+                                  <textarea value={week.weekNotes || ''} onChange={(e) => updateTrainingWeek(selectedFitnessEvent.id, week.id, { weekNotes: e.target.value })} placeholder="Notes for this week..." className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 text-sm resize-y" rows={1} />
                                 </div>
-
-                                {/* Week Photos */}
                                 <div className="mt-3">
                                   {weekPhotos.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-2">
                                       {weekPhotos.map(photo => (
                                         <div key={photo.id} className="relative group/photo">
                                           <img src={photo.url} alt="" className="w-20 h-20 rounded-lg object-cover border border-white/10" />
-                                          <button
-                                            onClick={() => handleWeekPhotoRemove(selectedFitnessEvent.id, week.id, weekPhotos, photo.id)}
-                                            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition"
-                                          >
-                                            <X className="w-3 h-3 text-white" />
-                                          </button>
+                                          <button onClick={() => handleWeekPhotoRemove(selectedFitnessEvent.id, week.id, weekPhotos, photo.id)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition"><X className="w-3 h-3 text-white" /></button>
                                         </div>
                                       ))}
                                     </div>
                                   )}
-                                  <div
+                                  <label
                                     onDrop={(e) => { e.preventDefault(); setWeekPhotoDrag(null); const file = e.dataTransfer?.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, week.id, weekPhotos, file); }}
                                     onDragOver={(e) => { e.preventDefault(); setWeekPhotoDrag(week.id); }}
                                     onDragLeave={() => setWeekPhotoDrag(null)}
-                                    className={`flex items-center gap-2 px-3 py-2 border border-dashed rounded-lg cursor-pointer transition ${
-                                      weekPhotoDrag === week.id ? 'border-orange-400 bg-orange-500/10 text-orange-300' : 'border-white/10 text-white/30 hover:text-white/50 hover:border-white/20'
-                                    }`}
-                                    onClick={() => {
-                                      const input = document.createElement('input');
-                                      input.type = 'file';
-                                      input.accept = 'image/*';
-                                      input.onchange = (e) => { const file = e.target.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, week.id, weekPhotos, file); };
-                                      input.click();
-                                    }}
+                                    className={`flex items-center gap-2 px-3 py-2 border border-dashed rounded-lg cursor-pointer transition ${weekPhotoDrag === week.id ? 'border-orange-400 bg-orange-500/10 text-orange-300' : 'border-white/10 text-white/30 hover:text-white/50 hover:border-white/20'}`}
                                   >
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, week.id, weekPhotos, file); e.target.value = ''; }} />
                                     <ImagePlus className="w-4 h-4" />
                                     <span className="text-xs">Add photo</span>
                                     <span className="text-[10px] text-white/20 hidden md:inline ml-auto">or drag & drop</span>
-                                  </div>
+                                  </label>
                                 </div>
                               </div>
                             </details>
@@ -6396,7 +6103,7 @@ export default function TripPlanner() {
 
                         return (
                           <div className="space-y-2">
-                            {/* Past Weeks - Collapsed */}
+                            {/* 1. Past Weeks - Collapsed */}
                             {pastWeeks.length > 0 && (
                               <div className="rounded-xl border border-white/10 overflow-hidden">
                                 <button
@@ -6409,9 +6116,7 @@ export default function TripPlanner() {
                                   </div>
                                   <span className="text-xs text-white/40">
                                     {pastWeeks.filter(w => {
-                                      const cc = isTriathlon
-                                        ? (w.runs?.filter(r => r.mike).length || 0) + (w.crossTraining?.filter(c => c.mike).length || 0)
-                                        : (w.runs?.filter(r => r.mike && r.adam).length || 0) + (w.crossTraining?.filter(c => c.mike && c.adam).length || 0);
+                                      const cc = isTriathlon ? (w.runs?.filter(r => r.mike).length || 0) + (w.crossTraining?.filter(c => c.mike).length || 0) : (w.runs?.filter(r => r.mike && r.adam).length || 0) + (w.crossTraining?.filter(c => c.mike && c.adam).length || 0);
                                       const tc = (w.runs?.length || 0) + (w.crossTraining?.length || 0);
                                       return tc > 0 && cc === tc;
                                     }).length}/{pastWeeks.length} completed
@@ -6419,20 +6124,96 @@ export default function TripPlanner() {
                                 </button>
                                 {pastWeeksExpanded && (
                                   <div className="space-y-2 p-2">
-                                    {pastWeeks.map((week) => {
-                                      const origIndex = allWeeks.findIndex(w => w.id === week.id);
-                                      return renderWeekCard(week, origIndex);
-                                    })}
+                                    {pastWeeks.map((week) => renderWeekAccordion(week, allWeeks.findIndex(w => w.id === week.id)))}
                                   </div>
                                 )}
                               </div>
                             )}
 
-                            {/* Current + Future Weeks */}
-                            {currentAndFutureWeeks.map((week) => {
-                              const origIndex = allWeeks.findIndex(w => w.id === week.id);
-                              return renderWeekCard(week, origIndex);
-                            })}
+                            {/* 2. Current Week Highlight */}
+                            {currentWeek && (
+                              <div className="bg-gradient-to-r from-orange-500/30 to-red-500/30 rounded-2xl p-6 border-2 border-orange-500/50">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <span className="text-2xl">📅</span>
+                                  <h3 className="text-xl font-bold text-white">This Week - Week {currentWeek.weekNumber || currentWeekIndex + 1}</h3>
+                                  <span className="px-3 py-1 bg-orange-500 text-white text-sm font-bold rounded-full">CURRENT</span>
+                                  {currentWeek.totalMiles && <span className="px-3 py-1 bg-white/20 text-white text-sm rounded-full">{currentWeek.totalMiles} mi goal</span>}
+                                  <button onClick={() => setEditingTrainingWeek({ eventId: selectedFitnessEvent.id, week: { ...currentWeek } })} className="ml-auto p-2 text-white/60 hover:text-white hover:bg-white/20 rounded-lg transition" title="Edit week">
+                                    <Pencil className="w-5 h-5" />
+                                  </button>
+                                </div>
+                                {currentWeek.weekNotes && <div className="mb-4 px-4 py-2 bg-white/10 rounded-lg text-white/90">{currentWeek.weekNotes}</div>}
+                                <div className="grid md:grid-cols-2 gap-4">
+                                  <div className="bg-white/10 rounded-xl p-4">
+                                    <h4 className="text-lg font-semibold text-orange-300 mb-3 flex items-center gap-2"><span>🏃</span> {isTriathlon ? 'Activities' : 'Runs'}</h4>
+                                    <div className="space-y-2">
+                                      {currentWeek.runs?.map(run => (
+                                        <div key={run.id} className={`flex items-center gap-3 p-3 rounded-lg ${isTriathlon ? (run.mike ? 'bg-green-500/20' : 'bg-white/5') : ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')}`}>
+                                          <div className="flex gap-2">
+                                            <button onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { mike: !run.mike })} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${run.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40 hover:border-white'}`} title="Mike">{run.mike && <Check className="w-4 h-4 text-white" />}</button>
+                                            {!isTriathlon && <button onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { adam: !run.adam })} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${run.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'}`} title="Adam">{run.adam && <Check className="w-4 h-4 text-white" />}</button>}
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-white font-medium">{run.label || run.day}</div>
+                                            <div className="text-xs text-white/50">{isTriathlon ? <span className={run.mike ? 'text-blue-400' : 'text-white/30'}>Mike</span> : <><span className={run.mike ? 'text-blue-400' : 'text-white/30'}>M</span>{' / '}<span className={run.adam ? 'text-purple-400' : 'text-white/30'}>A</span></>}</div>
+                                          </div>
+                                          <div className="text-white font-bold">{run.distance}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="bg-white/10 rounded-xl p-4">
+                                    <h4 className="text-lg font-semibold text-red-300 mb-3 flex items-center gap-2"><span>💪</span> Cross Training</h4>
+                                    <div className="space-y-2">
+                                      {currentWeek.crossTraining?.map(ct => (
+                                        <div key={ct.id} className={`flex items-center gap-3 p-3 rounded-lg ${isTriathlon ? (ct.mike ? 'bg-green-500/20' : 'bg-white/5') : ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')}`}>
+                                          <div className="flex gap-2">
+                                            <button onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { mike: !ct.mike })} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${ct.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40 hover:border-white'}`} title="Mike">{ct.mike && <Check className="w-4 h-4 text-white" />}</button>
+                                            {!isTriathlon && <button onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { adam: !ct.adam })} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${ct.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'}`} title="Adam">{ct.adam && <Check className="w-4 h-4 text-white" />}</button>}
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-white font-medium">{ct.label || ct.day}</div>
+                                            <div className="text-xs text-white/50">{isTriathlon ? <span className={ct.mike ? 'text-blue-400' : 'text-white/30'}>Mike</span> : <><span className={ct.mike ? 'text-blue-400' : 'text-white/30'}>M</span>{' / '}<span className={ct.adam ? 'text-purple-400' : 'text-white/30'}>A</span></>}</div>
+                                          </div>
+                                          <span className="text-white/60 text-sm">30+ min</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Current Week Notes */}
+                                <div className="mt-4">
+                                  <textarea value={currentWeek.weekNotes || ''} onChange={(e) => updateTrainingWeek(selectedFitnessEvent.id, currentWeek.id, { weekNotes: e.target.value })} placeholder="Add notes for this week..." className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 resize-y" rows={2} />
+                                </div>
+                                {/* Current Week Photos */}
+                                <div className="mt-4">
+                                  {(currentWeek.photos || []).length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                      {(currentWeek.photos || []).map(photo => (
+                                        <div key={photo.id} className="relative group/photo">
+                                          <img src={photo.url} alt="" className="w-24 h-24 rounded-xl object-cover border border-white/20" />
+                                          <button onClick={() => handleWeekPhotoRemove(selectedFitnessEvent.id, currentWeek.id, currentWeek.photos, photo.id)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition"><X className="w-3 h-3 text-white" /></button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <label
+                                    onDrop={(e) => { e.preventDefault(); setWeekPhotoDrag(null); const file = e.dataTransfer?.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, currentWeek.id, currentWeek.photos || [], file); }}
+                                    onDragOver={(e) => { e.preventDefault(); setWeekPhotoDrag(currentWeek.id); }}
+                                    onDragLeave={() => setWeekPhotoDrag(null)}
+                                    className={`flex items-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition ${weekPhotoDrag === currentWeek.id ? 'border-orange-400 bg-orange-500/10 text-orange-300' : 'border-white/20 text-white/40 hover:text-white/60 hover:border-white/30'}`}
+                                  >
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, currentWeek.id, currentWeek.photos || [], file); e.target.value = ''; }} />
+                                    <ImagePlus className="w-5 h-5" />
+                                    <span className="text-sm">Add photo</span>
+                                    <span className="text-xs text-white/20 hidden md:inline ml-auto">or drag & drop</span>
+                                  </label>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 3. Future Weeks */}
+                            {futureWeeks.map((week) => renderWeekAccordion(week, allWeeks.findIndex(w => w.id === week.id)))}
                           </div>
                         );
                       })()}
