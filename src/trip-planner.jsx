@@ -11321,7 +11321,7 @@ export default function TripPlanner() {
 
       {/* Floating Action Button (FAB) - Quick Add - Aligned with section navigation buttons */}
       {isOwner && !initialAppMode && !showAddMemoryModal && !editingMemory && !editingTrip && !editingPartyEvent && !showOpenDateModal && !showCompanionsModal && !showAddModal && !showNewTripModal && !showLinkModal && !showImportModal && !showGuestModal && !showMyProfileModal && !showAddFitnessEventModal && !editingFitnessEvent && !showAddEventModal && !editingEvent && !editingTrainingWeek && !showAddTaskModal && !showSharedListModal && !showAddIdeaModal && !showAddSocialModal && !showAddHabitModal && (
-        <div className="fixed bottom-20 md:bottom-8 right-4 md:right-6 z-[90]">
+        <div className="fixed md:bottom-8 right-4 md:right-6 z-[90]" style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom, 0px) + 8px)' }}>
           {/* FAB Menu - Compact 3x3 Grid */}
           {showAddNewMenu && (
             <>
