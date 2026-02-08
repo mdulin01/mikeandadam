@@ -1543,7 +1543,7 @@ export default function TripPlanner() {
   const [eventViewMode, setEventViewMode] = useState('upcoming');
   const [newEventData, setNewEventData] = useState({
     name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
-    location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500'
+    location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], tasks: []
   });
   const [eventGuestEmail, setEventGuestEmail] = useState('');
   const [eventGuestPermission, setEventGuestPermission] = useState('edit');
@@ -9834,6 +9834,109 @@ export default function TripPlanner() {
                   <img src={editingPartyEvent.coverImage} alt="Cover preview" className="mt-2 w-full h-32 object-cover rounded-lg" />
                 )}
               </div>
+
+              {/* To-Do List */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2 flex items-center gap-2">
+                  <CheckSquare className="w-4 h-4 text-green-400" />
+                  To-Do List
+                  <span className="text-white/40 text-xs">
+                    {(editingPartyEvent.tasks || []).filter(t => t.completed).length}/{(editingPartyEvent.tasks || []).length}
+                  </span>
+                </label>
+                <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                  {(editingPartyEvent.tasks || []).map(task => (
+                    <div key={task.id} className={`flex items-center gap-3 p-2.5 rounded-lg ${task.completed ? 'bg-green-500/10' : 'bg-white/5'}`}>
+                      <button
+                        onClick={() => setEditingPartyEvent(prev => ({
+                          ...prev,
+                          tasks: prev.tasks.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t)
+                        }))}
+                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition shrink-0 ${
+                          task.completed ? 'bg-green-500 border-green-500 text-white' : 'border-slate-500 hover:border-green-500'
+                        }`}
+                      >
+                        {task.completed && <Check className="w-3 h-3" />}
+                      </button>
+                      <span className={`flex-1 text-sm text-white ${task.completed ? 'line-through opacity-60' : ''}`}>{task.text}</span>
+                      {task.assignee && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          task.assignee === 'Mike' ? 'bg-purple-500/30 text-purple-300' :
+                          task.assignee === 'Adam' ? 'bg-blue-500/30 text-blue-300' :
+                          'bg-amber-500/30 text-amber-300'
+                        }`}>{task.assignee}</span>
+                      )}
+                      <button
+                        onClick={() => setEditingPartyEvent(prev => ({
+                          ...prev,
+                          tasks: prev.tasks.filter(t => t.id !== task.id)
+                        }))}
+                        className="p-1 text-slate-500 hover:text-red-400 transition"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Add a task..."
+                    value={newTaskText}
+                    onChange={(e) => setNewTaskText(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 text-sm focus:outline-none focus:border-green-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newTaskText.trim()) {
+                        setEditingPartyEvent(prev => ({
+                          ...prev,
+                          tasks: [...(prev.tasks || []), {
+                            id: Date.now(),
+                            text: newTaskText.trim(),
+                            assignee: newTaskAssignee || null,
+                            completed: false,
+                            createdBy: currentUser,
+                            createdAt: new Date().toISOString()
+                          }]
+                        }));
+                        setNewTaskText('');
+                        setNewTaskAssignee('');
+                      }
+                    }}
+                  />
+                  <select
+                    value={newTaskAssignee}
+                    onChange={(e) => setNewTaskAssignee(e.target.value)}
+                    className="px-2 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none"
+                  >
+                    <option value="">Who</option>
+                    <option value="Mike">Mike</option>
+                    <option value="Adam">Adam</option>
+                  </select>
+                  <button
+                    onClick={() => {
+                      if (newTaskText.trim()) {
+                        setEditingPartyEvent(prev => ({
+                          ...prev,
+                          tasks: [...(prev.tasks || []), {
+                            id: Date.now(),
+                            text: newTaskText.trim(),
+                            assignee: newTaskAssignee || null,
+                            completed: false,
+                            createdBy: currentUser,
+                            createdAt: new Date().toISOString()
+                          }]
+                        }));
+                        setNewTaskText('');
+                        setNewTaskAssignee('');
+                      }
+                    }}
+                    disabled={!newTaskText.trim()}
+                    className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="p-6 border-t border-white/10 space-y-3">
               <button onClick={() => { setSelectedPartyEvent(editingPartyEvent); setEditingPartyEvent(null); }} className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition flex items-center justify-center gap-2">
@@ -10627,7 +10730,7 @@ export default function TripPlanner() {
                     setEventCoverImagePreview(null);
                     setNewEventData({
                       name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
-                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500'
+                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: []
                     });
                   }}
                   className="p-2 hover:bg-white/10 rounded-full transition"
@@ -10848,6 +10951,97 @@ export default function TripPlanner() {
                 )}
               </div>
 
+              {/* To-Do List */}
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2 flex items-center gap-2">
+                  <CheckSquare className="w-4 h-4 text-green-400" />
+                  To-Do List
+                  {((editingEvent ? editingEvent.tasks : newEventData.tasks) || []).length > 0 && (
+                    <span className="text-white/40 text-xs">
+                      {((editingEvent ? editingEvent.tasks : newEventData.tasks) || []).filter(t => t.completed).length}/{((editingEvent ? editingEvent.tasks : newEventData.tasks) || []).length}
+                    </span>
+                  )}
+                </label>
+                <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                  {((editingEvent ? editingEvent.tasks : newEventData.tasks) || []).map(task => (
+                    <div key={task.id} className={`flex items-center gap-3 p-2.5 rounded-lg ${task.completed ? 'bg-green-500/10' : 'bg-white/5'}`}>
+                      <button
+                        onClick={() => {
+                          const updated = ((editingEvent ? editingEvent.tasks : newEventData.tasks) || []).map(t => t.id === task.id ? { ...t, completed: !t.completed } : t);
+                          if (editingEvent) { setEditingEvent({ ...editingEvent, tasks: updated }); }
+                          else { setNewEventData({ ...newEventData, tasks: updated }); }
+                        }}
+                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition shrink-0 ${
+                          task.completed ? 'bg-green-500 border-green-500 text-white' : 'border-slate-500 hover:border-green-500'
+                        }`}
+                      >
+                        {task.completed && <Check className="w-3 h-3" />}
+                      </button>
+                      <span className={`flex-1 text-sm text-white ${task.completed ? 'line-through opacity-60' : ''}`}>{task.text}</span>
+                      {task.assignee && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          task.assignee === 'Mike' ? 'bg-purple-500/30 text-purple-300' :
+                          task.assignee === 'Adam' ? 'bg-blue-500/30 text-blue-300' :
+                          'bg-amber-500/30 text-amber-300'
+                        }`}>{task.assignee}</span>
+                      )}
+                      <button
+                        onClick={() => {
+                          const updated = ((editingEvent ? editingEvent.tasks : newEventData.tasks) || []).filter(t => t.id !== task.id);
+                          if (editingEvent) { setEditingEvent({ ...editingEvent, tasks: updated }); }
+                          else { setNewEventData({ ...newEventData, tasks: updated }); }
+                        }}
+                        className="p-1 text-slate-500 hover:text-red-400 transition"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Add a task..."
+                    value={newTaskText}
+                    onChange={(e) => setNewTaskText(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 text-sm focus:outline-none focus:border-green-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newTaskText.trim()) {
+                        const newTask = { id: Date.now(), text: newTaskText.trim(), assignee: newTaskAssignee || null, completed: false, createdBy: currentUser, createdAt: new Date().toISOString() };
+                        if (editingEvent) { setEditingEvent({ ...editingEvent, tasks: [...(editingEvent.tasks || []), newTask] }); }
+                        else { setNewEventData({ ...newEventData, tasks: [...(newEventData.tasks || []), newTask] }); }
+                        setNewTaskText('');
+                        setNewTaskAssignee('');
+                      }
+                    }}
+                  />
+                  <select
+                    value={newTaskAssignee}
+                    onChange={(e) => setNewTaskAssignee(e.target.value)}
+                    className="px-2 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none"
+                  >
+                    <option value="">Who</option>
+                    <option value="Mike">Mike</option>
+                    <option value="Adam">Adam</option>
+                  </select>
+                  <button
+                    onClick={() => {
+                      if (newTaskText.trim()) {
+                        const newTask = { id: Date.now(), text: newTaskText.trim(), assignee: newTaskAssignee || null, completed: false, createdBy: currentUser, createdAt: new Date().toISOString() };
+                        if (editingEvent) { setEditingEvent({ ...editingEvent, tasks: [...(editingEvent.tasks || []), newTask] }); }
+                        else { setNewEventData({ ...newEventData, tasks: [...(newEventData.tasks || []), newTask] }); }
+                        setNewTaskText('');
+                        setNewTaskAssignee('');
+                      }
+                    }}
+                    disabled={!newTaskText.trim()}
+                    className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
               {/* Invite Guests - Coming Soon */}
               <div>
                 <label className="block text-sm font-medium text-white/70 mb-2">Invite Guests</label>
@@ -10886,7 +11080,7 @@ export default function TripPlanner() {
                     setEventCoverImagePreview(null);
                     setNewEventData({
                       name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
-                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500'
+                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: []
                     });
                   }}
                   className="px-5 py-2.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition"
@@ -10921,7 +11115,7 @@ export default function TripPlanner() {
                       setEventCoverImagePreview(null);
                       setNewEventData({
                         name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
-                        location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500'
+                        location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: []
                       });
                       showToast('Event created!', 'success');
                     }
