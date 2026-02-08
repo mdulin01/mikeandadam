@@ -46,34 +46,6 @@ import SocialCard from './components/SharedHub/SocialCard';
 import AddHabitModal from './components/SharedHub/AddHabitModal';
 import HabitCard from './components/SharedHub/HabitCard';
 
-// Hub-and-spoke icon component
-const HubIcon = ({ size = 24, className = '' }) => (
-  <svg viewBox="0 0 100 100" width={size} height={size} className={className} fill="none">
-    <circle cx="50" cy="50" r="14" fill="url(#hubGrad)" opacity="0.95"/>
-    {/* Spokes + outer nodes */}
-    {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => {
-      const rad = (angle * Math.PI) / 180;
-      const ox = 50 + 38 * Math.cos(rad);
-      const oy = 50 + 38 * Math.sin(rad);
-      const r = i % 2 === 0 ? 7 : 5;
-      return (
-        <g key={angle}>
-          <line x1={50 + 14 * Math.cos(rad)} y1={50 + 14 * Math.sin(rad)} x2={ox} y2={oy} stroke="url(#hubGrad)" strokeWidth="3" strokeLinecap="round" opacity="0.7"/>
-          <circle cx={ox} cy={oy} r={r} fill="url(#hubGrad)" opacity={i % 2 === 0 ? 0.9 : 0.65}/>
-        </g>
-      );
-    })}
-    <defs>
-      <linearGradient id="hubGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#2dd4bf"/>
-        <stop offset="25%" stopColor="#22d3ee"/>
-        <stop offset="50%" stopColor="#818cf8"/>
-        <stop offset="75%" stopColor="#c084fc"/>
-        <stop offset="100%" stopColor="#f472b6"/>
-      </linearGradient>
-    </defs>
-  </svg>
-);
 
 // Firebase imports
 import { initializeApp } from 'firebase/app';
@@ -3244,7 +3216,7 @@ export default function TripPlanner() {
                 {/* Mobile section indicator - icon only */}
                 <span className="md:hidden text-white/40 text-sm">•</span>
                 <span className="md:hidden text-lg">
-                  {activeSection === 'home' && <HubIcon size={18} />}
+                  {activeSection === 'home' && '⚛️'}
                   {activeSection === 'travel' && '✈️'}
                   {activeSection === 'fitness' && '🏃'}
                   {activeSection === 'events' && '🎉'}
@@ -3456,7 +3428,7 @@ export default function TripPlanner() {
             <div className="mt-6 hidden md:flex gap-2 flex-wrap items-center justify-center">
               {/* Main navigation buttons */}
               {[
-                { id: 'home', label: 'Hub', emoji: null, gradient: 'from-pink-500 to-purple-500' },
+                { id: 'home', label: 'Hub', emoji: '⚛️', gradient: 'from-pink-500 to-purple-500' },
                 { id: 'travel', label: 'Travel', emoji: '✈️', gradient: 'from-teal-400 to-cyan-500' },
                 { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
                 { id: 'events', label: 'Events', emoji: '🎉', gradient: 'from-amber-400 to-orange-500' },
@@ -3475,7 +3447,7 @@ export default function TripPlanner() {
                       : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
                   }`}
                 >
-                  <span>{section.id === 'home' ? <HubIcon size={20} /> : section.emoji}</span>
+                  <span>{section.emoji}</span>
                   {section.label}
                 </button>
               ))}
@@ -6811,7 +6783,7 @@ export default function TripPlanner() {
                 {/* Apps Grid */}
                 <div className="grid grid-cols-2 gap-4">
                   {[
-                    { id: 'home', name: 'Hub', emoji: null, color: 'from-pink-500 to-purple-500', desc: 'Tasks, lists, habits & more' },
+                    { id: 'home', name: 'Hub', emoji: '⚛️', color: 'from-pink-500 to-purple-500', desc: 'Tasks, lists, habits & more' },
                     { id: 'fitness', name: 'Fitness', emoji: '🏃', color: 'from-orange-400 to-red-500', desc: 'Track workouts & training' },
                     { id: 'travel', name: 'Travel', emoji: '✈️', color: 'from-teal-400 to-cyan-500', desc: 'Plan your adventures' },
                     { id: 'events', name: 'Events', emoji: '🎉', color: 'from-amber-400 to-orange-500', desc: 'Manage parties & gatherings' },
@@ -6835,7 +6807,7 @@ export default function TripPlanner() {
                       className="flex flex-col items-center gap-3 p-6 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition active:scale-95"
                     >
                       <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${app.color} flex items-center justify-center text-3xl shadow-lg`}>
-                        {app.id === 'home' ? <HubIcon size={36} /> : app.emoji}
+                        {app.emoji}
                       </div>
                       <div className="text-center">
                         <h3 className="text-white font-semibold text-lg">{app.name}</h3>
@@ -11309,7 +11281,7 @@ export default function TripPlanner() {
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-white/10 z-[100]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
           <div className="flex items-center justify-around py-2 px-1">
             {[
-              { id: 'home', label: 'Hub', emoji: null, gradient: 'from-pink-500 to-purple-500' },
+              { id: 'home', label: 'Hub', emoji: '⚛️', gradient: 'from-pink-500 to-purple-500' },
               { id: 'travel', label: 'Travel', emoji: '✈️', gradient: 'from-teal-400 to-cyan-500' },
               { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
               { id: 'events', label: 'Events', emoji: '🎉', gradient: 'from-amber-400 to-orange-500' },
@@ -11331,7 +11303,7 @@ export default function TripPlanner() {
                 }`}
               >
                 <span className={`text-xl mb-0.5 transition-transform ${activeSection === section.id ? 'scale-110' : ''}`}>
-                  {section.id === 'home' ? <HubIcon size={22} /> : section.emoji}
+                  {section.emoji}
                 </span>
                 <span className={`text-[10px] font-medium transition-colors ${
                   activeSection === section.id
