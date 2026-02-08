@@ -534,7 +534,7 @@ export default function TripPlanner() {
   const fitness = useFitness(saveFitnessRef.current, showToast, generateTrainingWeeksRef.current, triathlonTrainingPlanRef.current, indyHalfTrainingPlanRef.current);
   const {
     fitnessEvents, fitnessTrainingPlans, selectedFitnessEvent, fitnessViewMode,
-    updateFitnessEvent, deleteFitnessEvent,
+    updateFitnessEvent, deleteFitnessEvent, updateTrainingWeek, addWorkout, deleteWorkout,
     setFitnessEvents, setFitnessTrainingPlans, setSelectedFitnessEvent, setFitnessViewMode,
     showAddFitnessEventModal, setShowAddFitnessEventModal, editingFitnessEvent, setEditingFitnessEvent,
   } = fitness;
