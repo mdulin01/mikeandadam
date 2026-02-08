@@ -3213,19 +3213,19 @@ export default function TripPlanner() {
                 >
                   💕
                 </button>
-                {/* Mobile section indicator - icon only */}
+                {/* Mobile section indicator - icon + name */}
                 <span className="md:hidden text-white/40 text-sm">•</span>
-                <span className="md:hidden text-lg">
-                  {activeSection === 'home' && '⚛️'}
-                  {activeSection === 'travel' && '✈️'}
-                  {activeSection === 'fitness' && '🏃'}
-                  {activeSection === 'events' && '🎉'}
-                  {activeSection === 'memories' && '💝'}
-                  {activeSection === 'nutrition' && '🥗'}
-                  {activeSection === 'lifePlanning' && '🎯'}
-                  {activeSection === 'business' && '💼'}
-                  {activeSection === 'calendar' && '📅'}
-                  {activeSection === 'apps' && '📱'}
+                <span className="md:hidden text-sm font-semibold text-white/80 flex items-center gap-1">
+                  {activeSection === 'home' && <><span>⚛️</span> Hub</>}
+                  {activeSection === 'travel' && <><span>✈️</span> Travel</>}
+                  {activeSection === 'fitness' && <><span>🏃</span> Fitness</>}
+                  {activeSection === 'events' && <><span>🎉</span> Events</>}
+                  {activeSection === 'memories' && <><span>💝</span> Memories</>}
+                  {activeSection === 'nutrition' && <><span>🥗</span> Nutrition</>}
+                  {activeSection === 'lifePlanning' && <><span>🎯</span> Life Planning</>}
+                  {activeSection === 'business' && <><span>💼</span> Business</>}
+                  {activeSection === 'calendar' && <><span>📅</span> Calendar</>}
+                  {activeSection === 'apps' && <><span>📱</span> Apps</>}
                 </span>
               </div>
             </div>
