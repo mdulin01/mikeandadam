@@ -4670,10 +4670,11 @@ export default function TripPlanner() {
                       {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
                     </p>
                     {(() => {
+                      const now = new Date();
                       const tripStart = parseLocalDate(trip.dates.start);
                       const tripEnd = parseLocalDate(trip.dates.end);
-                      const daysTo = Math.ceil((tripStart - today) / (1000 * 60 * 60 * 24));
-                      const isOngoing = today >= tripStart && today <= tripEnd;
+                      const daysTo = Math.ceil((tripStart - now) / (1000 * 60 * 60 * 24));
+                      const isOngoing = now >= tripStart && now <= tripEnd;
                       if (isOngoing) return (
                         <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
                           🎉 Happening now!
