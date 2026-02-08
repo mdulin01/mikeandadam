@@ -62,12 +62,28 @@ const AddTaskModal = React.memo(({
     });
   };
 
-  const handleImagePick = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [dragActive, setDragActive] = useState(false);
+
+  const handleImageFile = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
     const dataUrl = await resizeImage(file);
     updateField('image', dataUrl);
   };
+
+  const handleImagePick = async (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageFile(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragActive(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleImageFile(file);
+  };
+
+  const handleDragOver = (e) => { e.preventDefault(); setDragActive(true); };
+  const handleDragLeave = () => setDragActive(false);
 
   const isEditing = !!editTask;
 
@@ -308,7 +324,7 @@ const AddTaskModal = React.memo(({
               className="hidden"
             />
             {formData.image ? (
-              <div className="relative inline-block">
+              <div className="relative inline-block w-full">
                 <img
                   src={formData.image}
                   alt="Task"
@@ -323,14 +339,21 @@ const AddTaskModal = React.memo(({
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full py-4 border-2 border-dashed border-slate-600 rounded-xl text-white/40 hover:text-white/60 hover:border-slate-500 transition flex items-center justify-center gap-2 text-sm"
+                className={`w-full py-6 border-2 border-dashed rounded-xl transition flex flex-col items-center justify-center gap-2 text-sm cursor-pointer ${
+                  dragActive
+                    ? 'border-teal-400 bg-teal-500/10 text-teal-400'
+                    : 'border-slate-600 text-white/40 hover:text-white/60 hover:border-slate-500'
+                }`}
               >
-                <ImagePlus className="w-5 h-5" />
-                Tap to add a photo
-              </button>
+                <ImagePlus className="w-6 h-6" />
+                <span>Tap to choose or take a photo</span>
+                <span className="text-[11px] text-white/25 hidden md:block">or drag & drop an image here</span>
+              </div>
             )}
           </div>
 
