@@ -3194,10 +3194,11 @@ export default function TripPlanner() {
                         <stop offset="100%" style={{stopColor:'#f472b6'}}/>
                       </linearGradient>
                     </defs>
-                    <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="#1e293b"/>
-                    <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="none" stroke="url(#logoSpectrum)" strokeWidth="16" opacity="0.6"/>
-                    <text x="148" y="360" fontFamily="-apple-system, system-ui, sans-serif" fontWeight="800" fontSize="280" fill="url(#logoSpectrum)" opacity="0.95" letterSpacing="-12">M</text>
-                    <text x="278" y="360" fontFamily="-apple-system, system-ui, sans-serif" fontWeight="800" fontSize="280" fill="url(#logoSpectrum)" opacity="0.95" letterSpacing="-12">A</text>
+                    <rect x="16" y="16" width="480" height="480" rx="96" fill="#1e293b"/>
+                    <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="url(#logoSpectrum)" strokeWidth="14" opacity="0.5"/>
+                    <polygon points="56,390 56,130 114,130 150,225 186,130 244,130 244,390 198,390 198,240 160,338 140,338 104,240 104,390" fill="url(#logoSpectrum)" opacity="0.92"/>
+                    <polygon points="232,390 320,130 356,130 452,390 402,390 382,328 294,328 274,390" fill="url(#logoSpectrum)" opacity="0.92"/>
+                    <polygon points="308,288 368,288 338,218" fill="#1e293b"/>
                   </svg>
                   <span className="hidden md:inline text-sm font-semibold bg-gradient-to-r from-teal-400 via-indigo-400 to-pink-400 bg-clip-text text-transparent">
                     Mike & Adam
