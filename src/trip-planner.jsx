@@ -6073,7 +6073,12 @@ export default function TripPlanner() {
                                 <div className="mt-3">
                                   <textarea value={week.weekNotes || ''} onChange={(e) => updateTrainingWeek(selectedFitnessEvent.id, week.id, { weekNotes: e.target.value })} placeholder="Notes for this week..." className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 text-sm resize-y" rows={1} />
                                 </div>
-                                <div className="mt-3">
+                                <div
+                                  className="mt-3"
+                                  onDrop={(e) => { e.preventDefault(); setWeekPhotoDrag(null); const file = e.dataTransfer?.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, week.id, weekPhotos, file); }}
+                                  onDragOver={(e) => { e.preventDefault(); setWeekPhotoDrag(week.id); }}
+                                  onDragLeave={() => setWeekPhotoDrag(null)}
+                                >
                                   {weekPhotos.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-2">
                                       {weekPhotos.map(photo => (
@@ -6084,16 +6089,19 @@ export default function TripPlanner() {
                                       ))}
                                     </div>
                                   )}
-                                  <label
-                                    onDrop={(e) => { e.preventDefault(); setWeekPhotoDrag(null); const file = e.dataTransfer?.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, week.id, weekPhotos, file); }}
-                                    onDragOver={(e) => { e.preventDefault(); setWeekPhotoDrag(week.id); }}
-                                    onDragLeave={() => setWeekPhotoDrag(null)}
-                                    className={`flex items-center gap-2 px-3 py-2 border border-dashed rounded-lg cursor-pointer transition ${weekPhotoDrag === week.id ? 'border-orange-400 bg-orange-500/10 text-orange-300' : 'border-white/10 text-white/30 hover:text-white/50 hover:border-white/20'}`}
-                                  >
-                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, week.id, weekPhotos, file); e.target.value = ''; }} />
-                                    <ImagePlus className="w-4 h-4" />
-                                    <span className="text-xs">Add photo</span>
-                                    <span className="text-[10px] text-white/20 hidden md:inline ml-auto">or drag & drop</span>
+                                  <label className={`flex items-center gap-2 px-3 py-2 border border-dashed rounded-lg cursor-pointer transition ${weekPhotoDrag === week.id ? 'border-orange-400 bg-orange-500/10 text-orange-300' : 'border-white/10 text-white/30 hover:text-white/50 hover:border-white/20'}`}>
+                                    <Upload className="w-4 h-4" />
+                                    <span className="text-xs">Add Photo</span>
+                                    <input
+                                      type="file"
+                                      accept="image/*,.heic,.heif"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, week.id, weekPhotos, file);
+                                        e.target.value = '';
+                                      }}
+                                    />
                                   </label>
                                 </div>
                               </div>
@@ -6186,7 +6194,12 @@ export default function TripPlanner() {
                                   <textarea value={currentWeek.weekNotes || ''} onChange={(e) => updateTrainingWeek(selectedFitnessEvent.id, currentWeek.id, { weekNotes: e.target.value })} placeholder="Add notes for this week..." className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 resize-y" rows={2} />
                                 </div>
                                 {/* Current Week Photos */}
-                                <div className="mt-4">
+                                <div
+                                  className="mt-4"
+                                  onDrop={(e) => { e.preventDefault(); setWeekPhotoDrag(null); const file = e.dataTransfer?.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, currentWeek.id, currentWeek.photos || [], file); }}
+                                  onDragOver={(e) => { e.preventDefault(); setWeekPhotoDrag(currentWeek.id); }}
+                                  onDragLeave={() => setWeekPhotoDrag(null)}
+                                >
                                   {(currentWeek.photos || []).length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-2">
                                       {(currentWeek.photos || []).map(photo => (
@@ -6197,16 +6210,19 @@ export default function TripPlanner() {
                                       ))}
                                     </div>
                                   )}
-                                  <label
-                                    onDrop={(e) => { e.preventDefault(); setWeekPhotoDrag(null); const file = e.dataTransfer?.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, currentWeek.id, currentWeek.photos || [], file); }}
-                                    onDragOver={(e) => { e.preventDefault(); setWeekPhotoDrag(currentWeek.id); }}
-                                    onDragLeave={() => setWeekPhotoDrag(null)}
-                                    className={`flex items-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition ${weekPhotoDrag === currentWeek.id ? 'border-orange-400 bg-orange-500/10 text-orange-300' : 'border-white/20 text-white/40 hover:text-white/60 hover:border-white/30'}`}
-                                  >
-                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, currentWeek.id, currentWeek.photos || [], file); e.target.value = ''; }} />
-                                    <ImagePlus className="w-5 h-5" />
-                                    <span className="text-sm">Add photo</span>
-                                    <span className="text-xs text-white/20 hidden md:inline ml-auto">or drag & drop</span>
+                                  <label className={`flex items-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition ${weekPhotoDrag === currentWeek.id ? 'border-orange-400 bg-orange-500/10 text-orange-300' : 'border-white/20 text-white/40 hover:text-white/60 hover:border-white/30'}`}>
+                                    <Upload className="w-5 h-5" />
+                                    <span className="text-sm">Add Photo</span>
+                                    <input
+                                      type="file"
+                                      accept="image/*,.heic,.heif"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, currentWeek.id, currentWeek.photos || [], file);
+                                        e.target.value = '';
+                                      }}
+                                    />
                                   </label>
                                 </div>
                               </div>
