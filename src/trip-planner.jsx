@@ -3529,7 +3529,7 @@ export default function TripPlanner() {
       </header>
 
       {/* Main Content - scrollable area on mobile */}
-      <main className="relative z-10 px-6 pb-24 md:pb-12 flex-1 overflow-y-auto" id="main-scroll">
+      <main className="relative z-10 px-6 pb-20 md:pb-12 flex-1 overflow-y-auto" id="main-scroll">
         <div className="max-w-6xl mx-auto">
 
           {/* ========== HUB SECTION (formerly Home) ========== */}
@@ -11384,7 +11384,7 @@ export default function TripPlanner() {
 
       {/* Mobile Bottom Navigation - Only show on mobile, when not in app mode, and when no modal is open */}
       {!initialAppMode && !showAddMemoryModal && !editingMemory && !editingTrip && !editingPartyEvent && !showOpenDateModal && !showCompanionsModal && !showAddModal && !showNewTripModal && !showLinkModal && !showImportModal && !showGuestModal && !showMyProfileModal && !showAddFitnessEventModal && !editingFitnessEvent && !showAddEventModal && !editingEvent && !editingTrainingWeek && !showAddTaskModal && !showSharedListModal && !showAddIdeaModal && !showAddSocialModal && !showAddHabitModal && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-white/10 z-[100]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-white/10 z-[100]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
           <div className="flex items-center justify-around py-2 px-1">
             {[
               { id: 'home', label: 'Hub', emoji: '⚛️', gradient: 'from-pink-500 to-purple-500' },
