@@ -11322,7 +11322,7 @@ export default function TripPlanner() {
           {showAddNewMenu && isOwner && (
             <>
               <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[99]" onClick={() => setShowAddNewMenu(false)} />
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[101] bg-slate-800/95 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl w-[240px]"
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-[76px] z-[101] bg-slate-800/95 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl w-[240px]"
                 style={{ animation: 'fabGridIn 0.15s ease-out both' }}>
                 <div className="grid grid-cols-3 gap-3">
                   {[
@@ -11357,7 +11357,7 @@ export default function TripPlanner() {
             {isOwner && (
               <button
                 onClick={() => setShowAddNewMenu(!showAddNewMenu)}
-                className={`absolute left-1/2 -translate-x-1/2 -top-14 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 z-[101] ${
+                className={`absolute left-1/2 -translate-x-1/2 -top-16 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 z-[101] ${
                   showAddNewMenu
                     ? 'bg-gradient-to-r from-pink-500 to-rose-500 rotate-45'
                     : 'bg-gradient-to-r from-purple-500 to-violet-600'
@@ -11389,7 +11389,7 @@ export default function TripPlanner() {
                     if (section.id === 'home') setHubSubView('home');
                     setShowComingSoonMenu(false);
                   }}
-                  className={`relative flex flex-col items-center justify-center py-1.5 rounded-xl transition-all active:scale-95 ${idx === 2 ? 'min-w-[56px] -mt-4' : 'min-w-[52px]'} ${
+                  className={`relative flex flex-col items-center justify-center py-1.5 rounded-xl transition-all active:scale-95 ${idx === 2 ? 'min-w-[56px] -mt-8' : 'min-w-[52px]'} ${
                     activeSection === section.id ? '' : ''
                   }`}
                 >
@@ -11413,11 +11413,9 @@ export default function TripPlanner() {
                       {section.emoji}
                     </span>
                   )}
-                  {idx !== 2 && (
-                    <span className={`text-[10px] font-medium transition-colors ${activeSection === section.id ? 'text-white' : 'text-white/40'}`}>
-                      {section.label}
-                    </span>
-                  )}
+                  <span className={`text-[10px] font-medium transition-colors ${activeSection === section.id ? 'text-white' : 'text-white/40'}`}>
+                    {section.label}
+                  </span>
                   {activeSection === section.id && idx !== 2 && (
                     <div className={`absolute -bottom-0.5 w-6 h-0.5 rounded-full bg-gradient-to-r ${section.gradient}`} />
                   )}
