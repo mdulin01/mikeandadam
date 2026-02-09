@@ -598,6 +598,7 @@ export default function TripPlanner() {
   const [uploadingToMemoryId, setUploadingToMemoryId] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [dragOverMemoryId, setDragOverMemoryId] = useState(null);
+  const [uploadingWeekPhotoId, setUploadingWeekPhotoId] = useState(null);
   const [heroPhotoIndex, setHeroPhotoIndex] = useState(0);
   const [dismissedEmojis, setDismissedEmojis] = useState(new Set());
 
@@ -899,37 +900,58 @@ export default function TripPlanner() {
   };
 
   // ========== FITNESS WEEK PHOTO HELPERS ==========
-  // Exact same pattern as task photo in AddTaskModal — resize to base64 dataURL, store directly
-  const resizeWeekPhoto = (file, maxWidth = 400) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new window.Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ratio = Math.min(maxWidth / img.width, maxWidth / img.height, 1);
-          canvas.width = img.width * ratio;
-          canvas.height = img.height * ratio;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg', 0.7));
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
+  // Uses Firebase Storage (same pattern as working memory photo upload)
   const handleWeekPhotoAdd = async (eventId, weekId, existingPhotos, file) => {
-    if (!file || !file.type.startsWith('image/')) return;
-    const dataUrl = await resizeWeekPhoto(file);
-    const photos = [...(existingPhotos || []), { id: Date.now(), url: dataUrl, addedAt: new Date().toISOString() }];
-    updateTrainingWeek(eventId, weekId, { photos });
+    if (!file) return;
+    // Accept images even without a proper MIME type (some mobile browsers)
+    const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic|heif|bmp)$/i.test(file.name);
+    if (!isImage) {
+      showToast('Please select an image file', 'error');
+      return;
+    }
+
+    const sizeError = validateFileSize(file);
+    if (sizeError) {
+      showToast(sizeError, 'error');
+      return;
+    }
+
+    setUploadingWeekPhotoId(weekId);
+    try {
+      let fileToUpload = file;
+      let fileName = file.name || 'photo.jpg';
+
+      // Convert HEIC/HEIF to JPEG (same as memories)
+      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
+                     fileName.toLowerCase().endsWith('.heic') || fileName.toLowerCase().endsWith('.heif');
+      if (isHeic) {
+        const convertedBlob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+        fileToUpload = new File([convertedBlob], fileName.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
+        fileName = fileToUpload.name;
+      }
+
+      // Upload to Firebase Storage using memories/ prefix (allowed by storage rules)
+      const timestamp = Date.now();
+      const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const storageRef = ref(storage, `memories/fitness-${eventId}-${weekId}-${timestamp}_${safeName}`);
+      await uploadBytes(storageRef, fileToUpload);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Save the download URL (not base64) to training week
+      const photos = [...(existingPhotos || []), { id: timestamp, url: downloadURL, addedAt: new Date().toISOString() }];
+      await updateTrainingWeek(eventId, weekId, { photos });
+      showToast('Photo added!', 'success');
+    } catch (error) {
+      console.error('Fitness week photo upload failed:', error);
+      showToast('Photo upload failed: ' + (error.message || 'Unknown error'), 'error');
+    } finally {
+      setUploadingWeekPhotoId(null);
+    }
   };
 
-  const handleWeekPhotoRemove = (eventId, weekId, existingPhotos, photoId) => {
+  const handleWeekPhotoRemove = async (eventId, weekId, existingPhotos, photoId) => {
     const photos = (existingPhotos || []).filter(p => p.id !== photoId);
-    updateTrainingWeek(eventId, weekId, { photos });
+    await updateTrainingWeek(eventId, weekId, { photos });
   };
 
   // Upload photo/video to Firebase Storage (with HEIC conversion for images) - for modals
@@ -6051,20 +6073,27 @@ export default function TripPlanner() {
                                       ))}
                                     </div>
                                   )}
-                                  <label className={`flex items-center gap-2 px-3 py-2 border border-dashed rounded-lg cursor-pointer transition ${weekPhotoDrag === week.id ? 'border-orange-400 bg-orange-500/10 text-orange-300' : 'border-white/10 text-white/30 hover:text-white/50 hover:border-white/20'}`}>
-                                    <Upload className="w-4 h-4" />
-                                    <span className="text-xs">Add Photo</span>
-                                    <input
-                                      type="file"
-                                      accept="image/*,.heic,.heif"
-                                      className="hidden"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, week.id, weekPhotos, file);
-                                        e.target.value = '';
-                                      }}
-                                    />
-                                  </label>
+                                  {uploadingWeekPhotoId === week.id ? (
+                                    <div className="flex items-center gap-2 px-3 py-2 border border-dashed rounded-lg border-orange-400 bg-orange-500/10 text-orange-300">
+                                      <Loader className="w-4 h-4 animate-spin" />
+                                      <span className="text-xs">Uploading...</span>
+                                    </div>
+                                  ) : (
+                                    <label className={`flex items-center gap-2 px-3 py-2 border border-dashed rounded-lg cursor-pointer transition ${weekPhotoDrag === week.id ? 'border-orange-400 bg-orange-500/10 text-orange-300' : 'border-white/10 text-white/30 hover:text-white/50 hover:border-white/20'}`}>
+                                      <Upload className="w-4 h-4" />
+                                      <span className="text-xs">Add Photo</span>
+                                      <input
+                                        type="file"
+                                        accept="image/*,.heic,.heif"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) handleWeekPhotoAdd(selectedFitnessEvent.id, week.id, weekPhotos, file);
+                                          e.target.value = '';
+                                        }}
+                                      />
+                                    </label>
+                                  )}
                                 </div>
                               </div>
                             </details>
@@ -6172,6 +6201,12 @@ export default function TripPlanner() {
                                       ))}
                                     </div>
                                   )}
+                                  {uploadingWeekPhotoId === currentWeek.id ? (
+                                    <div className="flex items-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl border-orange-400 bg-orange-500/10 text-orange-300">
+                                      <Loader className="w-5 h-5 animate-spin" />
+                                      <span className="text-sm">Uploading photo...</span>
+                                    </div>
+                                  ) : (
                                   <label className={`flex items-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition ${weekPhotoDrag === currentWeek.id ? 'border-orange-400 bg-orange-500/10 text-orange-300' : 'border-white/20 text-white/40 hover:text-white/60 hover:border-white/30'}`}>
                                     <Upload className="w-5 h-5" />
                                     <span className="text-sm">Add Photo</span>
@@ -6186,6 +6221,7 @@ export default function TripPlanner() {
                                       }}
                                     />
                                   </label>
+                                  )}
                                 </div>
                               </div>
                             )}
