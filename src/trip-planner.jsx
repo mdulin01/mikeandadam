@@ -11323,7 +11323,7 @@ export default function TripPlanner() {
             <>
               <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[99]" onClick={() => setShowAddNewMenu(false)} />
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-[76px] z-[101] bg-slate-800/95 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl w-[240px]"
-                style={{ animation: 'fabGridIn 0.15s ease-out both' }}>
+                style={{ animation: 'fabGridUp 0.2s cubic-bezier(0.16,1,0.3,1) both', transformOrigin: 'bottom center' }}>
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { action: () => setShowAddTaskModal('create'), icon: '✅', label: 'Task', gradient: 'from-blue-400 to-indigo-500' },
@@ -11335,18 +11335,22 @@ export default function TripPlanner() {
                     { action: () => setShowAddEventModal(true), icon: '🎉', label: 'Event', gradient: 'from-amber-400 to-orange-500' },
                     { action: () => setShowAddMemoryModal('milestone'), icon: '💝', label: 'Memory', gradient: 'from-rose-400 to-pink-500' },
                     { action: () => setShowAddFitnessEventModal(true), icon: '🏃', label: 'Fitness', gradient: 'from-orange-400 to-red-500' },
-                  ].map((item, idx) => (
-                    <button key={item.label} onClick={() => { setShowAddNewMenu(false); item.action(); }} className="flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl hover:bg-white/10 transition active:scale-95" style={{ animation: `fabItemIn 0.12s ease-out ${idx * 0.02}s both` }}>
-                      <span className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-xl shadow-md`}>{item.icon}</span>
-                      <span className="text-[11px] text-white/70 font-medium leading-tight">{item.label}</span>
-                    </button>
-                  ))}
+                  ].map((item, idx) => {
+                    // Bottom row (6,7,8) appears first, then middle (3,4,5), then top (0,1,2)
+                    const row = Math.floor(idx / 3);
+                    const delay = (2 - row) * 0.04 + (idx % 3) * 0.015;
+                    return (
+                      <button key={item.label} onClick={() => { setShowAddNewMenu(false); item.action(); }} className="flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl hover:bg-white/10 transition active:scale-95" style={{ animation: `fabItemUp 0.25s cubic-bezier(0.16,1,0.3,1) ${delay}s both` }}>
+                        <span className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-xl shadow-md`}>{item.icon}</span>
+                        <span className="text-[11px] text-white/70 font-medium leading-tight">{item.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <style>{`
-                @keyframes fabGridIn { from { opacity: 0; transform: scale(0.9) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-                @keyframes fabItemIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
-                @keyframes splashPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.55; } }
+                @keyframes fabGridUp { from { opacity: 0; transform: scaleY(0.3) scaleX(0.8) translateY(20px); } to { opacity: 1; transform: scaleY(1) scaleX(1) translateY(0); } }
+                @keyframes fabItemUp { from { opacity: 0; transform: translateY(12px) scale(0.7); } to { opacity: 1; transform: translateY(0) scale(1); } }
               `}</style>
             </>
           )}
