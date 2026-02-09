@@ -11322,7 +11322,7 @@ export default function TripPlanner() {
           {showAddNewMenu && isOwner && (
             <>
               <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[99]" onClick={() => setShowAddNewMenu(false)} />
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-[76px] z-[101] bg-slate-800/95 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl w-[240px]"
+              <div className="absolute bottom-full left-1/2 mb-[76px] z-[101] bg-slate-800/95 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl w-[240px]"
                 style={{ animation: 'fabGridUp 0.2s cubic-bezier(0.16,1,0.3,1) both', transformOrigin: 'bottom center' }}>
                 <div className="grid grid-cols-3 gap-3">
                   {[
@@ -11349,7 +11349,7 @@ export default function TripPlanner() {
                 </div>
               </div>
               <style>{`
-                @keyframes fabGridUp { from { opacity: 0; transform: scaleY(0.3) scaleX(0.8) translateY(20px); } to { opacity: 1; transform: scaleY(1) scaleX(1) translateY(0); } }
+                @keyframes fabGridUp { from { opacity: 0; transform: translateX(-50%) scaleY(0.3) scaleX(0.8) translateY(20px); } to { opacity: 1; transform: translateX(-50%) scaleY(1) scaleX(1) translateY(0); } }
                 @keyframes fabItemUp { from { opacity: 0; transform: translateY(12px) scale(0.7); } to { opacity: 1; transform: translateY(0) scale(1); } }
               `}</style>
             </>
