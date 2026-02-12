@@ -3756,7 +3756,7 @@ export default function TripPlanner() {
                             )}
 
                             {/* 7-Day Grid */}
-                            <div className="grid grid-cols-7 gap-1 overflow-x-auto">
+                            <div className={`grid grid-cols-7 gap-1 ${weekQuickAddDay ? 'overflow-visible pb-28' : 'overflow-x-auto'}`}>
                               {weekDays.map(day => (
                                 <div
                                   key={day.date}
@@ -3808,7 +3808,7 @@ export default function TripPlanner() {
                                       +
                                     </button>
                                     {weekQuickAddDay === day.date && (
-                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-slate-700 border border-white/20 rounded-xl shadow-xl z-30 py-1 min-w-[110px]">
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-slate-800 border border-white/20 rounded-xl shadow-2xl z-50 py-1 min-w-[120px]">
                                         <button onClick={() => { setShowAddTaskModal({ _prefill: true, dueDate: day.date }); setWeekQuickAddDay(null); }} className="w-full px-3 py-1.5 text-left text-xs text-white hover:bg-white/10 flex items-center gap-2">
                                           <span>✅</span> Task
                                         </button>
@@ -3817,6 +3817,9 @@ export default function TripPlanner() {
                                         </button>
                                         <button onClick={() => { setShowAddSocialModal({ _prefill: true, date: day.date }); setWeekQuickAddDay(null); }} className="w-full px-3 py-1.5 text-left text-xs text-white hover:bg-white/10 flex items-center gap-2">
                                           <span>👥</span> Social
+                                        </button>
+                                        <button onClick={() => { setActiveSection('fitness'); setWeekQuickAddDay(null); }} className="w-full px-3 py-1.5 text-left text-xs text-white hover:bg-white/10 flex items-center gap-2">
+                                          <span>🏋️</span> Fitness
                                         </button>
                                       </div>
                                     )}
