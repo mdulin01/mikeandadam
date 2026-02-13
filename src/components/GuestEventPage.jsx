@@ -56,6 +56,11 @@ export default function GuestEventPage() {
   const [uploadProgress, setUploadProgress] = useState({});
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(null);
   const [newListItem, setNewListItem] = useState({});
+  const [pendingRsvp, setPendingRsvp] = useState(null);
+  const [pendingNote, setPendingNote] = useState('');
+  const [pendingPlusOne, setPendingPlusOne] = useState(0);
+  const [rsvpSubmitted, setRsvpSubmitted] = useState(false);
+  const [submittingRsvp, setSubmittingRsvp] = useState(false);
   const fileInputRef = useRef(null);
 
   // Fetch event data
@@ -87,6 +92,10 @@ export default function GuestEventPage() {
         }
 
         setCurrentGuest(guest);
+        // Initialize pending state from existing guest data (only on first load)
+        setPendingRsvp((prev) => prev === null ? (guest.rsvp || 'pending') : prev);
+        setPendingNote((prev) => prev === '' && guest.note ? guest.note : prev);
+        setPendingPlusOne((prev) => prev === 0 && guest.plusOne ? guest.plusOne : prev);
         setError(null);
         setLoading(false);
       },
@@ -158,6 +167,45 @@ export default function GuestEventPage() {
       console.error('Error updating plus one:', err);
     }
   };
+
+  // Submit RSVP (batched write)
+  const handleSubmitRSVP = async () => {
+    if (!event || !currentGuest || pendingRsvp === 'pending') return;
+
+    setSubmittingRsvp(true);
+    try {
+      const eventRef = doc(db, 'events', eventId);
+      const updatedGuests = (event.guests || []).map((g) =>
+        g.token === guestToken
+          ? {
+              ...g,
+              rsvp: pendingRsvp,
+              rsvpAt: new Date().toISOString(),
+              plusOne: pendingPlusOne,
+              note: pendingNote,
+            }
+          : g
+      );
+      await setDoc(eventRef, { guests: updatedGuests }, { merge: true });
+
+      setRsvpSubmitted(true);
+      if (pendingRsvp === 'going') {
+        triggerConfetti();
+      }
+      // Reset submitted state after 3 seconds
+      setTimeout(() => setRsvpSubmitted(false), 3000);
+    } catch (err) {
+      console.error('Error submitting RSVP:', err);
+    } finally {
+      setSubmittingRsvp(false);
+    }
+  };
+
+  // Check if RSVP has unsaved changes
+  const hasRsvpChanges =
+    pendingRsvp !== (currentGuest?.rsvp || 'pending') ||
+    pendingNote !== (currentGuest?.note || '') ||
+    pendingPlusOne !== (currentGuest?.plusOne || 0);
 
   // Claim list item
   const handleClaimItem = async (listId, itemId) => {
@@ -480,9 +528,9 @@ export default function GuestEventPage() {
           {/* RSVP buttons */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             <button
-              onClick={() => handleRSVP('going', currentGuest.plusOne || 0)}
+              onClick={() => setPendingRsvp('going')}
               className={`py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2 ${
-                currentGuest.rsvp === 'going'
+                pendingRsvp === 'going'
                   ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/50 scale-105'
                   : 'bg-white/10 border border-white/20 hover:bg-white/20'
               }`}
@@ -491,9 +539,9 @@ export default function GuestEventPage() {
               <span>Going</span>
             </button>
             <button
-              onClick={() => handleRSVP('maybe', currentGuest.plusOne || 0)}
+              onClick={() => setPendingRsvp('maybe')}
               className={`py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2 ${
-                currentGuest.rsvp === 'maybe'
+                pendingRsvp === 'maybe'
                   ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg shadow-yellow-500/50 scale-105'
                   : 'bg-white/10 border border-white/20 hover:bg-white/20'
               }`}
@@ -502,9 +550,9 @@ export default function GuestEventPage() {
               <span>Maybe</span>
             </button>
             <button
-              onClick={() => handleRSVP('not-going', currentGuest.plusOne || 0)}
+              onClick={() => setPendingRsvp('not-going')}
               className={`py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2 ${
-                currentGuest.rsvp === 'not-going'
+                pendingRsvp === 'not-going'
                   ? 'bg-gradient-to-r from-slate-600 to-slate-700 text-white shadow-lg shadow-slate-500/50 scale-105'
                   : 'bg-white/10 border border-white/20 hover:bg-white/20'
               }`}
@@ -515,21 +563,21 @@ export default function GuestEventPage() {
           </div>
 
           {/* Plus one counter */}
-          {currentGuest.rsvp === 'going' && (
+          {pendingRsvp === 'going' && (
             <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
               <p className="text-sm text-white/70 mb-3">Bringing anyone with you?</p>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => handleUpdatePlusOne((currentGuest.plusOne || 0) - 1)}
+                  onClick={() => setPendingPlusOne(Math.max(0, pendingPlusOne - 1))}
                   className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
                 >
                   −
                 </button>
                 <span className="text-xl font-bold min-w-12 text-center">
-                  {currentGuest.plusOne || 0}
+                  {pendingPlusOne}
                 </span>
                 <button
-                  onClick={() => handleUpdatePlusOne((currentGuest.plusOne || 0) + 1)}
+                  onClick={() => setPendingPlusOne(Math.min(2, pendingPlusOne + 1))}
                   className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
                 >
                   +
@@ -539,18 +587,45 @@ export default function GuestEventPage() {
           )}
 
           {/* Note field */}
-          <div>
+          <div className="mb-6">
             <label className="block text-sm text-white/70 mb-2">
               Add a note or dietary info
             </label>
             <textarea
-              value={currentGuest.note || ''}
-              onChange={(e) => handleUpdateNote(e.target.value)}
+              value={pendingNote}
+              onChange={(e) => setPendingNote(e.target.value)}
               placeholder="e.g., I'm vegetarian, I have a shellfish allergy..."
               className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
               rows="3"
             />
           </div>
+
+          {/* Submit RSVP button */}
+          <button
+            onClick={handleSubmitRSVP}
+            disabled={pendingRsvp === 'pending' || submittingRsvp}
+            className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 ${
+              rsvpSubmitted
+                ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/30'
+                : pendingRsvp === 'pending' || submittingRsvp
+                ? 'bg-white/10 text-white/40 cursor-not-allowed'
+                : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white shadow-lg hover:shadow-xl hover:scale-[1.02]'
+            }`}
+          >
+            {submittingRsvp ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader className="w-5 h-5 animate-spin" />
+                Submitting...
+              </span>
+            ) : rsvpSubmitted ? (
+              <span className="flex items-center justify-center gap-2">
+                <Check className="w-5 h-5" />
+                RSVP Submitted!
+              </span>
+            ) : (
+              'Submit RSVP'
+            )}
+          </button>
         </div>
 
         {/* Event Details */}
@@ -619,7 +694,7 @@ export default function GuestEventPage() {
             rel="noopener noreferrer"
             className="block w-full rounded-2xl bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 transition-all p-4 text-center font-semibold text-white shadow-lg"
           >
-            + Add to Calendar
+            Add to your Google Calendar
           </a>
         </div>
 
