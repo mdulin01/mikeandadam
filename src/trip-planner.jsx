@@ -1144,6 +1144,7 @@ export default function TripPlanner() {
   const [showComingSoonMenu, setShowComingSoonMenu] = useState(false); // click-based dropdown
   const [showSectionDropdown, setShowSectionDropdown] = useState(false); // header nav dropdown
   const [showTypeFilterDropdown, setShowTypeFilterDropdown] = useState(false); // events type filter dropdown
+  const [showFullMonthCalendar, setShowFullMonthCalendar] = useState(false); // week vs month toggle in Hub
   const [showAddNewMenu, setShowAddNewMenu] = useState(false); // home page add new menu
 
   // ========== CELEBRATION STATE ==========
@@ -3692,29 +3693,7 @@ export default function TripPlanner() {
           {activeSection === 'home' && (
             <SharedHubProvider value={sharedHub}>
             <div>
-              {/* Hub Sub-Navigation */}
-              <div className="flex gap-1.5 md:gap-2 mb-4 items-center justify-start sticky top-0 z-20 bg-slate-800/95 backdrop-blur-md py-3 -mx-6 px-6">
-                {[
-                  { id: 'home', emoji: '📊' },
-                  { id: 'tasks', emoji: '✅' },
-                  { id: 'lists', emoji: '📋' },
-                  { id: 'social', emoji: '👥' },
-                  { id: 'habits', emoji: '🔄' },
-                  { id: 'ideas', emoji: '💡' },
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setHubSubView(tab.id)}
-                    className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-base md:text-lg text-center ${
-                      hubSubView === tab.id
-                        ? 'bg-rose-500 text-white shadow-lg'
-                        : 'bg-white/10 text-slate-300 hover:bg-white/20'
-                    }`}
-                  >
-                    {tab.emoji}
-                  </button>
-                ))}
-              </div>
+              {/* Hub sub-nav removed — all creation via FAB, dashboard shows everything */}
 
               {/* ===== HUB DASHBOARD VIEW ===== */}
               {hubSubView === 'home' && (
@@ -3911,6 +3890,101 @@ export default function TripPlanner() {
                                 </div>
                               ))}
                             </div>
+
+                            {/* Toggle & Google Calendar link */}
+                            <div className="flex items-center justify-between mt-3">
+                              <button
+                                onClick={() => setShowFullMonthCalendar(!showFullMonthCalendar)}
+                                className="text-xs text-purple-300 hover:text-purple-200 font-medium transition flex items-center gap-1"
+                              >
+                                <Calendar className="w-3.5 h-3.5" />
+                                {showFullMonthCalendar ? 'Show Week' : 'Show Full Month'}
+                              </button>
+                              {calendarConnected && (
+                                <button
+                                  onClick={() => window.open('https://calendar.google.com', '_blank')}
+                                  className="text-xs text-slate-400 hover:text-white transition flex items-center gap-1"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                  Google Calendar
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Full Month Calendar (expandable) */}
+                            {showFullMonthCalendar && (
+                              <div className="mt-4 border-t border-white/10 pt-4">
+                                <div className="flex items-center justify-between mb-4">
+                                  <button
+                                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
+                                    className="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition"
+                                  >
+                                    <ChevronLeft className="w-4 h-4" />
+                                  </button>
+                                  <span className="text-white font-semibold text-sm">
+                                    {months[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                                  </span>
+                                  <button
+                                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
+                                    className="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition"
+                                  >
+                                    <ChevronRight className="w-4 h-4" />
+                                  </button>
+                                </div>
+                                {/* Month grid */}
+                                <div className="grid grid-cols-7 gap-px">
+                                  {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
+                                    <div key={d} className="text-center text-[10px] text-white/40 font-medium pb-1">{d}</div>
+                                  ))}
+                                  {(() => {
+                                    const year = currentMonth.getFullYear();
+                                    const month = currentMonth.getMonth();
+                                    const firstDay = new Date(year, month, 1);
+                                    const lastDay = new Date(year, month + 1, 0);
+                                    let startIdx = firstDay.getDay() - 1;
+                                    if (startIdx < 0) startIdx = 6; // Sunday
+                                    const cells = [];
+                                    // Empty cells before month starts
+                                    for (let i = 0; i < startIdx; i++) cells.push(<div key={`e${i}`} />);
+                                    // Day cells
+                                    for (let d = 1; d <= lastDay.getDate(); d++) {
+                                      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                                      const todayStr2 = new Date().toISOString().split('T')[0];
+                                      const isToday2 = dateStr === todayStr2;
+                                      // Check if any trip spans this date
+                                      const hasTrip = trips.some(t => t.dates?.start && t.dates?.end && dateStr >= t.dates.start && dateStr <= t.dates.end);
+                                      const hasEvent = partyEvents.some(e => e.date === dateStr);
+                                      const hasGcal = (googleCalendarEvents || []).some(e => {
+                                        const s = e.start?.split('T')[0];
+                                        const en = e.end?.split('T')[0] || s;
+                                        return s && dateStr >= s && dateStr <= en;
+                                      });
+                                      cells.push(
+                                        <div key={d} className={`text-center py-1 rounded-md text-xs relative ${
+                                          isToday2 ? 'bg-purple-500/30 text-white font-bold' : 'text-white/60'
+                                        } ${hasTrip ? 'ring-1 ring-teal-400/50' : ''}`}>
+                                          {d}
+                                          {(hasTrip || hasEvent || hasGcal) && (
+                                            <div className="flex justify-center gap-0.5 mt-0.5">
+                                              {hasTrip && <div className="w-1 h-1 rounded-full bg-teal-400" />}
+                                              {hasEvent && <div className="w-1 h-1 rounded-full bg-amber-400" />}
+                                              {hasGcal && <div className="w-1 h-1 rounded-full bg-blue-400" />}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+                                    return cells;
+                                  })()}
+                                </div>
+                                {/* Legend */}
+                                <div className="flex items-center gap-4 mt-3 text-[10px] text-white/40">
+                                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400" /> Trips</span>
+                                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Events</span>
+                                  {calendarConnected && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400" /> Google</span>}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -7420,8 +7494,8 @@ export default function TripPlanner() {
 
 
 
-              {/* Calendar Section */}
-              {(!eventsTypeFilter || eventsTypeFilter === 'travel') && (
+              {/* Calendar moved to Hub — removed from Events */}
+              {false && (
           <>
           <section className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/10">
             <div className="flex items-center justify-between mb-6">
@@ -11582,6 +11656,7 @@ export default function TripPlanner() {
                     { action: () => setShowAddTaskModal('create'), icon: '✅', label: 'Task', gradient: 'from-blue-400 to-indigo-500' },
                     { action: () => setShowSharedListModal('create'), icon: '🛒', label: 'List', gradient: 'from-emerald-400 to-teal-500' },
                     { action: () => setShowAddIdeaModal('create'), icon: '💡', label: 'Idea', gradient: 'from-yellow-400 to-amber-500' },
+                    { action: () => setShowAddHabitModal('create'), icon: '🔄', label: 'Habit', gradient: 'from-green-400 to-emerald-500' },
                     { action: () => setShowAddEventModal(true), icon: '🎉', label: 'Event', gradient: 'from-amber-400 to-orange-500' },
                     { action: () => setShowAddMemoryModal('milestone'), icon: '💝', label: 'Memory', gradient: 'from-rose-400 to-pink-500' },
                   ].map((item, idx) => (
@@ -11618,6 +11693,7 @@ export default function TripPlanner() {
                     { action: () => setShowAddTaskModal('create'), icon: '✅', label: 'Task', gradient: 'from-blue-400 to-indigo-500' },
                     { action: () => setShowSharedListModal('create'), icon: '🛒', label: 'List', gradient: 'from-emerald-400 to-teal-500' },
                     { action: () => setShowAddIdeaModal('create'), icon: '💡', label: 'Idea', gradient: 'from-yellow-400 to-amber-500' },
+                    { action: () => setShowAddHabitModal('create'), icon: '🔄', label: 'Habit', gradient: 'from-green-400 to-emerald-500' },
                     { action: () => setShowAddEventModal(true), icon: '🎉', label: 'Event', gradient: 'from-amber-400 to-orange-500' },
                     { action: () => setShowAddMemoryModal('milestone'), icon: '💝', label: 'Memory', gradient: 'from-rose-400 to-pink-500' },
                   ].map((item, idx) => {
