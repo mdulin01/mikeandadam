@@ -24,5 +24,13 @@ npm-debug.log*
 # Temp files
 *.swp
 *.swo
+~$*
 .vercel
 vite.config.js.timestamp-*
+
+# Firebase keys (keep out of repo)
+newkey
+newkey.pub
+
+# Firebase functions dependencies
+functions/node_modules/
