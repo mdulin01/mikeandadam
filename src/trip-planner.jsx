@@ -3499,19 +3499,6 @@ export default function TripPlanner() {
             {/* User info - simplified in app mode */}
             {!initialAppMode ? (
               <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
-                {/* Calendar icon */}
-                <button
-                  onClick={() => setActiveSection('calendar')}
-                  className={`flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-lg md:rounded-xl transition shadow-lg ${
-                    activeSection === 'calendar'
-                      ? 'bg-gradient-to-br from-blue-400 to-indigo-500 text-white'
-                      : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
-                  }`}
-                  title="Calendar"
-                >
-                  <Calendar className="w-4 h-4 md:w-5 md:h-5" />
-                </button>
-
                 {/* Search button */}
                 <button
                   onClick={() => setShowSearch(true)}
@@ -3891,8 +3878,8 @@ export default function TripPlanner() {
                               ))}
                             </div>
 
-                            {/* Toggle & Google Calendar link */}
-                            <div className="flex items-center justify-between mt-3">
+                            {/* Toggle & Google Calendar controls */}
+                            <div className="flex items-center justify-between mt-3 gap-2">
                               <button
                                 onClick={() => setShowFullMonthCalendar(!showFullMonthCalendar)}
                                 className="text-xs text-purple-300 hover:text-purple-200 font-medium transition flex items-center gap-1"
@@ -3900,14 +3887,33 @@ export default function TripPlanner() {
                                 <Calendar className="w-3.5 h-3.5" />
                                 {showFullMonthCalendar ? 'Show Week' : 'Show Full Month'}
                               </button>
-                              {calendarConnected && (
+                              {!calendarConnected ? (
                                 <button
-                                  onClick={() => window.open('https://calendar.google.com', '_blank')}
-                                  className="text-xs text-slate-400 hover:text-white transition flex items-center gap-1"
+                                  onClick={connectGoogleCalendar}
+                                  disabled={calendarLoading}
+                                  className="text-xs text-blue-300 hover:text-blue-200 font-medium transition flex items-center gap-1"
                                 >
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                  Google Calendar
+                                  {calendarLoading ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Calendar className="w-3.5 h-3.5" />}
+                                  {calendarLoading ? 'Connecting...' : 'Link Google Calendar'}
                                 </button>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => fetchGoogleCalendarEvents()}
+                                    disabled={calendarLoading}
+                                    className="text-xs text-blue-300 hover:text-blue-200 transition flex items-center gap-1"
+                                  >
+                                    {calendarLoading ? <Loader className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                                    Refresh
+                                  </button>
+                                  <button
+                                    onClick={() => window.open('https://calendar.google.com', '_blank')}
+                                    className="text-xs text-slate-400 hover:text-white transition flex items-center gap-1"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    Open
+                                  </button>
+                                </div>
                               )}
                             </div>
 
@@ -3944,14 +3950,11 @@ export default function TripPlanner() {
                                     let startIdx = firstDay.getDay() - 1;
                                     if (startIdx < 0) startIdx = 6; // Sunday
                                     const cells = [];
-                                    // Empty cells before month starts
                                     for (let i = 0; i < startIdx; i++) cells.push(<div key={`e${i}`} />);
-                                    // Day cells
                                     for (let d = 1; d <= lastDay.getDate(); d++) {
                                       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                                       const todayStr2 = new Date().toISOString().split('T')[0];
                                       const isToday2 = dateStr === todayStr2;
-                                      // Check if any trip spans this date
                                       const hasTrip = trips.some(t => t.dates?.start && t.dates?.end && dateStr >= t.dates.start && dateStr <= t.dates.end);
                                       const hasEvent = partyEvents.some(e => e.date === dateStr);
                                       const hasGcal = (googleCalendarEvents || []).some(e => {
@@ -3983,6 +3986,40 @@ export default function TripPlanner() {
                                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Events</span>
                                   {calendarConnected && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400" /> Google</span>}
                                 </div>
+
+                                {/* Google Calendar Events — import list */}
+                                {calendarConnected && googleCalendarEvents.length > 0 && (
+                                  <div className="mt-4 border-t border-white/10 pt-3">
+                                    <h4 className="text-xs font-semibold text-blue-300 mb-2 flex items-center gap-1">
+                                      <Calendar className="w-3.5 h-3.5" /> Google Calendar Events
+                                    </h4>
+                                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                      {googleCalendarEvents.map(event => {
+                                        const startDate = new Date(event.start);
+                                        const dateLabel = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                        const timeLabel = !event.allDay && event.start.includes('T')
+                                          ? startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                                          : 'All day';
+                                        return (
+                                          <div
+                                            key={event.id}
+                                            className="flex items-center justify-between gap-2 bg-white/5 hover:bg-white/10 rounded-lg px-3 py-2 transition cursor-pointer group"
+                                            onClick={() => {
+                                              setImportSettings(prev => ({ ...prev, customName: '' }));
+                                              setShowImportModal(event);
+                                            }}
+                                          >
+                                            <div className="min-w-0 flex-1">
+                                              <div className="text-xs text-white truncate">{event.title}</div>
+                                              <div className="text-[10px] text-white/40">{dateLabel} · {timeLabel}{event.location ? ` · ${event.location}` : ''}</div>
+                                            </div>
+                                            <span className="text-[10px] text-blue-400 opacity-0 group-hover:opacity-100 transition shrink-0 font-medium">Import →</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -7509,333 +7546,7 @@ export default function TripPlanner() {
 
 
 
-              {/* Calendar moved to Hub — removed from Events */}
-              {false && (
-          <>
-          <section className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/10">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Calendar className="w-6 h-6 text-teal-400" />
-                Travel Calendar
-              </h2>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-                  className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <span className="text-white font-semibold min-w-[140px] text-center">
-                  {months[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-                </span>
-                <button
-                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-                  className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Upcoming Trips This Month */}
-            {(() => {
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-              const monthTrips = sortedTrips.filter(trip => {
-                const start = parseLocalDate(trip.dates.start);
-                const end = parseLocalDate(trip.dates.end);
-                return (start.getMonth() === currentMonth.getMonth() && start.getFullYear() === currentMonth.getFullYear()) ||
-                       (end.getMonth() === currentMonth.getMonth() && end.getFullYear() === currentMonth.getFullYear());
-              });
-              if (monthTrips.length === 0) return null;
-
-              return (
-                <div className="mb-6 space-y-2">
-                  {monthTrips.map(trip => {
-                    const start = parseLocalDate(trip.dates.start);
-                    const daysUntil = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
-                    const isOngoing = today >= parseLocalDate(trip.dates.start) && today <= parseLocalDate(trip.dates.end);
-                    const isPast = today > parseLocalDate(trip.dates.end);
-
-                    return (
-                      <div
-                        key={trip.id}
-                        onClick={() => setEditingTrip(trip)}
-                        className={`bg-gradient-to-r ${trip.color} ${trip.isPlanning ? 'opacity-70 border-2 border-dashed border-white/40' : ''} rounded-xl p-3 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform relative overflow-hidden`}
-                      >
-                        {trip.isPlanning && (
-                          <div className="absolute inset-0 opacity-20" style={{
-                            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.3) 5px, rgba(255,255,255,0.3) 10px)'
-                          }} />
-                        )}
-                        <div className="flex items-center gap-3 relative z-10">
-                          <span className="text-2xl">{trip.emoji}</span>
-                          <div className="text-white">
-                            <div className="font-bold flex items-center gap-2">
-                              {trip.destination}
-                              {trip.isPlanning && <span className="text-xs bg-yellow-500/30 text-yellow-200 px-2 py-0.5 rounded-full">Planning</span>}
-                            </div>
-                            <div className="text-sm opacity-80">
-                              {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-white text-right relative z-10">
-                          {trip.isPlanning ? (
-                            <span className="text-sm opacity-80">🔨 In the works</span>
-                          ) : isPast ? (
-                            <span className="text-sm opacity-70">Memories made! 💕</span>
-                          ) : isOngoing ? (
-                            <span className="bg-white/30 px-3 py-1 rounded-full text-sm font-bold animate-pulse">🎉 You're there!</span>
-                          ) : daysUntil <= 7 ? (
-                            <span className="bg-white/30 px-3 py-1 rounded-full text-sm font-bold">🔥 {daysUntil} {daysUntil === 1 ? 'day' : 'days'}!</span>
-                          ) : (
-                            <span className="text-sm opacity-80">{daysUntil} days away ✨</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1 mb-1">
-              {days.map(day => (
-                <div key={day} className="text-center text-slate-400 text-xs font-semibold py-2 uppercase tracking-wide">
-                  {day}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1 border border-white/10 rounded-xl overflow-hidden">
-              {[...Array(firstDay)].map((_, i) => (
-                <div key={`empty-${i}`} className="h-20 md:h-24 bg-white/5 border-r border-b border-white/5" />
-              ))}
-              {[...Array(daysInMonth)].map((_, i) => {
-                const day = i + 1;
-                const tripOnDate = isDateInTrip(day);
-                const checkDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-                const isStartDay = tripOnDate && parseLocalDate(tripOnDate.dates.start).toDateString() === checkDate.toDateString();
-                const isEndDay = tripOnDate && parseLocalDate(tripOnDate.dates.end).toDateString() === checkDate.toDateString();
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const isToday = checkDate.toDateString() === today.toDateString();
-                const isWeekend = checkDate.getDay() === 0 || checkDate.getDay() === 6;
-
-                // Check if this date falls within any visible open date range
-                const openDateOnDay = visibleOpenDates.find(od => {
-                  const start = parseLocalDate(od.start);
-                  const end = parseLocalDate(od.end);
-                  return checkDate >= start && checkDate <= end;
-                });
-                const isOpenDateStart = openDateOnDay && parseLocalDate(openDateOnDay.start).toDateString() === checkDate.toDateString();
-
-                return (
-                  <div
-                    key={day}
-                    className={`h-20 md:h-24 p-1 relative group border-r border-b border-white/5 transition-all ${
-                      tripOnDate
-                        ? 'cursor-pointer hover:z-10'
-                        : openDateOnDay
-                        ? 'cursor-pointer hover:z-10'
-                        : ''
-                    } ${isWeekend && !tripOnDate ? 'bg-white/[0.02]' : 'bg-white/5'} ${
-                      openDateOnDay && !tripOnDate ? 'bg-green-500/10' : ''
-                    }`}
-                    onClick={() => tripOnDate ? setEditingTrip(tripOnDate) : openDateOnDay ? setShowOpenDateModal(true) : null}
-                  >
-                    {/* Date number */}
-                    <div className={`text-xs font-medium mb-1 flex items-center justify-between ${
-                      isToday
-                        ? 'text-teal-400'
-                        : tripOnDate
-                        ? 'text-white'
-                        : 'text-slate-500'
-                    }`}>
-                      <span className={`${isToday ? 'bg-teal-400 text-slate-900 w-5 h-5 rounded-full flex items-center justify-center font-bold' : ''}`}>
-                        {day}
-                      </span>
-                      {isStartDay && <span className="text-xs">🛫</span>}
-                      {isEndDay && !isStartDay && <span className="text-xs">🛬</span>}
-                    </div>
-
-                    {/* Trip content */}
-                    {tripOnDate && (
-                      <div className={`${tripOnDate.isPlanning
-                        ? 'bg-gradient-to-br ' + tripOnDate.color + ' opacity-60 border-2 border-dashed border-white/50'
-                        : 'bg-gradient-to-br ' + tripOnDate.color + ' shadow-md hover:shadow-lg'
-                      } rounded-lg p-1.5 h-[calc(100%-20px)] flex flex-col justify-between overflow-hidden transition-shadow relative`}>
-                        {/* Planning stripe pattern overlay */}
-                        {tripOnDate.isPlanning && (
-                          <div className="absolute inset-0 opacity-20" style={{
-                            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.3) 5px, rgba(255,255,255,0.3) 10px)'
-                          }} />
-                        )}
-                        <div className="flex items-center gap-1 relative z-10">
-                          <span className="text-sm md:text-base">{tripOnDate.emoji}</span>
-                          <span className="text-xs font-semibold text-white truncate hidden md:block">
-                            {tripOnDate.destination}
-                          </span>
-                        </div>
-                        {tripOnDate.isPlanning && isStartDay && (
-                          <div className="text-xs text-white/90 truncate hidden md:block relative z-10">
-                            🔨 Planning
-                          </div>
-                        )}
-                        {!tripOnDate.isPlanning && tripOnDate.special && isStartDay && (
-                          <div className="text-xs text-white/80 truncate hidden md:block">
-                            {tripOnDate.special}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Open Date indicator */}
-                    {openDateOnDay && !tripOnDate && (
-                      <div className="bg-gradient-to-br from-green-400/80 to-emerald-500/80 rounded-lg p-1.5 h-[calc(100%-20px)] flex flex-col justify-between overflow-hidden border-2 border-dashed border-green-300/50">
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm">✨</span>
-                          <span className="text-xs font-semibold text-white truncate hidden md:block">
-                            Open!
-                          </span>
-                        </div>
-                        {isOpenDateStart && openDateOnDay.note && (
-                          <div className="text-xs text-white/90 truncate hidden md:block">
-                            {openDateOnDay.note}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Hover Preview Card */}
-                    {tripOnDate && (
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-30 scale-95 group-hover:scale-100">
-                        <div className={`bg-gradient-to-br ${tripOnDate.color} ${tripOnDate.isPlanning ? 'border-2 border-dashed border-white/50' : ''} rounded-xl p-3 shadow-2xl min-w-[200px] text-white`}>
-                          {tripOnDate.isPlanning && (
-                            <div className="mb-2 text-xs bg-yellow-500/30 text-yellow-200 px-2 py-1 rounded-full inline-flex items-center gap-1">
-                              🔨 Planning
-                            </div>
-                          )}
-                          {tripOnDate.coverImage && (
-                            <img src={tripOnDate.coverImage} alt="" className="w-full h-20 object-cover rounded-lg mb-2" />
-                          )}
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-2xl">{tripOnDate.emoji}</span>
-                            <span className="font-bold text-lg">{tripOnDate.destination}</span>
-                          </div>
-                          <div className="text-sm opacity-90">
-                            {formatDate(tripOnDate.dates.start, { weekday: 'short', month: 'short', day: 'numeric' })} - {formatDate(tripOnDate.dates.end, { weekday: 'short', month: 'short', day: 'numeric' })}
-                          </div>
-                          {tripOnDate.theme && tripOnDate.isPlanning && (
-                            <div className="mt-2 text-sm bg-white/20 inline-block px-2 py-1 rounded-full">
-                              🎯 {tripOnDate.theme}
-                            </div>
-                          )}
-                          {tripOnDate.special && !tripOnDate.isPlanning && (
-                            <div className="mt-2 text-sm bg-white/20 inline-block px-2 py-1 rounded-full">
-                              {tripOnDate.special}
-                            </div>
-                          )}
-                          <div className="mt-2 flex gap-2 text-xs">
-                            {isStartDay && <span className="bg-white/20 px-2 py-1 rounded-full">🛫 Trip starts!</span>}
-                            {isEndDay && <span className="bg-white/20 px-2 py-1 rounded-full">🛬 Last day!</span>}
-                            {!isStartDay && !isEndDay && <span className="bg-white/20 px-2 py-1 rounded-full">📍 Day {Math.ceil((checkDate - parseLocalDate(tripOnDate.dates.start)) / (1000 * 60 * 60 * 24)) + 1}</span>}
-                          </div>
-                          <div className="mt-2 text-xs opacity-70 flex items-center gap-1">
-                            <span>Click to view details →</span>
-                          </div>
-                        </div>
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-white/20" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {/* Fill remaining cells to complete the grid */}
-              {[...Array((7 - ((firstDay + daysInMonth) % 7)) % 7)].map((_, i) => (
-                <div key={`end-empty-${i}`} className="h-20 md:h-24 bg-white/5 border-r border-b border-white/5" />
-              ))}
-            </div>
-
-            {/* Legend with more info */}
-            <div className="mt-6 flex flex-wrap gap-4">
-              {sortedTrips.map(trip => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const start = parseLocalDate(trip.dates.start);
-                const daysUntil = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
-                const tripDuration = Math.ceil((parseLocalDate(trip.dates.end) - start) / (1000 * 60 * 60 * 24)) + 1;
-
-                return (
-                  <div
-                    key={trip.id}
-                    onClick={() => setEditingTrip(trip)}
-                    className="flex items-center gap-2 bg-white/5 hover:bg-white/10 px-3 py-2 rounded-full cursor-pointer transition"
-                  >
-                    <span className="text-lg">{trip.emoji}</span>
-                    <span className="text-white text-sm font-medium">{trip.destination}</span>
-                    <span className="text-slate-400 text-xs">({tripDuration}d)</span>
-                  </div>
-                );
-              })}
-              {/* Open dates in legend */}
-              {visibleOpenDates.length > 0 && (
-                <div
-                  onClick={() => isOwner && setShowOpenDateModal(true)}
-                  className={`flex items-center gap-2 bg-green-500/20 px-3 py-2 rounded-full transition border border-dashed border-green-400/50 ${isOwner ? 'hover:bg-green-500/30 cursor-pointer' : ''}`}
-                >
-                  <span className="text-lg">✨</span>
-                  <span className="text-green-300 text-sm font-medium">Open for Travel</span>
-                  <span className="text-green-400 text-xs">({visibleOpenDates.length} dates)</span>
-                </div>
-              )}
-            </div>
-
-            {/* Open Dates Summary */}
-            {visibleOpenDates.length > 0 && (
-              <div className="mt-4 p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-xl border border-green-500/20">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-green-300 font-semibold flex items-center gap-2">
-                    ✨ {isOwner ? 'Open for Travel Dates' : 'Mike & Adam are available'}
-                  </h4>
-                  {isOwner && (
-                    <button
-                      onClick={() => setShowOpenDateModal(true)}
-                      className="text-sm text-green-400 hover:text-green-300 underline"
-                    >
-                      Manage
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {visibleOpenDates.map(od => (
-                    <div key={od.id} className="bg-green-500/20 px-3 py-1.5 rounded-full text-sm text-green-200">
-                      {new Date(od.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(od.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      {od.note && <span className="text-green-400 ml-1">({od.note})</span>}
-                      {isOwner && !od.visibleTo.includes('all') && (
-                        <span className="ml-1 text-xs text-green-400/70">
-                          👁️ {od.visibleTo.map(id => (companions || []).find(c => c.id === id)?.firstName || (companions || []).find(c => c.id === id)?.name).filter(Boolean).join(', ')}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-
-          {/* Travel Quote */}
-          <div className="mt-12 mb-8 text-center">
-            <div className="max-w-2xl mx-auto px-6 py-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
-              <p className="text-lg md:text-xl text-white/80 italic">
-                "{travelQuotes[currentQuoteIndex].quote}"
-              </p>
-              <p className="text-sm text-white/50 mt-2">— {travelQuotes[currentQuoteIndex].author}</p>
-            </div>
-          </div>
-          </>
-              )}
+              {/* Old Events calendar removed — now in Hub */}
 
                   </>
                   )}
