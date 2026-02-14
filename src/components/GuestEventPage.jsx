@@ -36,6 +36,7 @@ import {
 } from 'firebase/storage';
 import { firebaseConfig } from '../firebase-config';
 import heic2any from 'heic2any';
+import BuildInfo from './BuildInfo';
 
 // Initialize Firebase
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
@@ -1008,7 +1009,8 @@ export default function GuestEventPage() {
       {/* Footer */}
       <footer className="border-t border-white/10 py-6 px-4 md:px-0 md:max-w-2xl md:mx-auto text-center text-white/50 text-sm">
         <p className="mb-2">Made with ❤️ by Mike & Adam</p>
-        <div className="h-1 bg-gradient-to-r from-red-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500 w-full max-w-xs mx-auto rounded-full" />
+        <BuildInfo />
+        <div className="h-1 bg-gradient-to-r from-red-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500 w-full max-w-xs mx-auto rounded-full mt-2" />
       </footer>
     </div>
   );

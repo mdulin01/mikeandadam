@@ -25,6 +25,7 @@ import OpenDateModal from './components/OpenDateModal';
 import CompanionsModal from './components/CompanionsModal';
 import MyProfileModal from './components/MyProfileModal';
 import TripDetail from './components/TripDetail';
+import BuildInfo from './components/BuildInfo';
 
 // Hooks
 import { useSharedHub } from './hooks/useSharedHub';
@@ -5653,6 +5654,7 @@ export default function TripPlanner() {
               <span className="text-xl">💕</span>
             </div>
             <p className="text-slate-500 text-sm mt-3">Made with love in 2026 🦄</p>
+            <BuildInfo />
           </div>
           </>
           )}
