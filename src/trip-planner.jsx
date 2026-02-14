@@ -1142,6 +1142,8 @@ export default function TripPlanner() {
 
   // ========== UI STATE ==========
   const [showComingSoonMenu, setShowComingSoonMenu] = useState(false); // click-based dropdown
+  const [showSectionDropdown, setShowSectionDropdown] = useState(false); // header nav dropdown
+  const [showTypeFilterDropdown, setShowTypeFilterDropdown] = useState(false); // events type filter dropdown
   const [showAddNewMenu, setShowAddNewMenu] = useState(false); // home page add new menu
 
   // ========== CELEBRATION STATE ==========
@@ -1660,7 +1662,7 @@ export default function TripPlanner() {
   const [eventsTypeFilter, setEventsTypeFilter] = useState(null); // null | 'datenight' | 'travel' | 'fitness' | 'concert' | 'pride' | 'karaoke' | 'parties'
   const [newEventData, setNewEventData] = useState({
     name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
-    location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: []
+    location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties'
   });
   const [eventGuestEmail, setEventGuestEmail] = useState('');
   const [eventGuestPermission, setEventGuestPermission] = useState('edit');
@@ -3384,19 +3386,51 @@ export default function TripPlanner() {
                 >
                   💕
                 </button>
-                {/* Mobile section indicator - icon + name */}
+                {/* Mobile section indicator - clickable dropdown */}
                 <span className="md:hidden text-white/40 text-sm">•</span>
-                <span className="md:hidden text-sm font-semibold text-white/80 flex items-center gap-1">
-                  {activeSection === 'home' && <><span>⚛️</span> Hub</>}
-                  {activeSection === 'fitness' && <><span>🏃</span> Fitness</>}
-                  {activeSection === 'events' && <><span>📅</span> Events</>}
-                  {activeSection === 'memories' && <><span>💝</span> Memories</>}
-                  {activeSection === 'nutrition' && <><span>🥗</span> Nutrition</>}
-                  {activeSection === 'lifePlanning' && <><span>🎯</span> Life Planning</>}
-                  {activeSection === 'business' && <><span>💼</span> Business</>}
-                  {activeSection === 'calendar' && <><span>📅</span> Calendar</>}
-                  {activeSection === 'apps' && <><span>📱</span> Apps</>}
-                </span>
+                <div className="md:hidden relative">
+                  <button
+                    onClick={() => setShowSectionDropdown(!showSectionDropdown)}
+                    className="text-sm font-semibold text-white/80 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-white/10 transition active:scale-95"
+                  >
+                    {activeSection === 'home' && <><span>⚛️</span> Hub</>}
+                    {activeSection === 'fitness' && <><span>🏃</span> Fitness</>}
+                    {activeSection === 'events' && <><span>📅</span> Events</>}
+                    {activeSection === 'memories' && <><span>💝</span> Memories</>}
+                    <span className={`text-white/40 text-xs ml-0.5 transition-transform ${showSectionDropdown ? 'rotate-180' : ''}`}>▼</span>
+                  </button>
+                  {showSectionDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-[60]" onClick={() => setShowSectionDropdown(false)} />
+                      <div className="absolute top-full left-0 mt-1 z-[61] bg-slate-800/95 backdrop-blur-md border border-white/15 rounded-xl py-1 shadow-2xl min-w-[140px]">
+                        {[
+                          { id: 'home', emoji: '⚛️', label: 'Hub' },
+                          { id: 'fitness', emoji: '🏃', label: 'Fitness' },
+                          { id: 'events', emoji: '📅', label: 'Events' },
+                          { id: 'memories', emoji: '💝', label: 'Memories' },
+                        ].map(section => (
+                          <button
+                            key={section.id}
+                            onClick={() => {
+                              setActiveSection(section.id);
+                              if (section.id === 'events') setTravelViewMode('main');
+                              if (section.id === 'home') setHubSubView('home');
+                              setShowSectionDropdown(false);
+                            }}
+                            className={`w-full text-left px-4 py-2.5 flex items-center gap-2 text-sm transition ${
+                              activeSection === section.id
+                                ? 'text-white bg-white/10 font-semibold'
+                                : 'text-white/70 hover:bg-white/5'
+                            }`}
+                          >
+                            <span>{section.emoji}</span>
+                            <span>{section.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -6742,75 +6776,66 @@ export default function TripPlanner() {
               ) : (
                 <>
                   {/* ===== Combined Events/Travel View ===== */}
-            {/* Combined Events Submenu */}
-            <div className="flex gap-1.5 md:gap-2 mb-4 items-center justify-start sticky top-0 z-20 bg-slate-800/95 backdrop-blur-md py-3 -mx-6 px-6">
+            {/* Combined Events Submenu — Date sort + Type filter */}
+            <div className="flex gap-2 mb-4 items-center sticky top-0 z-20 bg-slate-800/95 backdrop-blur-md py-3 -mx-6 px-6">
               {/* Date sort toggle */}
               <button
                 onClick={() => setEventsSortAsc(!eventsSortAsc)}
-                className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center bg-white/10 text-slate-300 hover:bg-white/20`}
+                className="px-4 py-2 rounded-xl font-medium transition text-sm bg-white/10 text-slate-300 hover:bg-white/20 flex items-center gap-1.5"
               >
-                🗓️ {eventsSortAsc ? '↑' : '↓'}
+                🗓️ <span>Date</span> <span className="text-white/50">{eventsSortAsc ? '↑' : '↓'}</span>
               </button>
-              {/* Type filter */}
-              {[
-                { id: null, emoji: '📋', label: 'All' },
-                { id: 'travel', emoji: '✈️', label: 'Trips' },
-                { id: 'parties', emoji: '🎉', label: 'Parties' },
-                { id: 'datenight', emoji: '🥂', label: 'Dates' },
-                { id: 'concert', emoji: '🎵', label: 'Shows' },
-                { id: 'fitness', emoji: '🏆', label: 'Fitness' },
-                { id: 'pride', emoji: '🏳️‍🌈', label: 'Pride' },
-                { id: 'karaoke', emoji: '🎤', label: 'Karaoke' },
-              ].map(filter => (
+              {/* Type filter with dropdown */}
+              <div className="relative">
                 <button
-                  key={filter.id || 'all'}
-                  onClick={() => setEventsTypeFilter(eventsTypeFilter === filter.id ? null : filter.id)}
-                  className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center ${
-                    eventsTypeFilter === filter.id
+                  onClick={() => setShowTypeFilterDropdown(!showTypeFilterDropdown)}
+                  className={`px-4 py-2 rounded-xl font-medium transition text-sm flex items-center gap-1.5 ${
+                    eventsTypeFilter
                       ? 'bg-amber-500 text-white shadow-lg'
                       : 'bg-white/10 text-slate-300 hover:bg-white/20'
                   }`}
                 >
-                  {filter.emoji}
+                  {eventsTypeFilter
+                    ? { travel: '✈️', parties: '🎉', datenight: '🥂', concert: '🎵', fitness: '🏆', pride: '🏳️‍🌈', karaoke: '🎤' }[eventsTypeFilter]
+                    : '🏷️'
+                  }
+                  <span>Type</span>
+                  <span className={`text-xs transition-transform ${showTypeFilterDropdown ? 'rotate-180' : ''}`}>▼</span>
                 </button>
-              ))}
-              {/* Random & Wishlist */}
-              <button
-                onClick={() => setTravelViewMode(travelViewMode === 'random' ? 'main' : 'random')}
-                className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center ${
-                  travelViewMode === 'random'
-                    ? 'bg-amber-500 text-white shadow-lg'
-                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
-                }`}
-              >
-                🎲
-              </button>
-              <button
-                onClick={() => setTravelViewMode(travelViewMode === 'wishlist' ? 'main' : 'wishlist')}
-                className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center ${
-                  travelViewMode === 'wishlist'
-                    ? 'bg-amber-500 text-white shadow-lg'
-                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
-                }`}
-              >
-                🦄
-              </button>
-              {isOwner && (
-                <>
-                  <button
-                    onClick={() => setShowOpenDateModal(true)}
-                    className="flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center bg-white/10 text-slate-300 hover:bg-white/20"
-                  >
-                    📅
-                  </button>
-                  <button
-                    onClick={() => setShowTravelCircleModal(true)}
-                    className="flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center bg-white/10 text-slate-300 hover:bg-white/20"
-                  >
-                    👥
-                  </button>
-                </>
-              )}
+                {showTypeFilterDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-[30]" onClick={() => setShowTypeFilterDropdown(false)} />
+                    <div className="absolute top-full left-0 mt-1 z-[31] bg-slate-800/95 backdrop-blur-md border border-white/15 rounded-xl py-1 shadow-2xl min-w-[160px]">
+                      {[
+                        { id: null, emoji: '📋', label: 'All Types' },
+                        { id: 'travel', emoji: '✈️', label: 'Trips' },
+                        { id: 'parties', emoji: '🎉', label: 'Parties' },
+                        { id: 'datenight', emoji: '🥂', label: 'Dates' },
+                        { id: 'concert', emoji: '🎵', label: 'Shows' },
+                        { id: 'fitness', emoji: '🏆', label: 'Fitness' },
+                        { id: 'pride', emoji: '🏳️‍🌈', label: 'Pride' },
+                        { id: 'karaoke', emoji: '🎤', label: 'Karaoke' },
+                      ].map(filter => (
+                        <button
+                          key={filter.id || 'all'}
+                          onClick={() => {
+                            setEventsTypeFilter(filter.id);
+                            setShowTypeFilterDropdown(false);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 flex items-center gap-2 text-sm transition ${
+                            eventsTypeFilter === filter.id
+                              ? 'text-white bg-amber-500/20 font-semibold'
+                              : 'text-white/70 hover:bg-white/5'
+                          }`}
+                        >
+                          <span>{filter.emoji}</span>
+                          <span>{filter.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
                   {/* Random Adventure Generator */}
@@ -11337,7 +11362,7 @@ export default function TripPlanner() {
                     setEventCoverImagePreview(null);
                     setNewEventData({
                       name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
-                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: []
+                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties'
                     });
                   }}
                   className="p-2 hover:bg-white/10 rounded-full transition"
@@ -11379,6 +11404,41 @@ export default function TripPlanner() {
                   }}
                   className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-amber-400"
                 />
+              </div>
+
+              {/* Event Type */}
+              <div>
+                <label className="block text-sm text-white/50 mb-2">Event Type</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: 'parties', emoji: '🎉', label: 'Party' },
+                    { id: 'travel', emoji: '✈️', label: 'Trip' },
+                    { id: 'datenight', emoji: '🥂', label: 'Date' },
+                    { id: 'concert', emoji: '🎵', label: 'Show' },
+                    { id: 'fitness', emoji: '🏆', label: 'Fitness' },
+                    { id: 'pride', emoji: '🏳️‍🌈', label: 'Pride' },
+                    { id: 'karaoke', emoji: '🎤', label: 'Karaoke' },
+                  ].map(type => (
+                    <button
+                      key={type.id}
+                      type="button"
+                      onClick={() => {
+                        if (editingEvent) {
+                          setEditingEvent({ ...editingEvent, eventType: type.id });
+                        } else {
+                          setNewEventData({ ...newEventData, eventType: type.id });
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-1 ${
+                        (editingEvent ? editingEvent.eventType : newEventData.eventType) === type.id
+                          ? 'bg-amber-500 text-white shadow-lg'
+                          : 'bg-white/10 text-white/70 hover:bg-white/20'
+                      }`}
+                    >
+                      <span>{type.emoji}</span> {type.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Date & Time */}
@@ -11661,7 +11721,7 @@ export default function TripPlanner() {
                     setEventCoverImagePreview(null);
                     setNewEventData({
                       name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
-                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: []
+                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties'
                     });
                   }}
                   className="px-5 py-2.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition"
@@ -11899,13 +11959,9 @@ export default function TripPlanner() {
                   {[
                     { action: () => setShowAddTaskModal('create'), icon: '✅', label: 'Task', gradient: 'from-blue-400 to-indigo-500' },
                     { action: () => setShowSharedListModal('create'), icon: '🛒', label: 'List', gradient: 'from-emerald-400 to-teal-500' },
-                    { action: () => setShowAddSocialModal('create'), icon: '👥', label: 'Social', gradient: 'from-purple-400 to-violet-500' },
-                    { action: () => setShowAddHabitModal('create'), icon: '🔄', label: 'Habit', gradient: 'from-green-400 to-emerald-500' },
                     { action: () => setShowAddIdeaModal('create'), icon: '💡', label: 'Idea', gradient: 'from-yellow-400 to-amber-500' },
-                    { action: () => setShowNewTripModal('adventure'), icon: '✈️', label: 'Trip', gradient: 'from-teal-400 to-cyan-500' },
                     { action: () => setShowAddEventModal(true), icon: '🎉', label: 'Event', gradient: 'from-amber-400 to-orange-500' },
                     { action: () => setShowAddMemoryModal('milestone'), icon: '💝', label: 'Memory', gradient: 'from-rose-400 to-pink-500' },
-                    { action: () => setShowAddFitnessEventModal(true), icon: '🏃', label: 'Fitness', gradient: 'from-orange-400 to-red-500' },
                   ].map((item, idx) => (
                     <button key={item.label} onClick={() => { setShowAddNewMenu(false); item.action(); }} className="flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl hover:bg-white/10 transition active:scale-95" style={{ animation: `fabItemIn 0.12s ease-out ${idx * 0.02}s both` }}>
                       <span className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-xl shadow-md`}>{item.icon}</span>
@@ -11933,23 +11989,18 @@ export default function TripPlanner() {
           {showAddNewMenu && isOwner && (
             <>
               <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[99]" onClick={() => setShowAddNewMenu(false)} />
-              <div className="absolute bottom-full left-1/2 mb-[68px] z-[101] bg-slate-800/95 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl w-[240px]"
+              <div className="absolute bottom-full left-1/2 mb-[24px] z-[101] bg-slate-800/95 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl w-[240px]"
                 style={{ animation: 'fabGridUp 0.2s cubic-bezier(0.16,1,0.3,1) both', transformOrigin: 'bottom center' }}>
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { action: () => setShowAddTaskModal('create'), icon: '✅', label: 'Task', gradient: 'from-blue-400 to-indigo-500' },
                     { action: () => setShowSharedListModal('create'), icon: '🛒', label: 'List', gradient: 'from-emerald-400 to-teal-500' },
-                    { action: () => setShowAddSocialModal('create'), icon: '👥', label: 'Social', gradient: 'from-purple-400 to-violet-500' },
-                    { action: () => setShowAddHabitModal('create'), icon: '🔄', label: 'Habit', gradient: 'from-green-400 to-emerald-500' },
                     { action: () => setShowAddIdeaModal('create'), icon: '💡', label: 'Idea', gradient: 'from-yellow-400 to-amber-500' },
-                    { action: () => setShowNewTripModal('adventure'), icon: '✈️', label: 'Trip', gradient: 'from-teal-400 to-cyan-500' },
                     { action: () => setShowAddEventModal(true), icon: '🎉', label: 'Event', gradient: 'from-amber-400 to-orange-500' },
                     { action: () => setShowAddMemoryModal('milestone'), icon: '💝', label: 'Memory', gradient: 'from-rose-400 to-pink-500' },
-                    { action: () => setShowAddFitnessEventModal(true), icon: '🏃', label: 'Fitness', gradient: 'from-orange-400 to-red-500' },
                   ].map((item, idx) => {
-                    // Bottom row (6,7,8) appears first, then middle (3,4,5), then top (0,1,2)
                     const row = Math.floor(idx / 3);
-                    const delay = (2 - row) * 0.04 + (idx % 3) * 0.015;
+                    const delay = (1 - row) * 0.04 + (idx % 3) * 0.015;
                     return (
                       <button key={item.label} onClick={() => { setShowAddNewMenu(false); item.action(); }} className="flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl hover:bg-white/10 transition active:scale-95" style={{ animation: `fabItemUp 0.25s cubic-bezier(0.16,1,0.3,1) ${delay}s both` }}>
                         <span className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-xl shadow-md`}>{item.icon}</span>
@@ -11972,26 +12023,26 @@ export default function TripPlanner() {
             {isOwner && (
               <button
                 onClick={() => setShowAddNewMenu(!showAddNewMenu)}
-                className={`absolute left-1/2 -translate-x-1/2 -top-14 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 z-[101] ${
+                className={`absolute left-1/2 -translate-x-1/2 -top-3 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 z-[101] ${
                   showAddNewMenu
                     ? 'bg-gradient-to-r from-pink-500 to-rose-500 rotate-45'
                     : 'bg-gradient-to-r from-purple-500 to-violet-600'
                 }`}
                 style={{
-                  width: '3.75rem', height: '3.75rem',
+                  width: '3rem', height: '3rem',
                   boxShadow: showAddNewMenu
                     ? '0 4px 30px rgba(236, 72, 153, 0.7), 0 0 0 4px rgba(236, 72, 153, 0.12), 0 8px 16px rgba(0,0,0,0.4)'
                     : '0 4px 30px rgba(139, 92, 246, 0.7), 0 0 0 4px rgba(139, 92, 246, 0.12), 0 8px 16px rgba(0,0,0,0.4)',
                 }}
               >
-                <Plus className="w-7 h-7 text-white transition-transform duration-200" />
+                <Plus className="w-6 h-6 text-white transition-transform duration-200" />
               </button>
             )}
             {/* Tab buttons — 4 items: Hub, Fitness, [FAB gap], Events, Memories */}
             <div className="flex items-end justify-around px-1 pt-1 pb-1">
               {[
                 { id: 'home', label: 'Hub', emoji: '⚛️', gradient: 'from-pink-500 to-purple-500' },
-                { id: 'fitness', label: 'Fitness', emoji: null, gradient: 'from-orange-400 to-red-500' },
+                { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
                 { id: 'events', label: 'Events', emoji: '📅', gradient: 'from-amber-400 to-orange-500' },
                 { id: 'memories', label: 'Memories', emoji: '💝', gradient: 'from-rose-400 to-pink-500' },
               ].map((section, idx) => (
@@ -12005,34 +12056,15 @@ export default function TripPlanner() {
                       if (section.id === 'home') setHubSubView('home');
                       setShowComingSoonMenu(false);
                     }}
-                    className={`relative flex flex-col items-center justify-center py-1.5 rounded-xl transition-all active:scale-95 ${idx === 1 ? 'min-w-[56px] -mt-8' : 'min-w-[52px]'} ${
-                      activeSection === section.id ? '' : ''
-                    }`}
+                    className={`relative flex flex-col items-center justify-center py-1.5 rounded-xl transition-all active:scale-95 min-w-[52px]`}
                   >
-                    {idx === 1 ? (
-                      /* Atlas figure — Fitness tab */
-                      <img
-                        src="/atlas-fitness.png"
-                        alt="Fitness"
-                        className={`transition-all duration-200 ${activeSection === section.id ? 'scale-110' : ''}`}
-                        style={{
-                          width: '38px',
-                          height: '46px',
-                          objectFit: 'contain',
-                          filter: activeSection === section.id
-                            ? 'brightness(1.6) saturate(1.3) drop-shadow(0 0 8px rgba(249,115,22,0.7)) drop-shadow(0 0 16px rgba(249,115,22,0.3))'
-                            : 'brightness(0.85) saturate(0.8) drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
-                        }}
-                      />
-                    ) : (
-                      <span className={`text-lg mb-0.5 transition-transform ${activeSection === section.id ? 'scale-110' : ''}`}>
-                        {section.emoji}
-                      </span>
-                    )}
+                    <span className={`text-lg mb-0.5 transition-transform ${activeSection === section.id ? 'scale-110' : ''}`}>
+                      {section.emoji}
+                    </span>
                     <span className={`text-[10px] font-medium transition-colors ${activeSection === section.id ? 'text-white' : 'text-white/40'}`}>
                       {section.label}
                     </span>
-                    {activeSection === section.id && idx !== 1 && (
+                    {activeSection === section.id && (
                       <div className={`absolute -bottom-0.5 w-6 h-0.5 rounded-full bg-gradient-to-r ${section.gradient}`} />
                     )}
                   </button>
