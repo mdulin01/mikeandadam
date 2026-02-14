@@ -473,7 +473,7 @@ export default function TripPlanner() {
     const appParam = urlParams.get('app');
     const validApps = ['fitness', 'travel', 'events', 'memories'];
     if (appParam && validApps.includes(appParam)) {
-      return appParam;
+      return appParam === 'travel' ? 'events' : appParam; // travel now lives under events
     }
     const isStandalone = typeof window !== 'undefined' && (
       window.matchMedia('(display-mode: standalone)').matches ||
@@ -489,7 +489,7 @@ export default function TripPlanner() {
     return null;
   })();
 
-  const [activeSection, setActiveSection] = useState(initialAppMode || 'home'); // 'home' (hub) | 'travel' | 'fitness' | 'nutrition' | 'events' | 'lifePlanning' | 'business' | 'memories'
+  const [activeSection, setActiveSection] = useState(initialAppMode || 'home'); // 'home' (hub) | 'fitness' | 'events' | 'memories' | 'nutrition' | 'lifePlanning' | 'business'
 
   // User profile selection
   const [currentUser, setCurrentUser] = useState('Mike');
@@ -1655,7 +1655,9 @@ export default function TripPlanner() {
   const [selectedPartyEvent, setSelectedPartyEvent] = useState(null);
   const [showAddEventModal, setShowAddEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
-  const [eventViewMode, setEventViewMode] = useState('upcoming');
+  const [eventViewMode, setEventViewMode] = useState('upcoming'); // legacy — kept for compat
+  const [eventsSortAsc, setEventsSortAsc] = useState(true); // true = soonest first
+  const [eventsTypeFilter, setEventsTypeFilter] = useState(null); // null | 'datenight' | 'travel' | 'fitness' | 'concert' | 'pride' | 'karaoke' | 'parties'
   const [newEventData, setNewEventData] = useState({
     name: '', emoji: '🎉', date: '', time: '18:00', endTime: '22:00',
     location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: []
@@ -3386,9 +3388,8 @@ export default function TripPlanner() {
                 <span className="md:hidden text-white/40 text-sm">•</span>
                 <span className="md:hidden text-sm font-semibold text-white/80 flex items-center gap-1">
                   {activeSection === 'home' && <><span>⚛️</span> Hub</>}
-                  {activeSection === 'travel' && <><span>✈️</span> Travel</>}
                   {activeSection === 'fitness' && <><span>🏃</span> Fitness</>}
-                  {activeSection === 'events' && <><span>🎉</span> Events</>}
+                  {activeSection === 'events' && <><span>📅</span> Events</>}
                   {activeSection === 'memories' && <><span>💝</span> Memories</>}
                   {activeSection === 'nutrition' && <><span>🥗</span> Nutrition</>}
                   {activeSection === 'lifePlanning' && <><span>🎯</span> Life Planning</>}
@@ -3410,12 +3411,6 @@ export default function TripPlanner() {
                   <p className="text-xs text-slate-400">Plan adventures, stay healthy, build our future</p>
                 </div>
               )}
-              {activeSection === 'travel' && (
-                <div>
-                  <h2 className="text-xl font-bold text-white">✈️ Our Adventures</h2>
-                  <p className="text-xs text-slate-400">Let's Travel The World</p>
-                </div>
-              )}
               {activeSection === 'fitness' && (
                 <div>
                   <h2 className="text-xl font-bold text-white">🏃 Fitness Training</h2>
@@ -3424,8 +3419,8 @@ export default function TripPlanner() {
               )}
               {activeSection === 'events' && (
                 <div>
-                  <h2 className="text-xl font-bold text-white">🎉 Events</h2>
-                  <p className="text-xs text-slate-400">Plan parties and gather friends</p>
+                  <h2 className="text-xl font-bold text-white">📅 Events</h2>
+                  <p className="text-xs text-slate-400">Trips, parties & everything in between</p>
                 </div>
               )}
               {activeSection === 'memories' && (
@@ -4634,1238 +4629,7 @@ export default function TripPlanner() {
           )}
           {/* ========== END HUB SECTION ========== */}
 
-          {/* ========== TRAVEL SECTION ========== */}
-          {activeSection === 'travel' && (
-          <div>
-            {/* Action Buttons - Travel (left padding for FAB on mobile) */}
-            <div className="flex gap-1.5 md:gap-2 mb-4 items-center justify-start sticky top-0 z-20 bg-slate-800/95 backdrop-blur-md py-3 -mx-6 px-6">
-              {[
-                { id: 'main', emoji: '✈️', action: () => setTravelViewMode('main') },
-                { id: 'random', emoji: '🎲', action: () => setTravelViewMode('random') },
-                { id: 'wishlist', emoji: '🦄', action: () => setTravelViewMode('wishlist') },
-                ...(isOwner ? [
-                  { id: 'opendates', emoji: '📅', action: () => setShowOpenDateModal(true) },
-                  { id: 'circle', emoji: '👥', action: () => setShowTravelCircleModal(true) },
-                ] : []),
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={tab.action}
-                  className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-base md:text-lg text-center ${
-                    travelViewMode === tab.id
-                      ? 'bg-teal-500 text-white shadow-lg'
-                      : 'bg-white/10 text-slate-300 hover:bg-white/20'
-                  }`}
-                >
-                  {tab.emoji}
-                </button>
-              ))}
-            </div>
 
-          {/* Trip Detail View - Inline (like Events) */}
-          {selectedTrip ? (
-            <TripDetail
-              trip={selectedTrip}
-              editingTrip={editingTrip}
-              setEditingTrip={setEditingTrip}
-              editingTripDates={editingTripDates}
-              setEditingTripDates={setEditingTripDates}
-              setSelectedTrip={setSelectedTrip}
-              tripDetails={tripDetails}
-              setTripDetails={setTripDetails}
-              canEditTrip={canEditTrip}
-              removeItem={removeItem}
-              removeLink={removeLink}
-              addLink={addLink}
-              setShowAddModal={setShowAddModal}
-              setShowLinkModal={setShowLinkModal}
-              setShowGuestModal={setShowGuestModal}
-              showLinkModal={showLinkModal}
-              showGuestModal={showGuestModal}
-              isOwner={isOwner}
-              isGuest={isGuest}
-              guestPermissions={guestPermissions}
-              currentUser={currentUser}
-              updateTripDates={updateTripDates}
-              showToast={showToast}
-              saveToFirestore={saveToFirestore}
-              setTrips={setTrips}
-              guestEmail={guestEmail}
-              setGuestEmail={setGuestEmail}
-              guestPermission={guestPermission}
-              setGuestPermission={setGuestPermission}
-              linkedTasks={sharedTasks.filter(t => t && t.linkedTo && t.linkedTo.section === 'trips' && t.linkedTo.itemId === selectedTrip?.id)}
-              onCompleteTask={completeTask}
-              onEditTask={(t) => setShowAddTaskModal(t)}
-            />
-          ) : (
-            <>
-
-          {/* Main Adventures View */}
-          {travelViewMode === 'main' && (
-          <>
-          {/* Countdown Banner for Next Trip */}
-          {(() => {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const upcomingTrips = sortedTrips.filter(t => parseLocalDate(t.dates.start) > today);
-            if (upcomingTrips.length === 0) return null;
-            const nextTrip = upcomingTrips[0];
-            const daysUntil = Math.ceil((parseLocalDate(nextTrip.dates.start) - today) / (1000 * 60 * 60 * 24));
-            const tripDuration = Math.ceil((parseLocalDate(nextTrip.dates.end) - parseLocalDate(nextTrip.dates.start)) / (1000 * 60 * 60 * 24)) + 1;
-
-            // Get trip details (hotels, events)
-            const details = tripDetails[nextTrip.id] || { hotels: [], events: [], flights: [] };
-
-            // Mock weather based on destination and month
-            const tripMonth = parseLocalDate(nextTrip.dates.start).getMonth();
-            const getWeather = () => {
-              const dest = nextTrip.destination.toLowerCase();
-              const isWinter = tripMonth >= 11 || tripMonth <= 2;
-              const isSummer = tripMonth >= 5 && tripMonth <= 8;
-              if (dest.includes('beach') || dest.includes('island') || dest.includes('key west') || dest.includes('puerto') || dest.includes('caribbean') || dest.includes('provincetown')) {
-                return { temp: isSummer ? '88°F' : '78°F', icon: '☀️', desc: 'Sunny & warm' };
-              }
-              if (dest.includes('london') || dest.includes('seattle')) {
-                return { temp: isSummer ? '68°F' : '45°F', icon: '🌧️', desc: 'Might rain' };
-              }
-              if (dest.includes('nyc') || dest.includes('new york') || dest.includes('chicago')) {
-                return { temp: isWinter ? '35°F' : isSummer ? '82°F' : '58°F', icon: isWinter ? '❄️' : '🌤️', desc: isWinter ? 'Bundle up!' : 'Nice weather' };
-              }
-              return { temp: isSummer ? '75°F' : '65°F', icon: '🌤️', desc: 'Pleasant' };
-            };
-            const weather = getWeather();
-
-            return (
-              <div
-                onClick={() => setEditingTrip(nextTrip)}
-                className={`mt-6 bg-gradient-to-r ${nextTrip.color} rounded-2xl p-4 md:p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] transition-transform`}>
-                <div className="absolute inset-0 bg-black/10" />
-                <div className="relative flex flex-col md:flex-row items-start justify-between gap-4">
-                  {/* Left side - Trip info */}
-                  <div className="flex items-start gap-4">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        startBouncingEmoji(nextTrip.emoji, rect.left, rect.top);
-                      }}
-                      className="text-5xl md:text-6xl hover:scale-125 transition-transform cursor-pointer"
-                      title="Click me! 🎉"
-                    >
-                      {nextTrip.emoji}
-                    </button>
-                    <div className="text-white">
-                      <p className="text-sm md:text-base opacity-80 font-medium">Next Adventure</p>
-                      <h3 className="text-2xl md:text-3xl font-bold">{nextTrip.destination}</h3>
-                      <div className="flex items-center gap-3 mt-1 flex-wrap">
-                        <span className="text-sm opacity-80">{tripDuration} days</span>
-                        <span className="text-sm opacity-60">•</span>
-                        <span className="text-sm flex items-center gap-1">
-                          <span>{weather.icon}</span>
-                          <span className="opacity-80">{weather.temp}</span>
-                        </span>
-                        <span className="text-sm opacity-60">•</span>
-                        <span className="text-sm opacity-80">
-                          {formatDate(nextTrip.dates.start)} - {formatDate(nextTrip.dates.end)}
-                        </span>
-                      </div>
-
-                      {/* Trip Details - Hotels & Events */}
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {details.hotels && details.hotels.length > 0 && (
-                          <div className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-lg">
-                            <Hotel className="w-4 h-4" />
-                            <span className="text-sm font-medium">{details.hotels[0].name}</span>
-                            {details.hotels[0].nights && (
-                              <span className="text-xs opacity-70">({details.hotels[0].nights} nights)</span>
-                            )}
-                          </div>
-                        )}
-                        {details.flights && details.flights.length > 0 && (
-                          <div className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-lg">
-                            <Plane className="w-4 h-4" />
-                            <span className="text-sm font-medium">{details.flights[0].airline}</span>
-                          </div>
-                        )}
-                        {details.events && details.events.map((event, idx) => (
-                          <div key={idx} className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-lg">
-                            <Music className="w-4 h-4" />
-                            <span className="text-sm font-medium">{event.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right side - Countdown */}
-                  <div className="flex items-center gap-3 self-center md:self-start">
-                    <div className="text-center bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 md:px-6 md:py-3">
-                      <div className="text-3xl md:text-5xl font-bold text-white">{daysUntil}</div>
-                      <div className="text-xs md:text-sm text-white/80 font-medium">{daysUntil === 1 ? 'day' : 'days'} to go!</div>
-                    </div>
-                    <div className="text-4xl md:text-5xl">
-                      {daysUntil <= 7 ? '🎉' : daysUntil <= 30 ? '✨' : '🗓️'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom row - Special event & Share */}
-                <div className="relative mt-3 flex items-center gap-3 flex-wrap">
-                  {nextTrip.special && (
-                    <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-white text-sm font-medium">
-                      {nextTrip.special}
-                    </span>
-                  )}
-                  {nextTrip.guests && nextTrip.guests.length > 0 && (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-white/15 rounded-full text-white text-sm">
-                      <Users className="w-3.5 h-3.5" />
-                      +{nextTrip.guests.length} guest{nextTrip.guests.length !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const text = `${nextTrip.emoji} ${daysUntil} days until ${nextTrip.destination}! ✨\n\n#TravelCountdown #${nextTrip.destination.replace(/[^a-zA-Z]/g, '')}`;
-                      if (navigator.share) {
-                        navigator.share({ title: 'Trip Countdown', text });
-                      } else {
-                        navigator.clipboard.writeText(text);
-                        alert('Countdown copied to clipboard! 📋');
-                      }
-                    }}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-white text-sm font-medium transition"
-                  >
-                    📤 Share Countdown
-                  </button>
-                </div>
-                <Starburst className="absolute -right-8 -bottom-8 w-32 h-32 text-white/10" />
-              </div>
-            );
-          })()}
-
-          {/* Trip Cards - Confirmed Adventures (skip the first upcoming trip since it's in the banner) */}
-          <section className="mt-8 mb-12">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {(() => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const upcomingTrips = sortedTrips.filter(t => parseLocalDate(t.dates.start) > today);
-                const nextTripId = upcomingTrips.length > 0 ? upcomingTrips[0].id : null;
-                // Filter out the next upcoming trip (shown in banner) from the grid
-                return confirmedTrips.filter(trip => trip.id !== nextTripId);
-              })().map(trip => (
-                <div
-                  key={trip.id}
-                  data-search-id={`travel-${trip.id}`}
-                  className={`bg-gradient-to-br ${trip.color} rounded-3xl text-white text-left relative overflow-hidden group hover:scale-105 transition-transform duration-300 shadow-xl`}
-                >
-                  {/* Cover Image */}
-                  {trip.coverImage && (
-                    <div className="h-28 w-full overflow-hidden">
-                      <img
-                        src={trip.coverImage}
-                        alt={trip.destination}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 h-28 bg-gradient-to-b from-black/20 to-transparent" />
-                    </div>
-                  )}
-                  <div className={`p-6 ${trip.coverImage ? 'pt-4' : ''}`}>
-                  <AtomicDots />
-
-                  {/* 3-dot menu button - Owner only */}
-                  {isOwner && (
-                  <div className="absolute top-3 right-3 z-20">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowTripMenu(showTripMenu === trip.id ? null : trip.id);
-                        setShowColorPicker(null);
-                        setShowEmojiEditor(null);
-                        setShowImageEditor(null);
-                      }}
-                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition opacity-0 group-hover:opacity-100"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-
-                    {/* Dropdown Menu */}
-                    {showTripMenu === trip.id && (
-                      <div className="absolute top-8 right-0 w-48 bg-white rounded-xl shadow-xl overflow-hidden z-30">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowEmojiEditor(trip.id);
-                            setShowColorPicker(null);
-                            setShowImageEditor(null);
-                          }}
-                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
-                        >
-                          <span className="text-lg">😀</span>
-                          Change Icon
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowColorPicker(trip.id);
-                            setShowEmojiEditor(null);
-                            setShowImageEditor(null);
-                          }}
-                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
-                        >
-                          <Palette className="w-4 h-4" />
-                          Change Color
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowImageEditor(trip.id);
-                            setShowColorPicker(null);
-                            setShowEmojiEditor(null);
-                          }}
-                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
-                        >
-                          <Image className="w-4 h-4" />
-                          {trip.coverImage ? 'Change Photo' : 'Add Photo'}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowGuestModal(trip.id);
-                            setShowTripMenu(null);
-                          }}
-                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
-                        >
-                          <Users className="w-4 h-4" />
-                          Manage Guests
-                          {trip.guests && trip.guests.length > 0 && (
-                            <span className="ml-auto bg-purple-100 text-purple-600 text-xs px-2 py-0.5 rounded-full">
-                              {trip.guests.length}
-                            </span>
-                          )}
-                        </button>
-                        {canDeleteTrip(trip.id) && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm(`Delete trip to ${trip.destination}?`)) {
-                                deleteTrip(trip.id);
-                              }
-                            }}
-                            className="w-full px-4 py-3 text-left text-red-500 hover:bg-red-50 flex items-center gap-2 text-sm border-t"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Delete Trip
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Color Picker */}
-                    {showColorPicker === trip.id && (
-                      <div className="absolute top-8 right-0 w-48 bg-white rounded-xl shadow-xl p-3 z-30">
-                        <p className="text-xs text-slate-500 mb-2 font-medium">Choose a color</p>
-                        <div className="grid grid-cols-4 gap-2">
-                          {tripColors.map((colorSet, idx) => (
-                            <button
-                              key={idx}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateTripColor(trip.id, colorSet);
-                              }}
-                              className={`w-8 h-8 rounded-lg bg-gradient-to-br ${colorSet.color} hover:scale-110 transition ${
-                                trip.color === colorSet.color ? 'ring-2 ring-white ring-offset-2' : ''
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Emoji Editor */}
-                    {showEmojiEditor === trip.id && (
-                      <div className="absolute top-8 right-0 w-56 bg-white rounded-xl shadow-xl p-3 z-30">
-                        <p className="text-xs text-slate-500 mb-2 font-medium">Choose an icon</p>
-                        <div className="grid grid-cols-6 gap-1 mb-2">
-                          {travelEmojis.map((emoji, idx) => (
-                            <button
-                              key={idx}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateTripEmoji(trip.id, emoji);
-                              }}
-                              className={`w-8 h-8 text-lg rounded-lg hover:bg-purple-100 transition flex items-center justify-center ${
-                                trip.emoji === emoji ? 'bg-purple-200 ring-2 ring-purple-400' : ''
-                              }`}
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="Or type emoji..."
-                          className="w-full px-2 py-1 text-sm text-center border border-slate-200 rounded-lg"
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              updateTripEmoji(trip.id, e.target.value);
-                            }
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {/* Image Editor */}
-                    {showImageEditor === trip.id && (
-                      <div className="absolute top-8 right-0 w-72 bg-white rounded-xl shadow-xl p-3 z-30">
-                        <p className="text-xs text-slate-500 mb-2 font-medium">Add a cover photo</p>
-                        {trip.coverImage && (
-                          <div className="mb-2 relative">
-                            <img src={trip.coverImage} alt="Current cover" className="w-full h-20 object-cover rounded-lg" />
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateTripCoverImage(trip.id, null);
-                              }}
-                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
-                        <input
-                          type="text"
-                          placeholder="Paste image URL..."
-                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:border-purple-400 outline-none"
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && e.target.value) {
-                              updateTripCoverImage(trip.id, e.target.value);
-                            }
-                          }}
-                        />
-                        <p className="text-xs text-slate-400 mt-2">Press Enter to save. Try: picsum.photos/seed/yourword/800/400</p>
-                      </div>
-                    )}
-                  </div>
-                  )}
-
-                  {/* Clickable card content */}
-                  <button
-                    onClick={() => {
-                      if (!showTripMenu && !showColorPicker && !showEmojiEditor && !showImageEditor) {
-                        setEditingTrip(trip);
-                      }
-                    }}
-                    className="w-full text-left relative z-10"
-                  >
-                    <div className="text-4xl mb-3">{trip.emoji}</div>
-                    <h3 className="text-xl font-bold mb-1">{trip.destination}</h3>
-                    <p className="text-white/80 text-sm">
-                      {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
-                    </p>
-                    {(() => {
-                      const now = new Date();
-                      const tripStart = parseLocalDate(trip.dates.start);
-                      const tripEnd = parseLocalDate(trip.dates.end);
-                      const daysTo = Math.ceil((tripStart - now) / (1000 * 60 * 60 * 24));
-                      const isOngoing = now >= tripStart && now <= tripEnd;
-                      if (isOngoing) return (
-                        <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
-                          🎉 Happening now!
-                        </div>
-                      );
-                      if (daysTo > 0) return (
-                        <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
-                          {daysTo <= 7 ? '🔥' : daysTo <= 30 ? '✨' : '🗓️'} {daysTo} {daysTo === 1 ? 'day' : 'days'} to go!
-                        </div>
-                      );
-                      return null;
-                    })()}
-                    {trip.special && (
-                      <div className="mt-3 text-sm font-semibold bg-white/20 inline-block px-3 py-1 rounded-full">
-                        {trip.special}
-                      </div>
-                    )}
-                    {/* Guest Count Indicator */}
-                    {trip.guests && trip.guests.length > 0 && (
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <div className="flex -space-x-1.5">
-                          {trip.guests.slice(0, 3).map((guest) => (
-                            <div
-                              key={guest.id}
-                              className="w-6 h-6 bg-white/30 rounded-full flex items-center justify-center text-[10px] font-bold border border-white/50"
-                              title={guest.name || guest.email || 'Guest'}
-                            >
-                              {(guest.name || guest.email || '?').charAt(0)}
-                            </div>
-                          ))}
-                        </div>
-                        <span className="text-xs opacity-80">
-                          +{trip.guests.length} guest{trip.guests.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    )}
-                    {/* Linked Hub Items */}
-                    {(() => {
-                      const { linkedTasks, linkedLists } = getLinkedHubItems('travel', trip.id);
-                      if (linkedTasks.length === 0 && linkedLists.length === 0) return null;
-                      return (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {linkedTasks.map(task => (
-                            <button
-                              key={task.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveSection('home');
-                                setHubSubView('home');
-                              }}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition hover:scale-105 ${
-                                task.status === 'done'
-                                  ? 'bg-green-500/30 text-green-200'
-                                  : 'bg-white/20 text-white'
-                              }`}
-                              title={task.title}
-                            >
-                              <span>{task.status === 'done' ? '✅' : '☑️'}</span>
-                              <span className="max-w-[80px] truncate">{task.title}</span>
-                            </button>
-                          ))}
-                          {linkedLists.map(list => (
-                            <button
-                              key={list.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveSection('home');
-                                setHubSubView('home');
-                              }}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-full text-xs font-medium text-white transition hover:scale-105"
-                              title={list.name}
-                            >
-                              <span>{list.emoji || '📝'}</span>
-                              <span className="max-w-[80px] truncate">{list.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                    <div className="mt-4 flex items-center gap-2 text-sm opacity-0 group-hover:opacity-100 transition">
-                      <span>Plan this trip</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </div>
-                  </button>
-                  <Starburst className="absolute -right-6 -bottom-6 w-24 h-24 text-white/10 group-hover:rotate-45 transition-transform duration-500" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* In the Works - Planning Section */}
-          {planningTrips.length > 0 && (
-            <section className="mb-12">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                <span className="text-2xl">🔨</span>
-                In the Works
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {planningTrips.map(trip => (
-                  <div
-                    key={trip.id}
-                    onClick={() => setEditingTrip(trip)}
-                    className={`bg-gradient-to-br ${trip.color} rounded-3xl text-white text-left relative overflow-hidden group hover:scale-105 transition-transform duration-300 shadow-xl border-2 border-dashed border-white/40 cursor-pointer`}
-                  >
-                    {/* Stripe pattern overlay */}
-                    <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
-                      backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.3) 10px, rgba(255,255,255,0.3) 20px)'
-                    }} />
-
-                    {/* Cover Image */}
-                    {trip.coverImage && (
-                      <div className="h-28 w-full overflow-hidden">
-                        <img
-                          src={trip.coverImage}
-                          alt={trip.destination}
-                          className="w-full h-full object-cover opacity-80"
-                        />
-                        <div className="absolute inset-0 h-28 bg-gradient-to-b from-black/20 to-transparent" />
-                      </div>
-                    )}
-
-                    <div className={`p-6 ${trip.coverImage ? 'pt-4' : ''} relative z-10`}>
-                      {/* Planning Badge */}
-                      <div className="absolute top-3 right-3">
-                        <span className="px-2 py-1 bg-yellow-500/40 text-yellow-200 text-xs font-bold rounded-full">
-                          🔨 Planning
-                        </span>
-                      </div>
-
-                      <div className="text-4xl mb-3">{trip.emoji}</div>
-                      <h3 className="text-xl font-bold leading-tight mb-1">{trip.destination}</h3>
-                      <p className="text-white/70 text-sm mb-2">
-                        {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
-                      </p>
-
-                      {/* Theme */}
-                      {trip.theme && (
-                        <div className="text-sm bg-white/20 px-2 py-1 rounded-lg inline-flex items-center gap-1 mb-3">
-                          🎯 {trip.theme}
-                        </div>
-                      )}
-
-                      {/* Planning Links Count */}
-                      {trip.planningLinks && trip.planningLinks.length > 0 && (
-                        <div className="text-xs text-white/60 flex items-center gap-1">
-                          <Link className="w-3 h-3" />
-                          {trip.planningLinks.length} planning link{trip.planningLinks.length !== 1 ? 's' : ''}
-                        </div>
-                      )}
-
-                      {/* Click to view */}
-                      <div className="mt-3 flex items-center justify-between text-sm">
-                        <span className="text-white/60">Click to plan</span>
-                        <ChevronRight className="w-4 h-4 text-white/60 group-hover:translate-x-1 transition-transform" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Calendar Section */}
-          <section className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/10">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Calendar className="w-6 h-6 text-teal-400" />
-                Travel Calendar
-              </h2>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-                  className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <span className="text-white font-semibold min-w-[140px] text-center">
-                  {months[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-                </span>
-                <button
-                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-                  className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Upcoming Trips This Month */}
-            {(() => {
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-              const monthTrips = sortedTrips.filter(trip => {
-                const start = parseLocalDate(trip.dates.start);
-                const end = parseLocalDate(trip.dates.end);
-                return (start.getMonth() === currentMonth.getMonth() && start.getFullYear() === currentMonth.getFullYear()) ||
-                       (end.getMonth() === currentMonth.getMonth() && end.getFullYear() === currentMonth.getFullYear());
-              });
-              if (monthTrips.length === 0) return null;
-
-              return (
-                <div className="mb-6 space-y-2">
-                  {monthTrips.map(trip => {
-                    const start = parseLocalDate(trip.dates.start);
-                    const daysUntil = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
-                    const isOngoing = today >= parseLocalDate(trip.dates.start) && today <= parseLocalDate(trip.dates.end);
-                    const isPast = today > parseLocalDate(trip.dates.end);
-
-                    return (
-                      <div
-                        key={trip.id}
-                        onClick={() => setEditingTrip(trip)}
-                        className={`bg-gradient-to-r ${trip.color} ${trip.isPlanning ? 'opacity-70 border-2 border-dashed border-white/40' : ''} rounded-xl p-3 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform relative overflow-hidden`}
-                      >
-                        {trip.isPlanning && (
-                          <div className="absolute inset-0 opacity-20" style={{
-                            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.3) 5px, rgba(255,255,255,0.3) 10px)'
-                          }} />
-                        )}
-                        <div className="flex items-center gap-3 relative z-10">
-                          <span className="text-2xl">{trip.emoji}</span>
-                          <div className="text-white">
-                            <div className="font-bold flex items-center gap-2">
-                              {trip.destination}
-                              {trip.isPlanning && <span className="text-xs bg-yellow-500/30 text-yellow-200 px-2 py-0.5 rounded-full">Planning</span>}
-                            </div>
-                            <div className="text-sm opacity-80">
-                              {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-white text-right relative z-10">
-                          {trip.isPlanning ? (
-                            <span className="text-sm opacity-80">🔨 In the works</span>
-                          ) : isPast ? (
-                            <span className="text-sm opacity-70">Memories made! 💕</span>
-                          ) : isOngoing ? (
-                            <span className="bg-white/30 px-3 py-1 rounded-full text-sm font-bold animate-pulse">🎉 You're there!</span>
-                          ) : daysUntil <= 7 ? (
-                            <span className="bg-white/30 px-3 py-1 rounded-full text-sm font-bold">🔥 {daysUntil} {daysUntil === 1 ? 'day' : 'days'}!</span>
-                          ) : (
-                            <span className="text-sm opacity-80">{daysUntil} days away ✨</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1 mb-1">
-              {days.map(day => (
-                <div key={day} className="text-center text-slate-400 text-xs font-semibold py-2 uppercase tracking-wide">
-                  {day}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1 border border-white/10 rounded-xl overflow-hidden">
-              {[...Array(firstDay)].map((_, i) => (
-                <div key={`empty-${i}`} className="h-20 md:h-24 bg-white/5 border-r border-b border-white/5" />
-              ))}
-              {[...Array(daysInMonth)].map((_, i) => {
-                const day = i + 1;
-                const tripOnDate = isDateInTrip(day);
-                const checkDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-                const isStartDay = tripOnDate && parseLocalDate(tripOnDate.dates.start).toDateString() === checkDate.toDateString();
-                const isEndDay = tripOnDate && parseLocalDate(tripOnDate.dates.end).toDateString() === checkDate.toDateString();
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const isToday = checkDate.toDateString() === today.toDateString();
-                const isWeekend = checkDate.getDay() === 0 || checkDate.getDay() === 6;
-
-                // Check if this date falls within any visible open date range
-                const openDateOnDay = visibleOpenDates.find(od => {
-                  const start = parseLocalDate(od.start);
-                  const end = parseLocalDate(od.end);
-                  return checkDate >= start && checkDate <= end;
-                });
-                const isOpenDateStart = openDateOnDay && parseLocalDate(openDateOnDay.start).toDateString() === checkDate.toDateString();
-
-                return (
-                  <div
-                    key={day}
-                    className={`h-20 md:h-24 p-1 relative group border-r border-b border-white/5 transition-all ${
-                      tripOnDate
-                        ? 'cursor-pointer hover:z-10'
-                        : openDateOnDay
-                        ? 'cursor-pointer hover:z-10'
-                        : ''
-                    } ${isWeekend && !tripOnDate ? 'bg-white/[0.02]' : 'bg-white/5'} ${
-                      openDateOnDay && !tripOnDate ? 'bg-green-500/10' : ''
-                    }`}
-                    onClick={() => tripOnDate ? setEditingTrip(tripOnDate) : openDateOnDay ? setShowOpenDateModal(true) : null}
-                  >
-                    {/* Date number */}
-                    <div className={`text-xs font-medium mb-1 flex items-center justify-between ${
-                      isToday
-                        ? 'text-teal-400'
-                        : tripOnDate
-                        ? 'text-white'
-                        : 'text-slate-500'
-                    }`}>
-                      <span className={`${isToday ? 'bg-teal-400 text-slate-900 w-5 h-5 rounded-full flex items-center justify-center font-bold' : ''}`}>
-                        {day}
-                      </span>
-                      {isStartDay && <span className="text-xs">🛫</span>}
-                      {isEndDay && !isStartDay && <span className="text-xs">🛬</span>}
-                    </div>
-
-                    {/* Trip content */}
-                    {tripOnDate && (
-                      <div className={`${tripOnDate.isPlanning
-                        ? 'bg-gradient-to-br ' + tripOnDate.color + ' opacity-60 border-2 border-dashed border-white/50'
-                        : 'bg-gradient-to-br ' + tripOnDate.color + ' shadow-md hover:shadow-lg'
-                      } rounded-lg p-1.5 h-[calc(100%-20px)] flex flex-col justify-between overflow-hidden transition-shadow relative`}>
-                        {/* Planning stripe pattern overlay */}
-                        {tripOnDate.isPlanning && (
-                          <div className="absolute inset-0 opacity-20" style={{
-                            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.3) 5px, rgba(255,255,255,0.3) 10px)'
-                          }} />
-                        )}
-                        <div className="flex items-center gap-1 relative z-10">
-                          <span className="text-sm md:text-base">{tripOnDate.emoji}</span>
-                          <span className="text-xs font-semibold text-white truncate hidden md:block">
-                            {tripOnDate.destination}
-                          </span>
-                        </div>
-                        {tripOnDate.isPlanning && isStartDay && (
-                          <div className="text-xs text-white/90 truncate hidden md:block relative z-10">
-                            🔨 Planning
-                          </div>
-                        )}
-                        {!tripOnDate.isPlanning && tripOnDate.special && isStartDay && (
-                          <div className="text-xs text-white/80 truncate hidden md:block">
-                            {tripOnDate.special}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Open Date indicator */}
-                    {openDateOnDay && !tripOnDate && (
-                      <div className="bg-gradient-to-br from-green-400/80 to-emerald-500/80 rounded-lg p-1.5 h-[calc(100%-20px)] flex flex-col justify-between overflow-hidden border-2 border-dashed border-green-300/50">
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm">✨</span>
-                          <span className="text-xs font-semibold text-white truncate hidden md:block">
-                            Open!
-                          </span>
-                        </div>
-                        {isOpenDateStart && openDateOnDay.note && (
-                          <div className="text-xs text-white/90 truncate hidden md:block">
-                            {openDateOnDay.note}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Hover Preview Card */}
-                    {tripOnDate && (
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-30 scale-95 group-hover:scale-100">
-                        <div className={`bg-gradient-to-br ${tripOnDate.color} ${tripOnDate.isPlanning ? 'border-2 border-dashed border-white/50' : ''} rounded-xl p-3 shadow-2xl min-w-[200px] text-white`}>
-                          {tripOnDate.isPlanning && (
-                            <div className="mb-2 text-xs bg-yellow-500/30 text-yellow-200 px-2 py-1 rounded-full inline-flex items-center gap-1">
-                              🔨 Planning
-                            </div>
-                          )}
-                          {tripOnDate.coverImage && (
-                            <img src={tripOnDate.coverImage} alt="" className="w-full h-20 object-cover rounded-lg mb-2" />
-                          )}
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-2xl">{tripOnDate.emoji}</span>
-                            <span className="font-bold text-lg">{tripOnDate.destination}</span>
-                          </div>
-                          <div className="text-sm opacity-90">
-                            {formatDate(tripOnDate.dates.start, { weekday: 'short', month: 'short', day: 'numeric' })} - {formatDate(tripOnDate.dates.end, { weekday: 'short', month: 'short', day: 'numeric' })}
-                          </div>
-                          {tripOnDate.theme && tripOnDate.isPlanning && (
-                            <div className="mt-2 text-sm bg-white/20 inline-block px-2 py-1 rounded-full">
-                              🎯 {tripOnDate.theme}
-                            </div>
-                          )}
-                          {tripOnDate.special && !tripOnDate.isPlanning && (
-                            <div className="mt-2 text-sm bg-white/20 inline-block px-2 py-1 rounded-full">
-                              {tripOnDate.special}
-                            </div>
-                          )}
-                          <div className="mt-2 flex gap-2 text-xs">
-                            {isStartDay && <span className="bg-white/20 px-2 py-1 rounded-full">🛫 Trip starts!</span>}
-                            {isEndDay && <span className="bg-white/20 px-2 py-1 rounded-full">🛬 Last day!</span>}
-                            {!isStartDay && !isEndDay && <span className="bg-white/20 px-2 py-1 rounded-full">📍 Day {Math.ceil((checkDate - parseLocalDate(tripOnDate.dates.start)) / (1000 * 60 * 60 * 24)) + 1}</span>}
-                          </div>
-                          <div className="mt-2 text-xs opacity-70 flex items-center gap-1">
-                            <span>Click to view details →</span>
-                          </div>
-                        </div>
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-white/20" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {/* Fill remaining cells to complete the grid */}
-              {[...Array((7 - ((firstDay + daysInMonth) % 7)) % 7)].map((_, i) => (
-                <div key={`end-empty-${i}`} className="h-20 md:h-24 bg-white/5 border-r border-b border-white/5" />
-              ))}
-            </div>
-
-            {/* Legend with more info */}
-            <div className="mt-6 flex flex-wrap gap-4">
-              {sortedTrips.map(trip => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const start = parseLocalDate(trip.dates.start);
-                const daysUntil = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
-                const tripDuration = Math.ceil((parseLocalDate(trip.dates.end) - start) / (1000 * 60 * 60 * 24)) + 1;
-
-                return (
-                  <div
-                    key={trip.id}
-                    onClick={() => setEditingTrip(trip)}
-                    className="flex items-center gap-2 bg-white/5 hover:bg-white/10 px-3 py-2 rounded-full cursor-pointer transition"
-                  >
-                    <span className="text-lg">{trip.emoji}</span>
-                    <span className="text-white text-sm font-medium">{trip.destination}</span>
-                    <span className="text-slate-400 text-xs">({tripDuration}d)</span>
-                  </div>
-                );
-              })}
-              {/* Open dates in legend */}
-              {visibleOpenDates.length > 0 && (
-                <div
-                  onClick={() => isOwner && setShowOpenDateModal(true)}
-                  className={`flex items-center gap-2 bg-green-500/20 px-3 py-2 rounded-full transition border border-dashed border-green-400/50 ${isOwner ? 'hover:bg-green-500/30 cursor-pointer' : ''}`}
-                >
-                  <span className="text-lg">✨</span>
-                  <span className="text-green-300 text-sm font-medium">Open for Travel</span>
-                  <span className="text-green-400 text-xs">({visibleOpenDates.length} dates)</span>
-                </div>
-              )}
-            </div>
-
-            {/* Open Dates Summary */}
-            {visibleOpenDates.length > 0 && (
-              <div className="mt-4 p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-xl border border-green-500/20">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-green-300 font-semibold flex items-center gap-2">
-                    ✨ {isOwner ? 'Open for Travel Dates' : 'Mike & Adam are available'}
-                  </h4>
-                  {isOwner && (
-                    <button
-                      onClick={() => setShowOpenDateModal(true)}
-                      className="text-sm text-green-400 hover:text-green-300 underline"
-                    >
-                      Manage
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {visibleOpenDates.map(od => (
-                    <div key={od.id} className="bg-green-500/20 px-3 py-1.5 rounded-full text-sm text-green-200">
-                      {new Date(od.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(od.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      {od.note && <span className="text-green-400 ml-1">({od.note})</span>}
-                      {isOwner && !od.visibleTo.includes('all') && (
-                        <span className="ml-1 text-xs text-green-400/70">
-                          👁️ {od.visibleTo.map(id => (companions || []).find(c => c.id === id)?.firstName || (companions || []).find(c => c.id === id)?.name).filter(Boolean).join(', ')}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-
-          {/* Travel Quote */}
-          <div className="mt-12 mb-8 text-center">
-            <div className="max-w-2xl mx-auto px-6 py-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
-              <p className="text-lg md:text-xl text-white/80 italic">
-                "{travelQuotes[currentQuoteIndex].quote}"
-              </p>
-              <p className="text-sm text-white/50 mt-2">— {travelQuotes[currentQuoteIndex].author}</p>
-            </div>
-          </div>
-
-          {/* Achievements Section */}
-          <div className="mb-12">
-            <button
-              onClick={() => setShowAchievements(!showAchievements)}
-              className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-orange-500/20 rounded-2xl border border-yellow-500/30 hover:border-yellow-500/50 transition"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">🏆</span>
-                <div className="text-left">
-                  <h3 className="text-lg font-bold text-white">Travel Achievements</h3>
-                  <p className="text-sm text-white/60">
-                    {achievementDefinitions.filter(a => a.condition(trips, tripDetails)).length} of {achievementDefinitions.length} unlocked
-                  </p>
-                </div>
-              </div>
-              <ChevronRight className={`w-6 h-6 text-white/60 transition-transform ${showAchievements ? 'rotate-90' : ''}`} />
-            </button>
-
-            {showAchievements && (
-              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-                {achievementDefinitions.map(achievement => {
-                  const unlocked = achievement.condition(trips, tripDetails);
-                  return (
-                    <div
-                      key={achievement.id}
-                      className={`p-4 rounded-xl text-center transition ${
-                        unlocked
-                          ? 'bg-gradient-to-br from-amber-500/30 to-yellow-500/30 border border-yellow-500/50'
-                          : 'bg-white/5 border border-white/10 opacity-50'
-                      }`}
-                    >
-                      <span className={`text-3xl ${unlocked ? '' : 'grayscale'}`}>{achievement.emoji}</span>
-                      <div className={`text-sm font-bold mt-2 ${unlocked ? 'text-yellow-300' : 'text-white/50'}`}>
-                        {achievement.name}
-                      </div>
-                      <div className="text-xs text-white/40 mt-1">{achievement.description}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Map View */}
-          <div className="mb-12">
-            <button
-              onClick={() => setShowMapView(!showMapView)}
-              className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 rounded-2xl border border-teal-500/30 hover:border-teal-500/50 transition"
-            >
-              <div className="flex items-center gap-3">
-                <Globe className="w-8 h-8 text-teal-400" />
-                <div className="text-left">
-                  <h3 className="text-lg font-bold text-white">Our Adventures Map</h3>
-                  <p className="text-sm text-white/60">{trips.length + wishlist.length} destinations on our list</p>
-                </div>
-              </div>
-              <ChevronRight className={`w-6 h-6 text-white/60 transition-transform ${showMapView ? 'rotate-90' : ''}`} />
-            </button>
-
-            {showMapView && (
-              <div className="mt-4 bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {[...trips, ...wishlist].map(trip => (
-                    <div
-                      key={trip.id}
-                      onClick={() => !trip.isWishlist && setEditingTrip(trip)}
-                      className={`p-3 rounded-xl ${trip.isWishlist ? 'bg-white/5 border border-dashed border-white/20' : `bg-gradient-to-br ${trip.color}`} cursor-pointer hover:scale-105 transition-transform`}
-                    >
-                      <div className="text-2xl mb-1">{trip.emoji}</div>
-                      <div className="text-sm font-medium text-white">{trip.destination}</div>
-                      {trip.dates && (
-                        <div className="text-xs text-white/60">
-                          {formatDate(trip.dates.start, { month: 'short', year: 'numeric' })}
-                        </div>
-                      )}
-                      {trip.isWishlist && (
-                        <div className="text-xs text-purple-400 mt-1">✨ Wishlist</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Love Note */}
-          <div className="text-center">
-            <div className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-teal-500/20 via-purple-500/20 to-indigo-500/20 rounded-full border border-purple-500/30">
-              <span className="text-xl">🏳️‍🌈</span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-purple-300 to-indigo-300 font-medium">
-                Every adventure is better with you, Adam
-              </span>
-              <span className="text-xl">💕</span>
-            </div>
-            <p className="text-slate-500 text-sm mt-3">Made with love in 2026 🦄</p>
-            <BuildInfo />
-          </div>
-          </>
-          )}
-          {/* End Main Adventures View */}
-
-          {/* Random Adventure View */}
-          {travelViewMode === 'random' && (
-            <div className="mt-8">
-              {/* Mobile Back Button */}
-              <button
-                onClick={() => setTravelViewMode('main')}
-                className="md:hidden flex items-center gap-2 text-teal-400 hover:text-teal-300 mb-4 active:scale-95 transition min-h-[44px]"
-              >
-                <ChevronLeft className="w-5 h-5" />
-                <span className="font-medium">Back to Adventures</span>
-              </button>
-              <div className="max-w-2xl mx-auto">
-                {/* Random Experience Generator */}
-                <div className="bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 rounded-3xl p-8 border border-amber-500/30 text-center mb-8">
-                  <div className="text-6xl mb-4">🎲</div>
-                  <h2 className="text-2xl font-bold text-white mb-2">Random Adventure Generator</h2>
-                  <p className="text-slate-300 mb-6">Let fate decide your next destination!</p>
-
-                  <button
-                    onClick={() => setShowRandomExperience(true)}
-                    className="px-8 py-4 bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold text-xl rounded-2xl hover:opacity-90 transition shadow-lg"
-                  >
-                    🎰 Spin the Wheel!
-                  </button>
-                </div>
-
-                {/* Experience Categories */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
-                  {[
-                    { emoji: '🏖️', label: 'Beach / Warm', color: 'from-cyan-500/20 to-blue-500/20' },
-                    { emoji: '🏔️', label: 'Mountain Escape', color: 'from-emerald-500/20 to-green-500/20' },
-                    { emoji: '🏛️', label: 'Cultural', color: 'from-purple-500/20 to-indigo-500/20' },
-                    { emoji: '🎢', label: 'Adventure', color: 'from-orange-500/20 to-red-500/20' },
-                    { emoji: '🏃', label: 'Fitness / Active', color: 'from-red-500/20 to-orange-500/20' },
-                    { emoji: '🧘', label: 'Relaxing / Spa', color: 'from-teal-500/20 to-cyan-500/20' },
-                    { emoji: '🍷', label: 'Food & Wine', color: 'from-rose-500/20 to-pink-500/20' },
-                    { emoji: '🌆', label: 'City Break', color: 'from-slate-500/20 to-zinc-500/20' },
-                    { emoji: '🏕️', label: 'Nature / Outdoors', color: 'from-green-500/20 to-lime-500/20' },
-                  ].map((cat, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setShowRandomExperience(true)}
-                      className={`bg-gradient-to-br ${cat.color} rounded-2xl p-4 sm:p-6 border border-white/10 hover:border-white/30 transition text-center active:scale-95`}
-                    >
-                      <div className="text-3xl sm:text-4xl mb-2">{cat.emoji}</div>
-                      <div className="text-white font-medium text-sm sm:text-base">{cat.label}</div>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Recent Random Picks */}
-                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                  <h3 className="text-lg font-bold text-white mb-4">💡 How it works</h3>
-                  <ul className="space-y-3 text-slate-300">
-                    <li className="flex items-start gap-3">
-                      <span className="text-teal-400">1.</span>
-                      <span>Click "Spin the Wheel" to get a random destination suggestion</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="text-teal-400">2.</span>
-                      <span>Love it? Add it to your adventures or wishlist</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="text-teal-400">3.</span>
-                      <span>Not feeling it? Spin again for a new suggestion</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-          {/* End Random Adventure View */}
-
-          {/* Wishlist View */}
-          {travelViewMode === 'wishlist' && (
-            <div className="mt-8">
-              {/* Mobile Back Button */}
-              <button
-                onClick={() => setTravelViewMode('main')}
-                className="md:hidden flex items-center gap-2 text-teal-400 hover:text-teal-300 mb-4 active:scale-95 transition min-h-[44px]"
-              >
-                <ChevronLeft className="w-5 h-5" />
-                <span className="font-medium">Back to Adventures</span>
-              </button>
-              {/* Add to Wishlist Button */}
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                  <span className="text-3xl">🦄</span>
-                  Dream Destinations
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-purple-400 to-indigo-400">✨</span>
-                </h2>
-                {isOwner && (
-                  <button
-                    onClick={() => setShowNewTripModal('wishlist')}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 border border-violet-500/30"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Dream
-                  </button>
-                )}
-              </div>
-
-              {wishlist.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {wishlist.map(item => (
-                    <div
-                      key={item.id}
-                      className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 relative overflow-hidden group hover:border-purple-500/50 transition"
-                    >
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-purple-400 to-indigo-400" />
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="text-4xl mb-3">{item.emoji}</div>
-                          <h3 className="text-xl font-bold text-white mb-1">{item.destination}</h3>
-                          {item.notes && (
-                            <p className="text-slate-400 text-sm">{item.notes}</p>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <button
-                            onClick={() => convertToAdventure(item)}
-                            className="px-3 py-1.5 bg-gradient-to-r from-teal-400 to-purple-400 text-white text-sm font-medium rounded-full hover:opacity-80 transition"
-                          >
-                            Book it! 🎉
-                          </button>
-                          {isOwner && (
-                            <button
-                              onClick={() => {
-                                if (confirm(`Remove ${item.destination} from wishlist?`)) {
-                                  const newWishlist = wishlist.filter(w => w.id !== item.id);
-                                  setWishlist(newWishlist);
-                                  saveToFirestore(null, newWishlist, null);
-                                }
-                              }}
-                              className="px-3 py-1.5 bg-white/10 text-slate-300 text-sm rounded-full hover:bg-red-500/20 hover:text-red-300 transition"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <Starburst className="absolute -right-4 -bottom-4 w-16 h-16 text-white/5" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-16 bg-white/5 rounded-3xl border border-white/10">
-                  <div className="text-6xl mb-4">🌟</div>
-                  <h3 className="text-xl font-bold text-white mb-2">No dream destinations yet</h3>
-                  <p className="text-slate-400 mb-6">Start adding places you'd love to visit!</p>
-                  {isOwner && (
-                    <button
-                      onClick={() => setShowNewTripModal('wishlist')}
-                      className="px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-500 text-white font-semibold rounded-xl hover:opacity-90 transition"
-                    >
-                      Add Your First Dream ✨
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Inspiration Section */}
-              <div className="mt-12">
-                <h3 className="text-xl font-bold text-white mb-4">🌈 Need Inspiration?</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[
-                    { destination: 'Santorini', emoji: '🇬🇷', notes: 'Stunning sunsets' },
-                    { destination: 'Kyoto', emoji: '🇯🇵', notes: 'Cherry blossoms' },
-                    { destination: 'Reykjavik', emoji: '🇮🇸', notes: 'Northern lights' },
-                    { destination: 'Bali', emoji: '🇮🇩', notes: 'Tropical paradise' },
-                  ].map((idea, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        if (isOwner) {
-                          const newItem = {
-                            id: Date.now(),
-                            destination: idea.destination,
-                            emoji: idea.emoji,
-                            notes: idea.notes,
-                            color: 'from-violet-400 to-purple-400',
-                            isWishlist: true
-                          };
-                          const newWishlist = [...wishlist, newItem];
-                          setWishlist(newWishlist);
-                          saveToFirestore(null, newWishlist, null);
-                          showToast(`${idea.destination} added to wishlist!`, 'success');
-                        }
-                      }}
-                      className="bg-white/5 rounded-xl p-4 border border-white/10 hover:border-purple-500/50 transition text-left"
-                    >
-                      <div className="text-2xl mb-1">{idea.emoji}</div>
-                      <div className="text-white font-medium">{idea.destination}</div>
-                      <div className="text-slate-400 text-xs">{idea.notes}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-          {/* End Wishlist View */}
-            </>
-          )}
-          </div>
-          )}
-          {/* ========== END TRAVEL SECTION ========== */}
 
           {/* ========== FITNESS SECTION ========== */}
           {activeSection === 'fitness' && (
@@ -7220,8 +5984,43 @@ export default function TripPlanner() {
           {/* ========== EVENTS SECTION ========== */}
           {activeSection === 'events' && (
             <div>
-              {/* Event Detail View */}
-              {selectedPartyEvent ? (
+              {/* Detail Views */}
+              {selectedTrip ? (
+<TripDetail
+              trip={selectedTrip}
+              editingTrip={editingTrip}
+              setEditingTrip={setEditingTrip}
+              editingTripDates={editingTripDates}
+              setEditingTripDates={setEditingTripDates}
+              setSelectedTrip={setSelectedTrip}
+              tripDetails={tripDetails}
+              setTripDetails={setTripDetails}
+              canEditTrip={canEditTrip}
+              removeItem={removeItem}
+              removeLink={removeLink}
+              addLink={addLink}
+              setShowAddModal={setShowAddModal}
+              setShowLinkModal={setShowLinkModal}
+              setShowGuestModal={setShowGuestModal}
+              showLinkModal={showLinkModal}
+              showGuestModal={showGuestModal}
+              isOwner={isOwner}
+              isGuest={isGuest}
+              guestPermissions={guestPermissions}
+              currentUser={currentUser}
+              updateTripDates={updateTripDates}
+              showToast={showToast}
+              saveToFirestore={saveToFirestore}
+              setTrips={setTrips}
+              guestEmail={guestEmail}
+              setGuestEmail={setGuestEmail}
+              guestPermission={guestPermission}
+              setGuestPermission={setGuestPermission}
+              linkedTasks={sharedTasks.filter(t => t && t.linkedTo && t.linkedTo.section === 'trips' && t.linkedTo.itemId === selectedTrip?.id)}
+              onCompleteTask={completeTask}
+              onEditTask={(t) => setShowAddTaskModal(t)}
+            />
+              ) : selectedPartyEvent ? (
                 <div>
                   {/* Back Button & Header */}
                   <div className="flex items-center gap-4 mb-6">
@@ -7942,28 +6741,827 @@ export default function TripPlanner() {
                 </div>
               ) : (
                 <>
-                  {/* Events List View */}
-                  {/* View Mode Toggle (left padding for FAB on mobile) */}
-                  <div className="flex gap-1.5 md:gap-2 mb-4 items-center justify-start sticky top-0 z-20 bg-slate-800/95 backdrop-blur-md py-3 -mx-6 px-6">
-                    {[
-                      { id: 'upcoming', emoji: '📅' },
-                      { id: 'past', emoji: '📜' },
-                      { id: 'all', emoji: '📋' },
-                    ].map(mode => (
-                      <button
-                        key={mode.id}
-                        onClick={() => setEventViewMode(mode.id)}
-                        className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-base md:text-lg text-center ${
-                          eventViewMode === mode.id
-                            ? 'bg-amber-500 text-white shadow-lg'
-                            : 'bg-white/10 text-slate-300 hover:bg-white/20'
-                        }`}
-                      >
-                        {mode.emoji}
-                      </button>
-                    ))}
+                  {/* ===== Combined Events/Travel View ===== */}
+            {/* Combined Events Submenu */}
+            <div className="flex gap-1.5 md:gap-2 mb-4 items-center justify-start sticky top-0 z-20 bg-slate-800/95 backdrop-blur-md py-3 -mx-6 px-6">
+              {/* Date sort toggle */}
+              <button
+                onClick={() => setEventsSortAsc(!eventsSortAsc)}
+                className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center bg-white/10 text-slate-300 hover:bg-white/20`}
+              >
+                🗓️ {eventsSortAsc ? '↑' : '↓'}
+              </button>
+              {/* Type filter */}
+              {[
+                { id: null, emoji: '📋', label: 'All' },
+                { id: 'travel', emoji: '✈️', label: 'Trips' },
+                { id: 'parties', emoji: '🎉', label: 'Parties' },
+                { id: 'datenight', emoji: '🥂', label: 'Dates' },
+                { id: 'concert', emoji: '🎵', label: 'Shows' },
+                { id: 'fitness', emoji: '🏆', label: 'Fitness' },
+                { id: 'pride', emoji: '🏳️‍🌈', label: 'Pride' },
+                { id: 'karaoke', emoji: '🎤', label: 'Karaoke' },
+              ].map(filter => (
+                <button
+                  key={filter.id || 'all'}
+                  onClick={() => setEventsTypeFilter(eventsTypeFilter === filter.id ? null : filter.id)}
+                  className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center ${
+                    eventsTypeFilter === filter.id
+                      ? 'bg-amber-500 text-white shadow-lg'
+                      : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                  }`}
+                >
+                  {filter.emoji}
+                </button>
+              ))}
+              {/* Random & Wishlist */}
+              <button
+                onClick={() => setTravelViewMode(travelViewMode === 'random' ? 'main' : 'random')}
+                className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center ${
+                  travelViewMode === 'random'
+                    ? 'bg-amber-500 text-white shadow-lg'
+                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                }`}
+              >
+                🎲
+              </button>
+              <button
+                onClick={() => setTravelViewMode(travelViewMode === 'wishlist' ? 'main' : 'wishlist')}
+                className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center ${
+                  travelViewMode === 'wishlist'
+                    ? 'bg-amber-500 text-white shadow-lg'
+                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                }`}
+              >
+                🦄
+              </button>
+              {isOwner && (
+                <>
+                  <button
+                    onClick={() => setShowOpenDateModal(true)}
+                    className="flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center bg-white/10 text-slate-300 hover:bg-white/20"
+                  >
+                    📅
+                  </button>
+                  <button
+                    onClick={() => setShowTravelCircleModal(true)}
+                    className="flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-sm md:text-base text-center bg-white/10 text-slate-300 hover:bg-white/20"
+                  >
+                    👥
+                  </button>
+                </>
+              )}
+            </div>
+
+                  {/* Random Adventure Generator */}
+          {travelViewMode === 'random' && (
+            <div className="mt-8">
+              {/* Mobile Back Button */}
+              <button
+                onClick={() => setTravelViewMode('main')}
+                className="md:hidden flex items-center gap-2 text-teal-400 hover:text-teal-300 mb-4 active:scale-95 transition min-h-[44px]"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                <span className="font-medium">Back to Adventures</span>
+              </button>
+              <div className="max-w-2xl mx-auto">
+                {/* Random Experience Generator */}
+                <div className="bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 rounded-3xl p-8 border border-amber-500/30 text-center mb-8">
+                  <div className="text-6xl mb-4">🎲</div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Random Adventure Generator</h2>
+                  <p className="text-slate-300 mb-6">Let fate decide your next destination!</p>
+
+                  <button
+                    onClick={() => setShowRandomExperience(true)}
+                    className="px-8 py-4 bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold text-xl rounded-2xl hover:opacity-90 transition shadow-lg"
+                  >
+                    🎰 Spin the Wheel!
+                  </button>
+                </div>
+
+                {/* Experience Categories */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+                  {[
+                    { emoji: '🏖️', label: 'Beach / Warm', color: 'from-cyan-500/20 to-blue-500/20' },
+                    { emoji: '🏔️', label: 'Mountain Escape', color: 'from-emerald-500/20 to-green-500/20' },
+                    { emoji: '🏛️', label: 'Cultural', color: 'from-purple-500/20 to-indigo-500/20' },
+                    { emoji: '🎢', label: 'Adventure', color: 'from-orange-500/20 to-red-500/20' },
+                    { emoji: '🏃', label: 'Fitness / Active', color: 'from-red-500/20 to-orange-500/20' },
+                    { emoji: '🧘', label: 'Relaxing / Spa', color: 'from-teal-500/20 to-cyan-500/20' },
+                    { emoji: '🍷', label: 'Food & Wine', color: 'from-rose-500/20 to-pink-500/20' },
+                    { emoji: '🌆', label: 'City Break', color: 'from-slate-500/20 to-zinc-500/20' },
+                    { emoji: '🏕️', label: 'Nature / Outdoors', color: 'from-green-500/20 to-lime-500/20' },
+                  ].map((cat, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setShowRandomExperience(true)}
+                      className={`bg-gradient-to-br ${cat.color} rounded-2xl p-4 sm:p-6 border border-white/10 hover:border-white/30 transition text-center active:scale-95`}
+                    >
+                      <div className="text-3xl sm:text-4xl mb-2">{cat.emoji}</div>
+                      <div className="text-white font-medium text-sm sm:text-base">{cat.label}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Recent Random Picks */}
+                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+                  <h3 className="text-lg font-bold text-white mb-4">💡 How it works</h3>
+                  <ul className="space-y-3 text-slate-300">
+                    <li className="flex items-start gap-3">
+                      <span className="text-teal-400">1.</span>
+                      <span>Click "Spin the Wheel" to get a random destination suggestion</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-teal-400">2.</span>
+                      <span>Love it? Add it to your adventures or wishlist</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-teal-400">3.</span>
+                      <span>Not feeling it? Spin again for a new suggestion</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+                  {/* Wishlist / Dream Destinations */}
+          {travelViewMode === 'wishlist' && (
+            <div className="mt-8">
+              {/* Mobile Back Button */}
+              <button
+                onClick={() => setTravelViewMode('main')}
+                className="md:hidden flex items-center gap-2 text-teal-400 hover:text-teal-300 mb-4 active:scale-95 transition min-h-[44px]"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                <span className="font-medium">Back to Adventures</span>
+              </button>
+              {/* Add to Wishlist Button */}
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <span className="text-3xl">🦄</span>
+                  Dream Destinations
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-purple-400 to-indigo-400">✨</span>
+                </h2>
+                {isOwner && (
+                  <button
+                    onClick={() => setShowNewTripModal('wishlist')}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 border border-violet-500/30"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Dream
+                  </button>
+                )}
+              </div>
+
+              {wishlist.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {wishlist.map(item => (
+                    <div
+                      key={item.id}
+                      className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 relative overflow-hidden group hover:border-purple-500/50 transition"
+                    >
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-purple-400 to-indigo-400" />
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="text-4xl mb-3">{item.emoji}</div>
+                          <h3 className="text-xl font-bold text-white mb-1">{item.destination}</h3>
+                          {item.notes && (
+                            <p className="text-slate-400 text-sm">{item.notes}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={() => convertToAdventure(item)}
+                            className="px-3 py-1.5 bg-gradient-to-r from-teal-400 to-purple-400 text-white text-sm font-medium rounded-full hover:opacity-80 transition"
+                          >
+                            Book it! 🎉
+                          </button>
+                          {isOwner && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remove ${item.destination} from wishlist?`)) {
+                                  const newWishlist = wishlist.filter(w => w.id !== item.id);
+                                  setWishlist(newWishlist);
+                                  saveToFirestore(null, newWishlist, null);
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-white/10 text-slate-300 text-sm rounded-full hover:bg-red-500/20 hover:text-red-300 transition"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <Starburst className="absolute -right-4 -bottom-4 w-16 h-16 text-white/5" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16 bg-white/5 rounded-3xl border border-white/10">
+                  <div className="text-6xl mb-4">🌟</div>
+                  <h3 className="text-xl font-bold text-white mb-2">No dream destinations yet</h3>
+                  <p className="text-slate-400 mb-6">Start adding places you'd love to visit!</p>
+                  {isOwner && (
+                    <button
+                      onClick={() => setShowNewTripModal('wishlist')}
+                      className="px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-500 text-white font-semibold rounded-xl hover:opacity-90 transition"
+                    >
+                      Add Your First Dream ✨
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Inspiration Section */}
+              <div className="mt-12">
+                <h3 className="text-xl font-bold text-white mb-4">🌈 Need Inspiration?</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { destination: 'Santorini', emoji: '🇬🇷', notes: 'Stunning sunsets' },
+                    { destination: 'Kyoto', emoji: '🇯🇵', notes: 'Cherry blossoms' },
+                    { destination: 'Reykjavik', emoji: '🇮🇸', notes: 'Northern lights' },
+                    { destination: 'Bali', emoji: '🇮🇩', notes: 'Tropical paradise' },
+                  ].map((idea, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        if (isOwner) {
+                          const newItem = {
+                            id: Date.now(),
+                            destination: idea.destination,
+                            emoji: idea.emoji,
+                            notes: idea.notes,
+                            color: 'from-violet-400 to-purple-400',
+                            isWishlist: true
+                          };
+                          const newWishlist = [...wishlist, newItem];
+                          setWishlist(newWishlist);
+                          saveToFirestore(null, newWishlist, null);
+                          showToast(`${idea.destination} added to wishlist!`, 'success');
+                        }
+                      }}
+                      className="bg-white/5 rounded-xl p-4 border border-white/10 hover:border-purple-500/50 transition text-left"
+                    >
+                      <div className="text-2xl mb-1">{idea.emoji}</div>
+                      <div className="text-white font-medium">{idea.destination}</div>
+                      <div className="text-slate-400 text-xs">{idea.notes}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+
+                  {/* Main Combined View - Trips + Events */}
+                  {travelViewMode === 'main' && (
+                  <>
+                  {/* Countdown Banner for Next Trip */}
+              {(!eventsTypeFilter || eventsTypeFilter === 'travel') && (
+          (() => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const upcomingTrips = sortedTrips.filter(t => parseLocalDate(t.dates.start) > today);
+            if (upcomingTrips.length === 0) return null;
+            const nextTrip = upcomingTrips[0];
+            const daysUntil = Math.ceil((parseLocalDate(nextTrip.dates.start) - today) / (1000 * 60 * 60 * 24));
+            const tripDuration = Math.ceil((parseLocalDate(nextTrip.dates.end) - parseLocalDate(nextTrip.dates.start)) / (1000 * 60 * 60 * 24)) + 1;
+
+            // Get trip details (hotels, events)
+            const details = tripDetails[nextTrip.id] || { hotels: [], events: [], flights: [] };
+
+            // Mock weather based on destination and month
+            const tripMonth = parseLocalDate(nextTrip.dates.start).getMonth();
+            const getWeather = () => {
+              const dest = nextTrip.destination.toLowerCase();
+              const isWinter = tripMonth >= 11 || tripMonth <= 2;
+              const isSummer = tripMonth >= 5 && tripMonth <= 8;
+              if (dest.includes('beach') || dest.includes('island') || dest.includes('key west') || dest.includes('puerto') || dest.includes('caribbean') || dest.includes('provincetown')) {
+                return { temp: isSummer ? '88°F' : '78°F', icon: '☀️', desc: 'Sunny & warm' };
+              }
+              if (dest.includes('london') || dest.includes('seattle')) {
+                return { temp: isSummer ? '68°F' : '45°F', icon: '🌧️', desc: 'Might rain' };
+              }
+              if (dest.includes('nyc') || dest.includes('new york') || dest.includes('chicago')) {
+                return { temp: isWinter ? '35°F' : isSummer ? '82°F' : '58°F', icon: isWinter ? '❄️' : '🌤️', desc: isWinter ? 'Bundle up!' : 'Nice weather' };
+              }
+              return { temp: isSummer ? '75°F' : '65°F', icon: '🌤️', desc: 'Pleasant' };
+            };
+            const weather = getWeather();
+
+            return (
+              <div
+                onClick={() => setEditingTrip(nextTrip)}
+                className={`mt-6 bg-gradient-to-r ${nextTrip.color} rounded-2xl p-4 md:p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] transition-transform`}>
+                <div className="absolute inset-0 bg-black/10" />
+                <div className="relative flex flex-col md:flex-row items-start justify-between gap-4">
+                  {/* Left side - Trip info */}
+                  <div className="flex items-start gap-4">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        startBouncingEmoji(nextTrip.emoji, rect.left, rect.top);
+                      }}
+                      className="text-5xl md:text-6xl hover:scale-125 transition-transform cursor-pointer"
+                      title="Click me! 🎉"
+                    >
+                      {nextTrip.emoji}
+                    </button>
+                    <div className="text-white">
+                      <p className="text-sm md:text-base opacity-80 font-medium">Next Adventure</p>
+                      <h3 className="text-2xl md:text-3xl font-bold">{nextTrip.destination}</h3>
+                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                        <span className="text-sm opacity-80">{tripDuration} days</span>
+                        <span className="text-sm opacity-60">•</span>
+                        <span className="text-sm flex items-center gap-1">
+                          <span>{weather.icon}</span>
+                          <span className="opacity-80">{weather.temp}</span>
+                        </span>
+                        <span className="text-sm opacity-60">•</span>
+                        <span className="text-sm opacity-80">
+                          {formatDate(nextTrip.dates.start)} - {formatDate(nextTrip.dates.end)}
+                        </span>
+                      </div>
+
+                      {/* Trip Details - Hotels & Events */}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {details.hotels && details.hotels.length > 0 && (
+                          <div className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-lg">
+                            <Hotel className="w-4 h-4" />
+                            <span className="text-sm font-medium">{details.hotels[0].name}</span>
+                            {details.hotels[0].nights && (
+                              <span className="text-xs opacity-70">({details.hotels[0].nights} nights)</span>
+                            )}
+                          </div>
+                        )}
+                        {details.flights && details.flights.length > 0 && (
+                          <div className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-lg">
+                            <Plane className="w-4 h-4" />
+                            <span className="text-sm font-medium">{details.flights[0].airline}</span>
+                          </div>
+                        )}
+                        {details.events && details.events.map((event, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-lg">
+                            <Music className="w-4 h-4" />
+                            <span className="text-sm font-medium">{event.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
+                  {/* Right side - Countdown */}
+                  <div className="flex items-center gap-3 self-center md:self-start">
+                    <div className="text-center bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 md:px-6 md:py-3">
+                      <div className="text-3xl md:text-5xl font-bold text-white">{daysUntil}</div>
+                      <div className="text-xs md:text-sm text-white/80 font-medium">{daysUntil === 1 ? 'day' : 'days'} to go!</div>
+                    </div>
+                    <div className="text-4xl md:text-5xl">
+                      {daysUntil <= 7 ? '🎉' : daysUntil <= 30 ? '✨' : '🗓️'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom row - Special event & Share */}
+                <div className="relative mt-3 flex items-center gap-3 flex-wrap">
+                  {nextTrip.special && (
+                    <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-white text-sm font-medium">
+                      {nextTrip.special}
+                    </span>
+                  )}
+                  {nextTrip.guests && nextTrip.guests.length > 0 && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-white/15 rounded-full text-white text-sm">
+                      <Users className="w-3.5 h-3.5" />
+                      +{nextTrip.guests.length} guest{nextTrip.guests.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const text = `${nextTrip.emoji} ${daysUntil} days until ${nextTrip.destination}! ✨\n\n#TravelCountdown #${nextTrip.destination.replace(/[^a-zA-Z]/g, '')}`;
+                      if (navigator.share) {
+                        navigator.share({ title: 'Trip Countdown', text });
+                      } else {
+                        navigator.clipboard.writeText(text);
+                        alert('Countdown copied to clipboard! 📋');
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-white text-sm font-medium transition"
+                  >
+                    📤 Share Countdown
+                  </button>
+                </div>
+                <Starburst className="absolute -right-8 -bottom-8 w-32 h-32 text-white/10" />
+              </div>
+            );
+          })()
+              )}
+
+
+              {(!eventsTypeFilter || eventsTypeFilter === 'travel') && (
+              <>
+          {/* Trip Cards - Confirmed Adventures (skip the first upcoming trip since it's in the banner) */}
+          <section className="mt-8 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {(() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const upcomingTrips = sortedTrips.filter(t => parseLocalDate(t.dates.start) > today);
+                const nextTripId = upcomingTrips.length > 0 ? upcomingTrips[0].id : null;
+                // Filter out the next upcoming trip (shown in banner) from the grid
+                return confirmedTrips.filter(trip => trip.id !== nextTripId && parseLocalDate(trip.dates.start) >= today);
+              })().map(trip => (
+                <div
+                  key={trip.id}
+                  data-search-id={`travel-${trip.id}`}
+                  className={`bg-gradient-to-br ${trip.color} rounded-3xl text-white text-left relative overflow-hidden group hover:scale-105 transition-transform duration-300 shadow-xl`}
+                >
+                  {/* Cover Image */}
+                  {trip.coverImage && (
+                    <div className="h-28 w-full overflow-hidden">
+                      <img
+                        src={trip.coverImage}
+                        alt={trip.destination}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 h-28 bg-gradient-to-b from-black/20 to-transparent" />
+                    </div>
+                  )}
+                  <div className={`p-6 ${trip.coverImage ? 'pt-4' : ''}`}>
+                  <AtomicDots />
+
+                  {/* 3-dot menu button - Owner only */}
+                  {isOwner && (
+                  <div className="absolute top-3 right-3 z-20">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowTripMenu(showTripMenu === trip.id ? null : trip.id);
+                        setShowColorPicker(null);
+                        setShowEmojiEditor(null);
+                        setShowImageEditor(null);
+                      }}
+                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition opacity-0 group-hover:opacity-100"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {showTripMenu === trip.id && (
+                      <div className="absolute top-8 right-0 w-48 bg-white rounded-xl shadow-xl overflow-hidden z-30">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowEmojiEditor(trip.id);
+                            setShowColorPicker(null);
+                            setShowImageEditor(null);
+                          }}
+                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
+                        >
+                          <span className="text-lg">😀</span>
+                          Change Icon
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowColorPicker(trip.id);
+                            setShowEmojiEditor(null);
+                            setShowImageEditor(null);
+                          }}
+                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
+                        >
+                          <Palette className="w-4 h-4" />
+                          Change Color
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowImageEditor(trip.id);
+                            setShowColorPicker(null);
+                            setShowEmojiEditor(null);
+                          }}
+                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
+                        >
+                          <Image className="w-4 h-4" />
+                          {trip.coverImage ? 'Change Photo' : 'Add Photo'}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowGuestModal(trip.id);
+                            setShowTripMenu(null);
+                          }}
+                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
+                        >
+                          <Users className="w-4 h-4" />
+                          Manage Guests
+                          {trip.guests && trip.guests.length > 0 && (
+                            <span className="ml-auto bg-purple-100 text-purple-600 text-xs px-2 py-0.5 rounded-full">
+                              {trip.guests.length}
+                            </span>
+                          )}
+                        </button>
+                        {canDeleteTrip(trip.id) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Delete trip to ${trip.destination}?`)) {
+                                deleteTrip(trip.id);
+                              }
+                            }}
+                            className="w-full px-4 py-3 text-left text-red-500 hover:bg-red-50 flex items-center gap-2 text-sm border-t"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete Trip
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Color Picker */}
+                    {showColorPicker === trip.id && (
+                      <div className="absolute top-8 right-0 w-48 bg-white rounded-xl shadow-xl p-3 z-30">
+                        <p className="text-xs text-slate-500 mb-2 font-medium">Choose a color</p>
+                        <div className="grid grid-cols-4 gap-2">
+                          {tripColors.map((colorSet, idx) => (
+                            <button
+                              key={idx}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateTripColor(trip.id, colorSet);
+                              }}
+                              className={`w-8 h-8 rounded-lg bg-gradient-to-br ${colorSet.color} hover:scale-110 transition ${
+                                trip.color === colorSet.color ? 'ring-2 ring-white ring-offset-2' : ''
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Emoji Editor */}
+                    {showEmojiEditor === trip.id && (
+                      <div className="absolute top-8 right-0 w-56 bg-white rounded-xl shadow-xl p-3 z-30">
+                        <p className="text-xs text-slate-500 mb-2 font-medium">Choose an icon</p>
+                        <div className="grid grid-cols-6 gap-1 mb-2">
+                          {travelEmojis.map((emoji, idx) => (
+                            <button
+                              key={idx}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateTripEmoji(trip.id, emoji);
+                              }}
+                              className={`w-8 h-8 text-lg rounded-lg hover:bg-purple-100 transition flex items-center justify-center ${
+                                trip.emoji === emoji ? 'bg-purple-200 ring-2 ring-purple-400' : ''
+                              }`}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Or type emoji..."
+                          className="w-full px-2 py-1 text-sm text-center border border-slate-200 rounded-lg"
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              updateTripEmoji(trip.id, e.target.value);
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Image Editor */}
+                    {showImageEditor === trip.id && (
+                      <div className="absolute top-8 right-0 w-72 bg-white rounded-xl shadow-xl p-3 z-30">
+                        <p className="text-xs text-slate-500 mb-2 font-medium">Add a cover photo</p>
+                        {trip.coverImage && (
+                          <div className="mb-2 relative">
+                            <img src={trip.coverImage} alt="Current cover" className="w-full h-20 object-cover rounded-lg" />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateTripCoverImage(trip.id, null);
+                              }}
+                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                        <input
+                          type="text"
+                          placeholder="Paste image URL..."
+                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:border-purple-400 outline-none"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && e.target.value) {
+                              updateTripCoverImage(trip.id, e.target.value);
+                            }
+                          }}
+                        />
+                        <p className="text-xs text-slate-400 mt-2">Press Enter to save. Try: picsum.photos/seed/yourword/800/400</p>
+                      </div>
+                    )}
+                  </div>
+                  )}
+
+                  {/* Clickable card content */}
+                  <button
+                    onClick={() => {
+                      if (!showTripMenu && !showColorPicker && !showEmojiEditor && !showImageEditor) {
+                        setEditingTrip(trip);
+                      }
+                    }}
+                    className="w-full text-left relative z-10"
+                  >
+                    <div className="text-4xl mb-3">{trip.emoji}</div>
+                    <h3 className="text-xl font-bold mb-1">{trip.destination}</h3>
+                    <p className="text-white/80 text-sm">
+                      {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
+                    </p>
+                    {(() => {
+                      const now = new Date();
+                      const tripStart = parseLocalDate(trip.dates.start);
+                      const tripEnd = parseLocalDate(trip.dates.end);
+                      const daysTo = Math.ceil((tripStart - now) / (1000 * 60 * 60 * 24));
+                      const isOngoing = now >= tripStart && now <= tripEnd;
+                      if (isOngoing) return (
+                        <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
+                          🎉 Happening now!
+                        </div>
+                      );
+                      if (daysTo > 0) return (
+                        <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
+                          {daysTo <= 7 ? '🔥' : daysTo <= 30 ? '✨' : '🗓️'} {daysTo} {daysTo === 1 ? 'day' : 'days'} to go!
+                        </div>
+                      );
+                      return null;
+                    })()}
+                    {trip.special && (
+                      <div className="mt-3 text-sm font-semibold bg-white/20 inline-block px-3 py-1 rounded-full">
+                        {trip.special}
+                      </div>
+                    )}
+                    {/* Guest Count Indicator */}
+                    {trip.guests && trip.guests.length > 0 && (
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <div className="flex -space-x-1.5">
+                          {trip.guests.slice(0, 3).map((guest) => (
+                            <div
+                              key={guest.id}
+                              className="w-6 h-6 bg-white/30 rounded-full flex items-center justify-center text-[10px] font-bold border border-white/50"
+                              title={guest.name || guest.email || 'Guest'}
+                            >
+                              {(guest.name || guest.email || '?').charAt(0)}
+                            </div>
+                          ))}
+                        </div>
+                        <span className="text-xs opacity-80">
+                          +{trip.guests.length} guest{trip.guests.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    )}
+                    {/* Linked Hub Items */}
+                    {(() => {
+                      const { linkedTasks, linkedLists } = getLinkedHubItems('travel', trip.id);
+                      if (linkedTasks.length === 0 && linkedLists.length === 0) return null;
+                      return (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {linkedTasks.map(task => (
+                            <button
+                              key={task.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveSection('home');
+                                setHubSubView('home');
+                              }}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition hover:scale-105 ${
+                                task.status === 'done'
+                                  ? 'bg-green-500/30 text-green-200'
+                                  : 'bg-white/20 text-white'
+                              }`}
+                              title={task.title}
+                            >
+                              <span>{task.status === 'done' ? '✅' : '☑️'}</span>
+                              <span className="max-w-[80px] truncate">{task.title}</span>
+                            </button>
+                          ))}
+                          {linkedLists.map(list => (
+                            <button
+                              key={list.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveSection('home');
+                                setHubSubView('home');
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-full text-xs font-medium text-white transition hover:scale-105"
+                              title={list.name}
+                            >
+                              <span>{list.emoji || '📝'}</span>
+                              <span className="max-w-[80px] truncate">{list.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                    <div className="mt-4 flex items-center gap-2 text-sm opacity-0 group-hover:opacity-100 transition">
+                      <span>Plan this trip</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </div>
+                  </button>
+                  <Starburst className="absolute -right-6 -bottom-6 w-24 h-24 text-white/10 group-hover:rotate-45 transition-transform duration-500" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+              </>
+              )}
+
+
+              {/* In the Works - Planning Section */}
+              {(!eventsTypeFilter || eventsTypeFilter === 'travel') && planningTrips.length > 0 && (
+            <section className="mb-12">
+              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                <span className="text-2xl">🔨</span>
+                In the Works
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {planningTrips.map(trip => (
+                  <div
+                    key={trip.id}
+                    onClick={() => setEditingTrip(trip)}
+                    className={`bg-gradient-to-br ${trip.color} rounded-3xl text-white text-left relative overflow-hidden group hover:scale-105 transition-transform duration-300 shadow-xl border-2 border-dashed border-white/40 cursor-pointer`}
+                  >
+                    {/* Stripe pattern overlay */}
+                    <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
+                      backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.3) 10px, rgba(255,255,255,0.3) 20px)'
+                    }} />
+
+                    {/* Cover Image */}
+                    {trip.coverImage && (
+                      <div className="h-28 w-full overflow-hidden">
+                        <img
+                          src={trip.coverImage}
+                          alt={trip.destination}
+                          className="w-full h-full object-cover opacity-80"
+                        />
+                        <div className="absolute inset-0 h-28 bg-gradient-to-b from-black/20 to-transparent" />
+                      </div>
+                    )}
+
+                    <div className={`p-6 ${trip.coverImage ? 'pt-4' : ''} relative z-10`}>
+                      {/* Planning Badge */}
+                      <div className="absolute top-3 right-3">
+                        <span className="px-2 py-1 bg-yellow-500/40 text-yellow-200 text-xs font-bold rounded-full">
+                          🔨 Planning
+                        </span>
+                      </div>
+
+                      <div className="text-4xl mb-3">{trip.emoji}</div>
+                      <h3 className="text-xl font-bold leading-tight mb-1">{trip.destination}</h3>
+                      <p className="text-white/70 text-sm mb-2">
+                        {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
+                      </p>
+
+                      {/* Theme */}
+                      {trip.theme && (
+                        <div className="text-sm bg-white/20 px-2 py-1 rounded-lg inline-flex items-center gap-1 mb-3">
+                          🎯 {trip.theme}
+                        </div>
+                      )}
+
+                      {/* Planning Links Count */}
+                      {trip.planningLinks && trip.planningLinks.length > 0 && (
+                        <div className="text-xs text-white/60 flex items-center gap-1">
+                          <Link className="w-3 h-3" />
+                          {trip.planningLinks.length} planning link{trip.planningLinks.length !== 1 ? 's' : ''}
+                        </div>
+                      )}
+
+                      {/* Click to view */}
+                      <div className="mt-3 flex items-center justify-between text-sm">
+                        <span className="text-white/60">Click to plan</span>
+                        <ChevronRight className="w-4 h-4 text-white/60 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+
+                  {/* Event Cards Grid */}
+              {(!eventsTypeFilter || eventsTypeFilter === 'parties') && (
+              <>
                   {/* Events Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {partyEvents
@@ -7971,14 +7569,14 @@ export default function TripPlanner() {
                         const eventDate = parseLocalDate(event.date);
                         const today = new Date();
                         today.setHours(0, 0, 0, 0);
-                        if (eventViewMode === 'upcoming') return eventDate >= today;
-                        if (eventViewMode === 'past') return eventDate < today;
-                        return true;
+                        return eventDate >= today; // Only show upcoming events
+                        // Past events now only in Memories
+                        // return true;
                       })
                       .sort((a, b) => {
                         const dateA = parseLocalDate(a.date);
                         const dateB = parseLocalDate(b.date);
-                        return eventViewMode === 'past' ? dateB - dateA : dateA - dateB;
+                        return eventsSortAsc ? dateA - dateB : dateB - dateA;
                       })
                       .map(event => {
                         const eventDate = parseLocalDate(event.date);
@@ -8148,15 +7746,14 @@ export default function TripPlanner() {
                       const eventDate = parseLocalDate(event.date);
                       const today = new Date();
                       today.setHours(0, 0, 0, 0);
-                      if (eventViewMode === 'upcoming') return eventDate >= today;
-                      if (eventViewMode === 'past') return eventDate < today;
-                      return true;
+                      return eventDate >= today; // Only show upcoming events
+                      // Past events now only in Memories
+                      // return true;
                     }).length === 0 && (
                       <div className="col-span-full text-center py-12">
                         <div className="text-6xl mb-4">🎈</div>
                         <h3 className="text-xl font-bold text-white mb-2">
-                          {eventViewMode === 'upcoming' ? 'No upcoming events' :
-                           eventViewMode === 'past' ? 'No past events' : 'No events yet'}
+                          No upcoming events
                         </h3>
                         <p className="text-slate-400 mb-4">
                           {isOwner ? 'Create your first event to get started!' : 'Check back soon for new events!'}
@@ -8172,6 +7769,340 @@ export default function TripPlanner() {
                       </div>
                     )}
                   </div>
+              </>
+              )}
+
+
+              {/* Calendar Section */}
+              {(!eventsTypeFilter || eventsTypeFilter === 'travel') && (
+          <>
+          <section className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/10">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                <Calendar className="w-6 h-6 text-teal-400" />
+                Travel Calendar
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
+                  className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <span className="text-white font-semibold min-w-[140px] text-center">
+                  {months[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                </span>
+                <button
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
+                  className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Upcoming Trips This Month */}
+            {(() => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const monthTrips = sortedTrips.filter(trip => {
+                const start = parseLocalDate(trip.dates.start);
+                const end = parseLocalDate(trip.dates.end);
+                return (start.getMonth() === currentMonth.getMonth() && start.getFullYear() === currentMonth.getFullYear()) ||
+                       (end.getMonth() === currentMonth.getMonth() && end.getFullYear() === currentMonth.getFullYear());
+              });
+              if (monthTrips.length === 0) return null;
+
+              return (
+                <div className="mb-6 space-y-2">
+                  {monthTrips.map(trip => {
+                    const start = parseLocalDate(trip.dates.start);
+                    const daysUntil = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
+                    const isOngoing = today >= parseLocalDate(trip.dates.start) && today <= parseLocalDate(trip.dates.end);
+                    const isPast = today > parseLocalDate(trip.dates.end);
+
+                    return (
+                      <div
+                        key={trip.id}
+                        onClick={() => setEditingTrip(trip)}
+                        className={`bg-gradient-to-r ${trip.color} ${trip.isPlanning ? 'opacity-70 border-2 border-dashed border-white/40' : ''} rounded-xl p-3 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform relative overflow-hidden`}
+                      >
+                        {trip.isPlanning && (
+                          <div className="absolute inset-0 opacity-20" style={{
+                            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.3) 5px, rgba(255,255,255,0.3) 10px)'
+                          }} />
+                        )}
+                        <div className="flex items-center gap-3 relative z-10">
+                          <span className="text-2xl">{trip.emoji}</span>
+                          <div className="text-white">
+                            <div className="font-bold flex items-center gap-2">
+                              {trip.destination}
+                              {trip.isPlanning && <span className="text-xs bg-yellow-500/30 text-yellow-200 px-2 py-0.5 rounded-full">Planning</span>}
+                            </div>
+                            <div className="text-sm opacity-80">
+                              {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-white text-right relative z-10">
+                          {trip.isPlanning ? (
+                            <span className="text-sm opacity-80">🔨 In the works</span>
+                          ) : isPast ? (
+                            <span className="text-sm opacity-70">Memories made! 💕</span>
+                          ) : isOngoing ? (
+                            <span className="bg-white/30 px-3 py-1 rounded-full text-sm font-bold animate-pulse">🎉 You're there!</span>
+                          ) : daysUntil <= 7 ? (
+                            <span className="bg-white/30 px-3 py-1 rounded-full text-sm font-bold">🔥 {daysUntil} {daysUntil === 1 ? 'day' : 'days'}!</span>
+                          ) : (
+                            <span className="text-sm opacity-80">{daysUntil} days away ✨</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* Calendar Grid */}
+            <div className="grid grid-cols-7 gap-1 mb-1">
+              {days.map(day => (
+                <div key={day} className="text-center text-slate-400 text-xs font-semibold py-2 uppercase tracking-wide">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1 border border-white/10 rounded-xl overflow-hidden">
+              {[...Array(firstDay)].map((_, i) => (
+                <div key={`empty-${i}`} className="h-20 md:h-24 bg-white/5 border-r border-b border-white/5" />
+              ))}
+              {[...Array(daysInMonth)].map((_, i) => {
+                const day = i + 1;
+                const tripOnDate = isDateInTrip(day);
+                const checkDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                const isStartDay = tripOnDate && parseLocalDate(tripOnDate.dates.start).toDateString() === checkDate.toDateString();
+                const isEndDay = tripOnDate && parseLocalDate(tripOnDate.dates.end).toDateString() === checkDate.toDateString();
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const isToday = checkDate.toDateString() === today.toDateString();
+                const isWeekend = checkDate.getDay() === 0 || checkDate.getDay() === 6;
+
+                // Check if this date falls within any visible open date range
+                const openDateOnDay = visibleOpenDates.find(od => {
+                  const start = parseLocalDate(od.start);
+                  const end = parseLocalDate(od.end);
+                  return checkDate >= start && checkDate <= end;
+                });
+                const isOpenDateStart = openDateOnDay && parseLocalDate(openDateOnDay.start).toDateString() === checkDate.toDateString();
+
+                return (
+                  <div
+                    key={day}
+                    className={`h-20 md:h-24 p-1 relative group border-r border-b border-white/5 transition-all ${
+                      tripOnDate
+                        ? 'cursor-pointer hover:z-10'
+                        : openDateOnDay
+                        ? 'cursor-pointer hover:z-10'
+                        : ''
+                    } ${isWeekend && !tripOnDate ? 'bg-white/[0.02]' : 'bg-white/5'} ${
+                      openDateOnDay && !tripOnDate ? 'bg-green-500/10' : ''
+                    }`}
+                    onClick={() => tripOnDate ? setEditingTrip(tripOnDate) : openDateOnDay ? setShowOpenDateModal(true) : null}
+                  >
+                    {/* Date number */}
+                    <div className={`text-xs font-medium mb-1 flex items-center justify-between ${
+                      isToday
+                        ? 'text-teal-400'
+                        : tripOnDate
+                        ? 'text-white'
+                        : 'text-slate-500'
+                    }`}>
+                      <span className={`${isToday ? 'bg-teal-400 text-slate-900 w-5 h-5 rounded-full flex items-center justify-center font-bold' : ''}`}>
+                        {day}
+                      </span>
+                      {isStartDay && <span className="text-xs">🛫</span>}
+                      {isEndDay && !isStartDay && <span className="text-xs">🛬</span>}
+                    </div>
+
+                    {/* Trip content */}
+                    {tripOnDate && (
+                      <div className={`${tripOnDate.isPlanning
+                        ? 'bg-gradient-to-br ' + tripOnDate.color + ' opacity-60 border-2 border-dashed border-white/50'
+                        : 'bg-gradient-to-br ' + tripOnDate.color + ' shadow-md hover:shadow-lg'
+                      } rounded-lg p-1.5 h-[calc(100%-20px)] flex flex-col justify-between overflow-hidden transition-shadow relative`}>
+                        {/* Planning stripe pattern overlay */}
+                        {tripOnDate.isPlanning && (
+                          <div className="absolute inset-0 opacity-20" style={{
+                            backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.3) 5px, rgba(255,255,255,0.3) 10px)'
+                          }} />
+                        )}
+                        <div className="flex items-center gap-1 relative z-10">
+                          <span className="text-sm md:text-base">{tripOnDate.emoji}</span>
+                          <span className="text-xs font-semibold text-white truncate hidden md:block">
+                            {tripOnDate.destination}
+                          </span>
+                        </div>
+                        {tripOnDate.isPlanning && isStartDay && (
+                          <div className="text-xs text-white/90 truncate hidden md:block relative z-10">
+                            🔨 Planning
+                          </div>
+                        )}
+                        {!tripOnDate.isPlanning && tripOnDate.special && isStartDay && (
+                          <div className="text-xs text-white/80 truncate hidden md:block">
+                            {tripOnDate.special}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Open Date indicator */}
+                    {openDateOnDay && !tripOnDate && (
+                      <div className="bg-gradient-to-br from-green-400/80 to-emerald-500/80 rounded-lg p-1.5 h-[calc(100%-20px)] flex flex-col justify-between overflow-hidden border-2 border-dashed border-green-300/50">
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm">✨</span>
+                          <span className="text-xs font-semibold text-white truncate hidden md:block">
+                            Open!
+                          </span>
+                        </div>
+                        {isOpenDateStart && openDateOnDay.note && (
+                          <div className="text-xs text-white/90 truncate hidden md:block">
+                            {openDateOnDay.note}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Hover Preview Card */}
+                    {tripOnDate && (
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-30 scale-95 group-hover:scale-100">
+                        <div className={`bg-gradient-to-br ${tripOnDate.color} ${tripOnDate.isPlanning ? 'border-2 border-dashed border-white/50' : ''} rounded-xl p-3 shadow-2xl min-w-[200px] text-white`}>
+                          {tripOnDate.isPlanning && (
+                            <div className="mb-2 text-xs bg-yellow-500/30 text-yellow-200 px-2 py-1 rounded-full inline-flex items-center gap-1">
+                              🔨 Planning
+                            </div>
+                          )}
+                          {tripOnDate.coverImage && (
+                            <img src={tripOnDate.coverImage} alt="" className="w-full h-20 object-cover rounded-lg mb-2" />
+                          )}
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-2xl">{tripOnDate.emoji}</span>
+                            <span className="font-bold text-lg">{tripOnDate.destination}</span>
+                          </div>
+                          <div className="text-sm opacity-90">
+                            {formatDate(tripOnDate.dates.start, { weekday: 'short', month: 'short', day: 'numeric' })} - {formatDate(tripOnDate.dates.end, { weekday: 'short', month: 'short', day: 'numeric' })}
+                          </div>
+                          {tripOnDate.theme && tripOnDate.isPlanning && (
+                            <div className="mt-2 text-sm bg-white/20 inline-block px-2 py-1 rounded-full">
+                              🎯 {tripOnDate.theme}
+                            </div>
+                          )}
+                          {tripOnDate.special && !tripOnDate.isPlanning && (
+                            <div className="mt-2 text-sm bg-white/20 inline-block px-2 py-1 rounded-full">
+                              {tripOnDate.special}
+                            </div>
+                          )}
+                          <div className="mt-2 flex gap-2 text-xs">
+                            {isStartDay && <span className="bg-white/20 px-2 py-1 rounded-full">🛫 Trip starts!</span>}
+                            {isEndDay && <span className="bg-white/20 px-2 py-1 rounded-full">🛬 Last day!</span>}
+                            {!isStartDay && !isEndDay && <span className="bg-white/20 px-2 py-1 rounded-full">📍 Day {Math.ceil((checkDate - parseLocalDate(tripOnDate.dates.start)) / (1000 * 60 * 60 * 24)) + 1}</span>}
+                          </div>
+                          <div className="mt-2 text-xs opacity-70 flex items-center gap-1">
+                            <span>Click to view details →</span>
+                          </div>
+                        </div>
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-white/20" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {/* Fill remaining cells to complete the grid */}
+              {[...Array((7 - ((firstDay + daysInMonth) % 7)) % 7)].map((_, i) => (
+                <div key={`end-empty-${i}`} className="h-20 md:h-24 bg-white/5 border-r border-b border-white/5" />
+              ))}
+            </div>
+
+            {/* Legend with more info */}
+            <div className="mt-6 flex flex-wrap gap-4">
+              {sortedTrips.map(trip => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const start = parseLocalDate(trip.dates.start);
+                const daysUntil = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
+                const tripDuration = Math.ceil((parseLocalDate(trip.dates.end) - start) / (1000 * 60 * 60 * 24)) + 1;
+
+                return (
+                  <div
+                    key={trip.id}
+                    onClick={() => setEditingTrip(trip)}
+                    className="flex items-center gap-2 bg-white/5 hover:bg-white/10 px-3 py-2 rounded-full cursor-pointer transition"
+                  >
+                    <span className="text-lg">{trip.emoji}</span>
+                    <span className="text-white text-sm font-medium">{trip.destination}</span>
+                    <span className="text-slate-400 text-xs">({tripDuration}d)</span>
+                  </div>
+                );
+              })}
+              {/* Open dates in legend */}
+              {visibleOpenDates.length > 0 && (
+                <div
+                  onClick={() => isOwner && setShowOpenDateModal(true)}
+                  className={`flex items-center gap-2 bg-green-500/20 px-3 py-2 rounded-full transition border border-dashed border-green-400/50 ${isOwner ? 'hover:bg-green-500/30 cursor-pointer' : ''}`}
+                >
+                  <span className="text-lg">✨</span>
+                  <span className="text-green-300 text-sm font-medium">Open for Travel</span>
+                  <span className="text-green-400 text-xs">({visibleOpenDates.length} dates)</span>
+                </div>
+              )}
+            </div>
+
+            {/* Open Dates Summary */}
+            {visibleOpenDates.length > 0 && (
+              <div className="mt-4 p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-xl border border-green-500/20">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-green-300 font-semibold flex items-center gap-2">
+                    ✨ {isOwner ? 'Open for Travel Dates' : 'Mike & Adam are available'}
+                  </h4>
+                  {isOwner && (
+                    <button
+                      onClick={() => setShowOpenDateModal(true)}
+                      className="text-sm text-green-400 hover:text-green-300 underline"
+                    >
+                      Manage
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {visibleOpenDates.map(od => (
+                    <div key={od.id} className="bg-green-500/20 px-3 py-1.5 rounded-full text-sm text-green-200">
+                      {new Date(od.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(od.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {od.note && <span className="text-green-400 ml-1">({od.note})</span>}
+                      {isOwner && !od.visibleTo.includes('all') && (
+                        <span className="ml-1 text-xs text-green-400/70">
+                          👁️ {od.visibleTo.map(id => (companions || []).find(c => c.id === id)?.firstName || (companions || []).find(c => c.id === id)?.name).filter(Boolean).join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Travel Quote */}
+          <div className="mt-12 mb-8 text-center">
+            <div className="max-w-2xl mx-auto px-6 py-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
+              <p className="text-lg md:text-xl text-white/80 italic">
+                "{travelQuotes[currentQuoteIndex].quote}"
+              </p>
+              <p className="text-sm text-white/50 mt-2">— {travelQuotes[currentQuoteIndex].author}</p>
+            </div>
+          </div>
+          </>
+              )}
+
+                  </>
+                  )}
                 </>
               )}
             </div>
@@ -12056,54 +11987,56 @@ export default function TripPlanner() {
                 <Plus className="w-7 h-7 text-white transition-transform duration-200" />
               </button>
             )}
-            {/* Tab buttons */}
+            {/* Tab buttons — 4 items: Hub, Fitness, [FAB gap], Events, Memories */}
             <div className="flex items-end justify-around px-1 pt-1 pb-1">
               {[
                 { id: 'home', label: 'Hub', emoji: '⚛️', gradient: 'from-pink-500 to-purple-500' },
-                { id: 'travel', label: 'Travel', emoji: '✈️', gradient: 'from-teal-400 to-cyan-500' },
                 { id: 'fitness', label: 'Fitness', emoji: null, gradient: 'from-orange-400 to-red-500' },
-                { id: 'events', label: 'Events', emoji: '🎉', gradient: 'from-amber-400 to-orange-500' },
+                { id: 'events', label: 'Events', emoji: '📅', gradient: 'from-amber-400 to-orange-500' },
                 { id: 'memories', label: 'Memories', emoji: '💝', gradient: 'from-rose-400 to-pink-500' },
               ].map((section, idx) => (
-                <button
-                  key={section.id}
-                  onClick={() => {
-                    setActiveSection(section.id);
-                    if (section.id === 'travel') setTravelViewMode('main');
-                    if (section.id === 'home') setHubSubView('home');
-                    setShowComingSoonMenu(false);
-                  }}
-                  className={`relative flex flex-col items-center justify-center py-1.5 rounded-xl transition-all active:scale-95 ${idx === 2 ? 'min-w-[56px] -mt-8' : 'min-w-[52px]'} ${
-                    activeSection === section.id ? '' : ''
-                  }`}
-                >
-                  {idx === 2 ? (
-                    /* Atlas figure holding up the FAB — nono banana artwork */
-                    <img
-                      src="/atlas-fitness.png"
-                      alt="Fitness"
-                      className={`transition-all duration-200 ${activeSection === section.id ? 'scale-110' : ''}`}
-                      style={{
-                        width: '38px',
-                        height: '46px',
-                        objectFit: 'contain',
-                        filter: activeSection === section.id
-                          ? 'brightness(1.6) saturate(1.3) drop-shadow(0 0 8px rgba(249,115,22,0.7)) drop-shadow(0 0 16px rgba(249,115,22,0.3))'
-                          : 'brightness(0.85) saturate(0.8) drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
-                      }}
-                    />
-                  ) : (
-                    <span className={`text-lg mb-0.5 transition-transform ${activeSection === section.id ? 'scale-110' : ''}`}>
-                      {section.emoji}
+                <React.Fragment key={section.id}>
+                  {/* FAB spacer between Fitness (idx 1) and Events (idx 2) */}
+                  {idx === 2 && isOwner && <div className="min-w-[56px]" />}
+                  <button
+                    onClick={() => {
+                      setActiveSection(section.id);
+                      if (section.id === 'events') setTravelViewMode('main');
+                      if (section.id === 'home') setHubSubView('home');
+                      setShowComingSoonMenu(false);
+                    }}
+                    className={`relative flex flex-col items-center justify-center py-1.5 rounded-xl transition-all active:scale-95 ${idx === 1 ? 'min-w-[56px] -mt-8' : 'min-w-[52px]'} ${
+                      activeSection === section.id ? '' : ''
+                    }`}
+                  >
+                    {idx === 1 ? (
+                      /* Atlas figure — Fitness tab */
+                      <img
+                        src="/atlas-fitness.png"
+                        alt="Fitness"
+                        className={`transition-all duration-200 ${activeSection === section.id ? 'scale-110' : ''}`}
+                        style={{
+                          width: '38px',
+                          height: '46px',
+                          objectFit: 'contain',
+                          filter: activeSection === section.id
+                            ? 'brightness(1.6) saturate(1.3) drop-shadow(0 0 8px rgba(249,115,22,0.7)) drop-shadow(0 0 16px rgba(249,115,22,0.3))'
+                            : 'brightness(0.85) saturate(0.8) drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
+                        }}
+                      />
+                    ) : (
+                      <span className={`text-lg mb-0.5 transition-transform ${activeSection === section.id ? 'scale-110' : ''}`}>
+                        {section.emoji}
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-medium transition-colors ${activeSection === section.id ? 'text-white' : 'text-white/40'}`}>
+                      {section.label}
                     </span>
-                  )}
-                  <span className={`text-[10px] font-medium transition-colors ${activeSection === section.id ? 'text-white' : 'text-white/40'}`}>
-                    {section.label}
-                  </span>
-                  {activeSection === section.id && idx !== 2 && (
-                    <div className={`absolute -bottom-0.5 w-6 h-0.5 rounded-full bg-gradient-to-r ${section.gradient}`} />
-                  )}
-                </button>
+                    {activeSection === section.id && idx !== 1 && (
+                      <div className={`absolute -bottom-0.5 w-6 h-0.5 rounded-full bg-gradient-to-r ${section.gradient}`} />
+                    )}
+                  </button>
+                </React.Fragment>
               ))}
             </div>
           </div>
