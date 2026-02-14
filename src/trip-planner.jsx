@@ -524,6 +524,7 @@ export default function TripPlanner() {
 
   // Week Ahead planner state
   const [weekQuickAddDay, setWeekQuickAddDay] = useState(null); // YYYY-MM-DD of day whose + was tapped
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, +1 = next week, -1 = prev week
 
   // Refs for dependencies defined later
   const saveToFirestoreRef = useRef(() => {});
@@ -3766,10 +3767,10 @@ export default function TripPlanner() {
                   {(() => {
                     const today = new Date();
                     const todayStr = today.toISOString().split('T')[0];
-                    // Compute Monday of current week
+                    // Compute Monday of current week + offset
                     const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon...
                     const monday = new Date(today);
-                    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+                    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1) + (weekOffset * 7));
                     monday.setHours(0,0,0,0);
 
                     const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -3856,9 +3857,26 @@ export default function TripPlanner() {
                             <span className="text-lg">📅</span>
                             <span className="text-white font-bold text-lg">{showFullMonthCalendar ? 'Calendar' : 'Week Ahead'}</span>
                             {!showFullMonthCalendar && (
-                              <span className="text-slate-400 text-sm ml-1">
-                                {weekDays[0].month}/{weekDays[0].dayNum} – {weekDays[6].month}/{weekDays[6].dayNum}
-                              </span>
+                              <div className="flex items-center gap-1 ml-1" onClick={e => e.stopPropagation()}>
+                                <button
+                                  onClick={() => setWeekOffset(prev => prev - 1)}
+                                  className="p-1 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition"
+                                >
+                                  <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setWeekOffset(0)}
+                                  className={`text-sm px-1.5 py-0.5 rounded transition ${weekOffset === 0 ? 'text-purple-300 font-semibold' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                  {weekDays[0].month}/{weekDays[0].dayNum} – {weekDays[6].month}/{weekDays[6].dayNum}
+                                </button>
+                                <button
+                                  onClick={() => setWeekOffset(prev => prev + 1)}
+                                  className="p-1 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition"
+                                >
+                                  <ChevronRight className="w-4 h-4" />
+                                </button>
+                              </div>
                             )}
                           </div>
                           <svg className={`w-5 h-5 text-slate-400 transition-transform ${isCollapsed ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
