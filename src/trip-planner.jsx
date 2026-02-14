@@ -3349,7 +3349,7 @@ export default function TripPlanner() {
       {/* Anchor removed for cleaner UI */}
 
       {/* Header */}
-      <header className="relative z-10 pt-safe pb-2 md:pb-4 px-4 md:px-6 shrink-0">
+      <header className="relative z-20 pt-safe pb-2 md:pb-4 px-4 md:px-6 shrink-0">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between gap-2 md:gap-4 relative">
             {/* Left side: Names + Section Title on mobile */}
@@ -4472,6 +4472,9 @@ export default function TripPlanner() {
               {/* ===== TASKS FULL VIEW ===== */}
               {hubSubView === 'tasks' && (
                 <div>
+                  <button onClick={() => setHubSubView('home')} className="flex items-center gap-1 text-sm text-white/60 hover:text-white mb-3 transition">
+                    <ChevronLeft className="w-4 h-4" /> Back to Hub
+                  </button>
                   {/* Time horizon filter tabs + sort toggle */}
                   <div className="flex items-center gap-2 mb-4">
                     <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
@@ -4540,6 +4543,9 @@ export default function TripPlanner() {
               {/* ===== LISTS FULL VIEW ===== */}
               {hubSubView === 'lists' && (
                 <div>
+                  <button onClick={() => setHubSubView('home')} className="flex items-center gap-1 text-sm text-white/60 hover:text-white mb-3 transition">
+                    <ChevronLeft className="w-4 h-4" /> Back to Hub
+                  </button>
                   {/* Category filter */}
                   <div className="flex gap-1.5 mb-4 overflow-x-auto pb-2">
                     <button onClick={() => setHubListFilter('all')}
@@ -4580,6 +4586,9 @@ export default function TripPlanner() {
               {/* ===== SOCIAL FULL VIEW ===== */}
               {hubSubView === 'social' && (
                 <div>
+                  <button onClick={() => setHubSubView('home')} className="flex items-center gap-1 text-sm text-white/60 hover:text-white mb-3 transition">
+                    <ChevronLeft className="w-4 h-4" /> Back to Hub
+                  </button>
                   {/* Type filter */}
                   <div className="flex gap-1.5 mb-4 overflow-x-auto pb-2">
                     {[{ value: 'all', label: 'All', emoji: '👥' }, ...socialTypes].map(st => (
@@ -4639,6 +4648,9 @@ export default function TripPlanner() {
               {/* ===== HABITS FULL VIEW ===== */}
               {hubSubView === 'habits' && (
                 <div>
+                  <button onClick={() => setHubSubView('home')} className="flex items-center gap-1 text-sm text-white/60 hover:text-white mb-3 transition">
+                    <ChevronLeft className="w-4 h-4" /> Back to Hub
+                  </button>
                   {/* Identity statements banner */}
                   {(() => {
                     const identities = sharedHabits.filter(h => h.identity && h.status === 'active');
@@ -4697,6 +4709,9 @@ export default function TripPlanner() {
               {/* ===== IDEAS FULL VIEW ===== */}
               {hubSubView === 'ideas' && (
                 <div>
+                  <button onClick={() => setHubSubView('home')} className="flex items-center gap-1 text-sm text-white/60 hover:text-white mb-3 transition">
+                    <ChevronLeft className="w-4 h-4" /> Back to Hub
+                  </button>
                   {/* Filters */}
                   <div className="flex gap-1.5 mb-4 overflow-x-auto pb-2">
                     {[{ value: 'all', label: 'All' }, ...ideaCategories].map(c => (
