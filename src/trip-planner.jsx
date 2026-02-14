@@ -3627,16 +3627,15 @@ export default function TripPlanner() {
               {/* Main navigation buttons */}
               {[
                 { id: 'home', label: 'Hub', emoji: '⚛️', gradient: 'from-pink-500 to-purple-500' },
-                { id: 'travel', label: 'Travel', emoji: '✈️', gradient: 'from-teal-400 to-cyan-500' },
                 { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
-                { id: 'events', label: 'Events', emoji: '🎉', gradient: 'from-amber-400 to-orange-500' },
+                { id: 'events', label: 'Events', emoji: '📅', gradient: 'from-amber-400 to-orange-500' },
                 { id: 'memories', label: 'Memories', emoji: '💝', gradient: 'from-rose-400 to-pink-500' },
               ].map(section => (
                 <button
                   key={section.id}
                   onClick={() => {
                     setActiveSection(section.id);
-                    if (section.id === 'travel') setTravelViewMode('main');
+                    if (section.id === 'events') setTravelViewMode('main');
                     if (section.id === 'home') setHubSubView('home');
                   }}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold transition shadow-lg ${
@@ -7043,106 +7042,123 @@ export default function TripPlanner() {
                   {/* Main Combined View - Trips + Events */}
                   {travelViewMode === 'main' && (
                   <>
-                  {/* Countdown Banner for Next Trip */}
-              {(!eventsTypeFilter || eventsTypeFilter === 'travel') && (
-          (() => {
+                  {/* Countdown Banner for Next Event (any type) */}
+              {(() => {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            const upcomingTrips = sortedTrips.filter(t => parseLocalDate(t.dates.start) > today);
-            if (upcomingTrips.length === 0) return null;
-            const nextTrip = upcomingTrips[0];
-            const daysUntil = Math.ceil((parseLocalDate(nextTrip.dates.start) - today) / (1000 * 60 * 60 * 24));
-            const tripDuration = Math.ceil((parseLocalDate(nextTrip.dates.end) - parseLocalDate(nextTrip.dates.start)) / (1000 * 60 * 60 * 24)) + 1;
 
-            // Get trip details (hotels, events)
-            const details = tripDetails[nextTrip.id] || { hotels: [], events: [], flights: [] };
+            // Gather upcoming trips
+            const upcomingTrips = sortedTrips
+              .filter(t => parseLocalDate(t.dates.start) > today)
+              .map(t => ({
+                type: 'travel', id: t.id, name: t.destination, emoji: t.emoji,
+                date: parseLocalDate(t.dates.start), color: t.color,
+                guests: t.guests, special: t.special, raw: t,
+              }));
 
-            // Mock weather based on destination and month
-            const tripMonth = parseLocalDate(nextTrip.dates.start).getMonth();
-            const getWeather = () => {
-              const dest = nextTrip.destination.toLowerCase();
-              const isWinter = tripMonth >= 11 || tripMonth <= 2;
-              const isSummer = tripMonth >= 5 && tripMonth <= 8;
-              if (dest.includes('beach') || dest.includes('island') || dest.includes('key west') || dest.includes('puerto') || dest.includes('caribbean') || dest.includes('provincetown')) {
-                return { temp: isSummer ? '88°F' : '78°F', icon: '☀️', desc: 'Sunny & warm' };
-              }
-              if (dest.includes('london') || dest.includes('seattle')) {
-                return { temp: isSummer ? '68°F' : '45°F', icon: '🌧️', desc: 'Might rain' };
-              }
-              if (dest.includes('nyc') || dest.includes('new york') || dest.includes('chicago')) {
-                return { temp: isWinter ? '35°F' : isSummer ? '82°F' : '58°F', icon: isWinter ? '❄️' : '🌤️', desc: isWinter ? 'Bundle up!' : 'Nice weather' };
-              }
-              return { temp: isSummer ? '75°F' : '65°F', icon: '🌤️', desc: 'Pleasant' };
-            };
-            const weather = getWeather();
+            // Gather upcoming party events
+            const upcomingEvents = partyEvents
+              .filter(e => parseLocalDate(e.date) >= today)
+              .map(e => ({
+                type: e.eventType || 'parties', id: e.id, name: e.name, emoji: e.emoji,
+                date: parseLocalDate(e.date), color: e.color || 'from-amber-400 to-orange-500',
+                guests: e.guests, special: null, raw: e,
+              }));
+
+            // Combine and sort — soonest first
+            const allUpcoming = [...upcomingTrips, ...upcomingEvents].sort((a, b) => a.date - b.date);
+
+            // Apply type filter if set
+            const filtered = eventsTypeFilter
+              ? allUpcoming.filter(item => item.type === eventsTypeFilter)
+              : allUpcoming;
+
+            if (filtered.length === 0) return null;
+            const next = filtered[0];
+            const daysUntil = Math.ceil((next.date - today) / (1000 * 60 * 60 * 24));
+            const isTrip = next.type === 'travel';
+
+            // Trip-specific extras
+            const details = isTrip ? (tripDetails[next.id] || { hotels: [], events: [], flights: [] }) : null;
+            const tripDuration = isTrip ? Math.ceil((parseLocalDate(next.raw.dates.end) - next.date) / (1000 * 60 * 60 * 24)) + 1 : null;
 
             return (
               <div
-                onClick={() => setEditingTrip(nextTrip)}
-                className={`mt-6 bg-gradient-to-r ${nextTrip.color} rounded-2xl p-4 md:p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] transition-transform`}>
+                onClick={() => isTrip ? setEditingTrip(next.raw) : setSelectedPartyEvent(next.raw)}
+                className={`mt-6 bg-gradient-to-r ${next.color} rounded-2xl p-4 md:p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] transition-transform`}>
                 <div className="absolute inset-0 bg-black/10" />
                 <div className="relative flex flex-col md:flex-row items-start justify-between gap-4">
-                  {/* Left side - Trip info */}
                   <div className="flex items-start gap-4">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         const rect = e.currentTarget.getBoundingClientRect();
-                        startBouncingEmoji(nextTrip.emoji, rect.left, rect.top);
+                        startBouncingEmoji(next.emoji, rect.left, rect.top);
                       }}
                       className="text-5xl md:text-6xl hover:scale-125 transition-transform cursor-pointer"
-                      title="Click me! 🎉"
+                      title="Click me!"
                     >
-                      {nextTrip.emoji}
+                      {next.emoji}
                     </button>
                     <div className="text-white">
-                      <p className="text-sm md:text-base opacity-80 font-medium">Next Adventure</p>
-                      <h3 className="text-2xl md:text-3xl font-bold">{nextTrip.destination}</h3>
+                      <p className="text-sm md:text-base opacity-80 font-medium">Next Up</p>
+                      <h3 className="text-2xl md:text-3xl font-bold">{next.name}</h3>
                       <div className="flex items-center gap-3 mt-1 flex-wrap">
-                        <span className="text-sm opacity-80">{tripDuration} days</span>
-                        <span className="text-sm opacity-60">•</span>
-                        <span className="text-sm flex items-center gap-1">
-                          <span>{weather.icon}</span>
-                          <span className="opacity-80">{weather.temp}</span>
-                        </span>
-                        <span className="text-sm opacity-60">•</span>
-                        <span className="text-sm opacity-80">
-                          {formatDate(nextTrip.dates.start)} - {formatDate(nextTrip.dates.end)}
-                        </span>
+                        {isTrip && tripDuration && (
+                          <>
+                            <span className="text-sm opacity-80">{tripDuration} days</span>
+                            <span className="text-sm opacity-60">•</span>
+                            <span className="text-sm opacity-80">
+                              {formatDate(next.raw.dates.start)} - {formatDate(next.raw.dates.end)}
+                            </span>
+                          </>
+                        )}
+                        {!isTrip && (
+                          <>
+                            <span className="text-sm opacity-80">
+                              {formatDate(next.raw.date, { weekday: 'short', month: 'short', day: 'numeric' })}
+                            </span>
+                            {next.raw.time && (
+                              <>
+                                <span className="text-sm opacity-60">•</span>
+                                <span className="text-sm opacity-80">{next.raw.time}</span>
+                              </>
+                            )}
+                            {next.raw.location && (
+                              <>
+                                <span className="text-sm opacity-60">•</span>
+                                <span className="text-sm opacity-80">{next.raw.location}</span>
+                              </>
+                            )}
+                          </>
+                        )}
                       </div>
 
-                      {/* Trip Details - Hotels & Events */}
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {details.hotels && details.hotels.length > 0 && (
-                          <div className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-lg">
-                            <Hotel className="w-4 h-4" />
-                            <span className="text-sm font-medium">{details.hotels[0].name}</span>
-                            {details.hotels[0].nights && (
-                              <span className="text-xs opacity-70">({details.hotels[0].nights} nights)</span>
-                            )}
-                          </div>
-                        )}
-                        {details.flights && details.flights.length > 0 && (
-                          <div className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-lg">
-                            <Plane className="w-4 h-4" />
-                            <span className="text-sm font-medium">{details.flights[0].airline}</span>
-                          </div>
-                        )}
-                        {details.events && details.events.map((event, idx) => (
-                          <div key={idx} className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-lg">
-                            <Music className="w-4 h-4" />
-                            <span className="text-sm font-medium">{event.name}</span>
-                          </div>
-                        ))}
-                      </div>
+                      {/* Trip-specific details */}
+                      {isTrip && details && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {details.hotels && details.hotels.length > 0 && (
+                            <div className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-lg">
+                              <Hotel className="w-4 h-4" />
+                              <span className="text-sm font-medium">{details.hotels[0].name}</span>
+                            </div>
+                          )}
+                          {details.flights && details.flights.length > 0 && (
+                            <div className="flex items-center gap-1.5 bg-white/15 px-3 py-1.5 rounded-lg">
+                              <Plane className="w-4 h-4" />
+                              <span className="text-sm font-medium">{details.flights[0].airline}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Right side - Countdown */}
+                  {/* Countdown */}
                   <div className="flex items-center gap-3 self-center md:self-start">
                     <div className="text-center bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 md:px-6 md:py-3">
                       <div className="text-3xl md:text-5xl font-bold text-white">{daysUntil}</div>
-                      <div className="text-xs md:text-sm text-white/80 font-medium">{daysUntil === 1 ? 'day' : 'days'} to go!</div>
+                      <div className="text-xs md:text-sm text-white/80 font-medium">{daysUntil === 0 ? 'Today!' : daysUntil === 1 ? 'day to go!' : `days to go!`}</div>
                     </div>
                     <div className="text-4xl md:text-5xl">
                       {daysUntil <= 7 ? '🎉' : daysUntil <= 30 ? '✨' : '🗓️'}
@@ -7150,365 +7166,184 @@ export default function TripPlanner() {
                   </div>
                 </div>
 
-                {/* Bottom row - Special event & Share */}
+                {/* Bottom row */}
                 <div className="relative mt-3 flex items-center gap-3 flex-wrap">
-                  {nextTrip.special && (
+                  {next.special && (
                     <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-white text-sm font-medium">
-                      {nextTrip.special}
+                      {next.special}
                     </span>
                   )}
-                  {nextTrip.guests && nextTrip.guests.length > 0 && (
+                  {next.guests && next.guests.length > 0 && (
                     <span className="inline-flex items-center gap-1 px-3 py-1 bg-white/15 rounded-full text-white text-sm">
                       <Users className="w-3.5 h-3.5" />
-                      +{nextTrip.guests.length} guest{nextTrip.guests.length !== 1 ? 's' : ''}
+                      +{next.guests.length} guest{next.guests.length !== 1 ? 's' : ''}
                     </span>
                   )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const text = `${nextTrip.emoji} ${daysUntil} days until ${nextTrip.destination}! ✨\n\n#TravelCountdown #${nextTrip.destination.replace(/[^a-zA-Z]/g, '')}`;
+                      const text = `${next.emoji} ${daysUntil} days until ${next.name}! ✨`;
                       if (navigator.share) {
-                        navigator.share({ title: 'Trip Countdown', text });
+                        navigator.share({ title: 'Event Countdown', text });
                       } else {
                         navigator.clipboard.writeText(text);
-                        alert('Countdown copied to clipboard! 📋');
                       }
                     }}
                     className="inline-flex items-center gap-1 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-white text-sm font-medium transition"
                   >
-                    📤 Share Countdown
+                    📤 Share
                   </button>
                 </div>
                 <Starburst className="absolute -right-8 -bottom-8 w-32 h-32 text-white/10" />
               </div>
             );
-          })()
-              )}
+          })()}
 
 
-              {(!eventsTypeFilter || eventsTypeFilter === 'travel') && (
-              <>
-          {/* Trip Cards - Confirmed Adventures (skip the first upcoming trip since it's in the banner) */}
+              {/* ===== Unified Events Grid (all types) ===== */}
           <section className="mt-8 mb-12">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {(() => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
-                const upcomingTrips = sortedTrips.filter(t => parseLocalDate(t.dates.start) > today);
-                const nextTripId = upcomingTrips.length > 0 ? upcomingTrips[0].id : null;
-                // Filter out the next upcoming trip (shown in banner) from the grid
-                return confirmedTrips.filter(trip => trip.id !== nextTripId && parseLocalDate(trip.dates.start) >= today);
-              })().map(trip => (
-                <div
-                  key={trip.id}
-                  data-search-id={`travel-${trip.id}`}
-                  className={`bg-gradient-to-br ${trip.color} rounded-3xl text-white text-left relative overflow-hidden group hover:scale-105 transition-transform duration-300 shadow-xl`}
-                >
-                  {/* Cover Image */}
-                  {trip.coverImage && (
-                    <div className="h-28 w-full overflow-hidden">
-                      <img
-                        src={trip.coverImage}
-                        alt={trip.destination}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 h-28 bg-gradient-to-b from-black/20 to-transparent" />
-                    </div>
-                  )}
-                  <div className={`p-6 ${trip.coverImage ? 'pt-4' : ''}`}>
-                  <AtomicDots />
 
-                  {/* 3-dot menu button - Owner only */}
-                  {isOwner && (
-                  <div className="absolute top-3 right-3 z-20">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowTripMenu(showTripMenu === trip.id ? null : trip.id);
-                        setShowColorPicker(null);
-                        setShowEmojiEditor(null);
-                        setShowImageEditor(null);
-                      }}
-                      className="p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition opacity-0 group-hover:opacity-100"
+                // Normalize trips into unified items
+                const tripItems = sortedTrips
+                  .filter(t => parseLocalDate(t.dates.start) >= today)
+                  .map(t => ({
+                    itemType: 'travel', id: t.id, name: t.destination, emoji: t.emoji,
+                    sortDate: parseLocalDate(t.dates.start),
+                    dateLabel: `${formatDate(t.dates.start)} - ${formatDate(t.dates.end)}`,
+                    color: t.color, guests: t.guests || [], raw: t,
+                    images: [], tasks: [],
+                  }));
+
+                // Normalize events into unified items
+                const eventItems = partyEvents
+                  .filter(e => parseLocalDate(e.date) >= today)
+                  .map(e => ({
+                    itemType: e.eventType || 'parties', id: e.id, name: e.name, emoji: e.emoji,
+                    sortDate: parseLocalDate(e.date),
+                    dateLabel: `${formatDate(e.date, { weekday: 'short', month: 'short', day: 'numeric' })}${e.time ? ` • ${e.time}` : ''}`,
+                    color: e.color || 'from-amber-400 to-orange-500', guests: e.guests || [], raw: e,
+                    images: e.images || [], tasks: e.tasks || [],
+                  }));
+
+                // Combine, filter by type, sort
+                let allItems = [...tripItems, ...eventItems];
+                if (eventsTypeFilter) {
+                  allItems = allItems.filter(item => item.itemType === eventsTypeFilter);
+                }
+                allItems.sort((a, b) => eventsSortAsc ? a.sortDate - b.sortDate : b.sortDate - a.sortDate);
+
+                // Skip the banner item (first item if no filter)
+                const bannerId = allItems.length > 0 ? allItems[0].id : null;
+                const bannerType = allItems.length > 0 ? allItems[0].itemType : null;
+                const gridItems = allItems.slice(1); // skip first (shown in banner)
+
+                if (gridItems.length === 0 && allItems.length <= 1) {
+                  return (
+                    <div className="col-span-full text-center py-12">
+                      <div className="text-6xl mb-4">🎈</div>
+                      <h3 className="text-xl font-bold text-white mb-2">
+                        {allItems.length === 0 ? 'No upcoming events' : 'Only one event coming up!'}
+                      </h3>
+                      <p className="text-slate-400 mb-4">
+                        {isOwner ? 'Create more events with the + button!' : 'Check back soon!'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return gridItems.map(item => {
+                  const daysUntil = Math.ceil((item.sortDate - today) / (1000 * 60 * 60 * 24));
+                  const isToday = daysUntil === 0;
+                  const isTrip = item.itemType === 'travel';
+                  const typeEmoji = { travel: '✈️', parties: '🎉', datenight: '🥂', concert: '🎵', fitness: '🏆', pride: '🏳️‍🌈', karaoke: '🎤' }[item.itemType] || '📅';
+
+                  return (
+                    <div
+                      key={`${item.itemType}-${item.id}`}
+                      data-search-id={`${item.itemType}-${item.id}`}
+                      onClick={() => isTrip ? setEditingTrip(item.raw) : setSelectedPartyEvent(item.raw)}
+                      className="relative rounded-2xl border border-white/20 cursor-pointer hover:scale-[1.02] transition-all overflow-hidden"
                     >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-
-                    {/* Dropdown Menu */}
-                    {showTripMenu === trip.id && (
-                      <div className="absolute top-8 right-0 w-48 bg-white rounded-xl shadow-xl overflow-hidden z-30">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowEmojiEditor(trip.id);
-                            setShowColorPicker(null);
-                            setShowImageEditor(null);
-                          }}
-                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
-                        >
-                          <span className="text-lg">😀</span>
-                          Change Icon
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowColorPicker(trip.id);
-                            setShowEmojiEditor(null);
-                            setShowImageEditor(null);
-                          }}
-                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
-                        >
-                          <Palette className="w-4 h-4" />
-                          Change Color
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowImageEditor(trip.id);
-                            setShowColorPicker(null);
-                            setShowEmojiEditor(null);
-                          }}
-                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
-                        >
-                          <Image className="w-4 h-4" />
-                          {trip.coverImage ? 'Change Photo' : 'Add Photo'}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowGuestModal(trip.id);
-                            setShowTripMenu(null);
-                          }}
-                          className="w-full px-4 py-3 text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2 text-sm"
-                        >
-                          <Users className="w-4 h-4" />
-                          Manage Guests
-                          {trip.guests && trip.guests.length > 0 && (
-                            <span className="ml-auto bg-purple-100 text-purple-600 text-xs px-2 py-0.5 rounded-full">
-                              {trip.guests.length}
-                            </span>
-                          )}
-                        </button>
-                        {canDeleteTrip(trip.id) && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm(`Delete trip to ${trip.destination}?`)) {
-                                deleteTrip(trip.id);
-                              }
-                            }}
-                            className="w-full px-4 py-3 text-left text-red-500 hover:bg-red-50 flex items-center gap-2 text-sm border-t"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Delete Trip
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Color Picker */}
-                    {showColorPicker === trip.id && (
-                      <div className="absolute top-8 right-0 w-48 bg-white rounded-xl shadow-xl p-3 z-30">
-                        <p className="text-xs text-slate-500 mb-2 font-medium">Choose a color</p>
-                        <div className="grid grid-cols-4 gap-2">
-                          {tripColors.map((colorSet, idx) => (
-                            <button
-                              key={idx}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateTripColor(trip.id, colorSet);
-                              }}
-                              className={`w-8 h-8 rounded-lg bg-gradient-to-br ${colorSet.color} hover:scale-110 transition ${
-                                trip.color === colorSet.color ? 'ring-2 ring-white ring-offset-2' : ''
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Emoji Editor */}
-                    {showEmojiEditor === trip.id && (
-                      <div className="absolute top-8 right-0 w-56 bg-white rounded-xl shadow-xl p-3 z-30">
-                        <p className="text-xs text-slate-500 mb-2 font-medium">Choose an icon</p>
-                        <div className="grid grid-cols-6 gap-1 mb-2">
-                          {travelEmojis.map((emoji, idx) => (
-                            <button
-                              key={idx}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateTripEmoji(trip.id, emoji);
-                              }}
-                              className={`w-8 h-8 text-lg rounded-lg hover:bg-purple-100 transition flex items-center justify-center ${
-                                trip.emoji === emoji ? 'bg-purple-200 ring-2 ring-purple-400' : ''
-                              }`}
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="Or type emoji..."
-                          className="w-full px-2 py-1 text-sm text-center border border-slate-200 rounded-lg"
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              updateTripEmoji(trip.id, e.target.value);
-                            }
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {/* Image Editor */}
-                    {showImageEditor === trip.id && (
-                      <div className="absolute top-8 right-0 w-72 bg-white rounded-xl shadow-xl p-3 z-30">
-                        <p className="text-xs text-slate-500 mb-2 font-medium">Add a cover photo</p>
-                        {trip.coverImage && (
-                          <div className="mb-2 relative">
-                            <img src={trip.coverImage} alt="Current cover" className="w-full h-20 object-cover rounded-lg" />
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateTripCoverImage(trip.id, null);
-                              }}
-                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
-                        <input
-                          type="text"
-                          placeholder="Paste image URL..."
-                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:border-purple-400 outline-none"
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && e.target.value) {
-                              updateTripCoverImage(trip.id, e.target.value);
-                            }
-                          }}
-                        />
-                        <p className="text-xs text-slate-400 mt-2">Press Enter to save. Try: picsum.photos/seed/yourword/800/400</p>
-                      </div>
-                    )}
-                  </div>
-                  )}
-
-                  {/* Clickable card content */}
-                  <button
-                    onClick={() => {
-                      if (!showTripMenu && !showColorPicker && !showEmojiEditor && !showImageEditor) {
-                        setEditingTrip(trip);
-                      }
-                    }}
-                    className="w-full text-left relative z-10"
-                  >
-                    <div className="text-4xl mb-3">{trip.emoji}</div>
-                    <h3 className="text-xl font-bold mb-1">{trip.destination}</h3>
-                    <p className="text-white/80 text-sm">
-                      {formatDate(trip.dates.start)} - {formatDate(trip.dates.end)}
-                    </p>
-                    {(() => {
-                      const now = new Date();
-                      const tripStart = parseLocalDate(trip.dates.start);
-                      const tripEnd = parseLocalDate(trip.dates.end);
-                      const daysTo = Math.ceil((tripStart - now) / (1000 * 60 * 60 * 24));
-                      const isOngoing = now >= tripStart && now <= tripEnd;
-                      if (isOngoing) return (
-                        <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
-                          🎉 Happening now!
-                        </div>
-                      );
-                      if (daysTo > 0) return (
-                        <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
-                          {daysTo <= 7 ? '🔥' : daysTo <= 30 ? '✨' : '🗓️'} {daysTo} {daysTo === 1 ? 'day' : 'days'} to go!
-                        </div>
-                      );
-                      return null;
-                    })()}
-                    {trip.special && (
-                      <div className="mt-3 text-sm font-semibold bg-white/20 inline-block px-3 py-1 rounded-full">
-                        {trip.special}
-                      </div>
-                    )}
-                    {/* Guest Count Indicator */}
-                    {trip.guests && trip.guests.length > 0 && (
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <div className="flex -space-x-1.5">
-                          {trip.guests.slice(0, 3).map((guest) => (
-                            <div
-                              key={guest.id}
-                              className="w-6 h-6 bg-white/30 rounded-full flex items-center justify-center text-[10px] font-bold border border-white/50"
-                              title={guest.name || guest.email || 'Guest'}
-                            >
-                              {(guest.name || guest.email || '?').charAt(0)}
+                      {/* Cover Image */}
+                      {(isTrip ? item.raw.coverImage : item.raw.coverImage) ? (
+                        <div className="relative h-40">
+                          <img
+                            src={isTrip ? item.raw.coverImage : item.raw.coverImage}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                          <div className="absolute inset-0 p-5 flex flex-col justify-end">
+                            <div className="flex items-start justify-between mb-2">
+                              <span className="text-3xl drop-shadow-lg">{item.emoji}</span>
+                              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                isToday ? 'bg-green-500 text-white' :
+                                daysUntil <= 7 ? 'bg-amber-500 text-white' :
+                                'bg-white/30 text-white backdrop-blur-sm'
+                              }`}>
+                                {isToday ? '🎉 Today!' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
+                              </span>
                             </div>
-                          ))}
+                            <h3 className="text-xl font-bold text-white drop-shadow-lg">{item.name}</h3>
+                            <p className="text-white/90 text-sm">{item.dateLabel}</p>
+                          </div>
                         </div>
-                        <span className="text-xs opacity-80">
-                          +{trip.guests.length} guest{trip.guests.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    )}
-                    {/* Linked Hub Items */}
-                    {(() => {
-                      const { linkedTasks, linkedLists } = getLinkedHubItems('travel', trip.id);
-                      if (linkedTasks.length === 0 && linkedLists.length === 0) return null;
-                      return (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {linkedTasks.map(task => (
-                            <button
-                              key={task.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveSection('home');
-                                setHubSubView('home');
-                              }}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition hover:scale-105 ${
-                                task.status === 'done'
-                                  ? 'bg-green-500/30 text-green-200'
-                                  : 'bg-white/20 text-white'
-                              }`}
-                              title={task.title}
-                            >
-                              <span>{task.status === 'done' ? '✅' : '☑️'}</span>
-                              <span className="max-w-[80px] truncate">{task.title}</span>
-                            </button>
-                          ))}
-                          {linkedLists.map(list => (
-                            <button
-                              key={list.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveSection('home');
-                                setHubSubView('home');
-                              }}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-full text-xs font-medium text-white transition hover:scale-105"
-                              title={list.name}
-                            >
-                              <span>{list.emoji || '📝'}</span>
-                              <span className="max-w-[80px] truncate">{list.name}</span>
-                            </button>
-                          ))}
+                      ) : (
+                        <div className={`bg-gradient-to-br ${item.color} p-5`}>
+                          {/* Type badge */}
+                          <div className="absolute top-3 right-3">
+                            <span className="px-2 py-1 bg-black/20 backdrop-blur-sm text-white text-xs font-medium rounded-full">
+                              {typeEmoji}
+                            </span>
+                          </div>
+
+                          <div className="flex items-start justify-between mb-3">
+                            <span className="text-4xl">{item.emoji}</span>
+                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              isToday ? 'bg-green-500 text-white' :
+                              daysUntil <= 7 ? 'bg-amber-500 text-white' :
+                              'bg-white/20 text-white'
+                            }`}>
+                              {isToday ? '🎉 Today!' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
+                            </span>
+                          </div>
+
+                          <h3 className="text-xl font-bold text-white mb-1">{item.name}</h3>
+                          <p className="text-white/80 text-sm mb-3">{item.dateLabel}</p>
+
+                          {/* Stats row */}
+                          <div className="flex items-center gap-4">
+                            {item.guests.length > 0 && (
+                              <div className="flex items-center gap-1 text-white/70 text-sm">
+                                <Users className="w-4 h-4" />
+                                <span>{item.guests.length}</span>
+                              </div>
+                            )}
+                            {item.images.length > 0 && (
+                              <div className="flex items-center gap-1 text-white/70 text-sm">
+                                <Image className="w-4 h-4" />
+                                <span>{item.images.length}</span>
+                              </div>
+                            )}
+                            {item.tasks.length > 0 && (
+                              <div className="flex items-center gap-1 text-white/70 text-sm">
+                                <CheckSquare className="w-4 h-4" />
+                                <span>{item.tasks.filter(t => t.completed).length}/{item.tasks.length}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      );
-                    })()}
-                    <div className="mt-4 flex items-center gap-2 text-sm opacity-0 group-hover:opacity-100 transition">
-                      <span>Plan this trip</span>
-                      <ChevronRight className="w-4 h-4" />
+                      )}
                     </div>
-                  </button>
-                  <Starburst className="absolute -right-6 -bottom-6 w-24 h-24 text-white/10 group-hover:rotate-45 transition-transform duration-500" />
-                  </div>
-                </div>
-              ))}
+                  );
+                });
+              })()}
             </div>
           </section>
-
-              </>
-              )}
 
 
               {/* In the Works - Planning Section */}
@@ -7583,219 +7418,6 @@ export default function TripPlanner() {
             </section>
           )}
 
-
-                  {/* Event Cards Grid */}
-              {(!eventsTypeFilter || eventsTypeFilter === 'parties') && (
-              <>
-                  {/* Events Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {partyEvents
-                      .filter(event => {
-                        const eventDate = parseLocalDate(event.date);
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        return eventDate >= today; // Only show upcoming events
-                        // Past events now only in Memories
-                        // return true;
-                      })
-                      .sort((a, b) => {
-                        const dateA = parseLocalDate(a.date);
-                        const dateB = parseLocalDate(b.date);
-                        return eventsSortAsc ? dateA - dateB : dateB - dateA;
-                      })
-                      .map(event => {
-                        const eventDate = parseLocalDate(event.date);
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const daysUntil = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
-                        const isPast = eventDate < today;
-                        const isToday = daysUntil === 0;
-
-                        return (
-                          <div
-                            key={event.id}
-                            data-search-id={`events-${event.id}`}
-                            onClick={() => setSelectedPartyEvent(event)}
-                            onDragOver={(e) => { e.preventDefault(); setDragOverEventId(event.id); }}
-                            onDragLeave={() => setDragOverEventId(null)}
-                            onDrop={(e) => { e.stopPropagation(); handleEventCardDrop(e, event.id); }}
-                            className={`relative rounded-2xl border cursor-pointer hover:scale-[1.02] transition-all overflow-hidden ${isPast ? 'opacity-60' : ''} ${
-                              dragOverEventId === event.id ? 'border-purple-500 scale-105' : 'border-white/20'
-                            }`}
-                          >
-                            {/* Cover Image or Gradient Background */}
-                            {event.coverImage ? (
-                              <div className="relative h-40">
-                                <img
-                                  src={event.coverImage}
-                                  alt={event.name}
-                                  className="w-full h-full object-cover"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-                                {/* Content overlay on image */}
-                                <div className="absolute inset-0 p-5 flex flex-col justify-end">
-                                  <div className="flex items-start justify-between mb-2">
-                                    <span className="text-3xl drop-shadow-lg">{event.emoji}</span>
-                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                      isPast ? 'bg-slate-500/80 text-slate-200' :
-                                      isToday ? 'bg-green-500 text-white' :
-                                      daysUntil <= 7 ? 'bg-amber-500 text-white' :
-                                      'bg-white/30 text-white backdrop-blur-sm'
-                                    }`}>
-                                      {isPast ? 'Past' : isToday ? '🎉 Today!' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
-                                    </span>
-                                  </div>
-                                  <h3 className="text-xl font-bold text-white drop-shadow-lg">{event.name}</h3>
-                                  <p className="text-white/90 text-sm">
-                                    {formatDate(event.date, { weekday: 'short', month: 'short', day: 'numeric' })}
-                                    {event.time && ` • ${event.time}`}
-                                  </p>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className={`bg-gradient-to-br ${event.color || 'from-amber-500/30 to-orange-500/30'} p-5`}>
-                                {/* Upload indicator */}
-                                {uploadingToEventId === event.id && (
-                                  <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center z-10">
-                                    <Loader className="w-8 h-8 text-purple-500 animate-spin" />
-                                  </div>
-                                )}
-                                {/* Drop indicator */}
-                                {dragOverEventId === event.id && (
-                                  <div className="absolute inset-0 bg-purple-500/30 rounded-2xl flex items-center justify-center z-10 pointer-events-none">
-                                    <div className="text-white font-semibold">📷 Drop to add photo</div>
-                                  </div>
-                                )}
-                                {/* Photo preview if event has images */}
-                                {(event.images || []).length > 0 && (
-                                  <div className="absolute top-2 right-2 flex -space-x-2">
-                                    {(event.images || []).slice(0, 3).map((img, i) => (
-                                      <div key={i} className="w-8 h-8 rounded-full border-2 border-white/50 overflow-hidden">
-                                        <img src={img} alt="" className="w-full h-full object-cover" />
-                                      </div>
-                                    ))}
-                                    {(event.images || []).length > 3 && (
-                                      <div className="w-8 h-8 rounded-full border-2 border-white/50 bg-black/50 flex items-center justify-center text-white text-xs font-bold">
-                                        +{(event.images || []).length - 3}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                                <div className="flex items-start justify-between mb-3">
-                                  <span className="text-4xl">{event.emoji}</span>
-                                  {!isPast && !(event.images || []).length && (
-                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                      isToday ? 'bg-green-500 text-white' :
-                                      daysUntil <= 7 ? 'bg-amber-500 text-white' :
-                                      'bg-white/20 text-white'
-                                    }`}>
-                                      {isToday ? '🎉 Today!' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
-                                    </span>
-                                  )}
-                                  {isPast && !(event.images || []).length && (
-                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-slate-500/50 text-slate-300">
-                                      Past
-                                    </span>
-                                  )}
-                                </div>
-                                <h3 className="text-xl font-bold text-white mb-1">{event.name}</h3>
-                                <p className="text-white/80 text-sm mb-3">
-                                  {formatDate(event.date, { weekday: 'short', month: 'short', day: 'numeric' })}
-                                  {event.time && ` • ${event.time}`}
-                                </p>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-1 text-white/70 text-sm">
-                                    <Users className="w-4 h-4" />
-                                    <span>{(event.guests || []).length + 2}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1 text-white/70 text-sm">
-                                    <Image className="w-4 h-4" />
-                                    <span>{(event.images || []).length}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1 text-white/70 text-sm">
-                                    <CheckSquare className="w-4 h-4" />
-                                    <span>{(event.tasks || []).filter(t => t.completed).length}/{(event.tasks || []).length}</span>
-                                  </div>
-                                </div>
-                                {/* Linked Hub Items */}
-                                {(() => {
-                                  const { linkedTasks, linkedLists } = getLinkedHubItems('events', event.id);
-                                  if (linkedTasks.length === 0 && linkedLists.length === 0) return null;
-                                  return (
-                                    <div className="mt-3 flex flex-wrap gap-1.5">
-                                      {linkedTasks.map(task => (
-                                        <span
-                                          key={task.id}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActiveSection('home');
-                                            setHubSubView('home');
-                                          }}
-                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:scale-105 transition ${
-                                            task.status === 'done'
-                                              ? 'bg-green-500/30 text-green-200'
-                                              : 'bg-white/20 text-white'
-                                          }`}
-                                          title={task.title}
-                                        >
-                                          <span>{task.status === 'done' ? '✅' : '☑️'}</span>
-                                          <span className="max-w-[80px] truncate">{task.title}</span>
-                                        </span>
-                                      ))}
-                                      {linkedLists.map(list => (
-                                        <span
-                                          key={list.id}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActiveSection('home');
-                                            setHubSubView('home');
-                                          }}
-                                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-full text-xs font-medium text-white cursor-pointer hover:scale-105 transition"
-                                          title={list.name}
-                                        >
-                                          <span>{list.emoji || '📝'}</span>
-                                          <span className="max-w-[80px] truncate">{list.name}</span>
-                                        </span>
-                                      ))}
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-
-                    {/* Empty State */}
-                    {partyEvents.filter(event => {
-                      const eventDate = parseLocalDate(event.date);
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      return eventDate >= today; // Only show upcoming events
-                      // Past events now only in Memories
-                      // return true;
-                    }).length === 0 && (
-                      <div className="col-span-full text-center py-12">
-                        <div className="text-6xl mb-4">🎈</div>
-                        <h3 className="text-xl font-bold text-white mb-2">
-                          No upcoming events
-                        </h3>
-                        <p className="text-slate-400 mb-4">
-                          {isOwner ? 'Create your first event to get started!' : 'Check back soon for new events!'}
-                        </p>
-                        {isOwner && (
-                          <button
-                            onClick={() => setShowAddEventModal(true)}
-                            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:opacity-90 transition"
-                          >
-                            Create Event
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-              </>
-              )}
 
 
               {/* Calendar Section */}
