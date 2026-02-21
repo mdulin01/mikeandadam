@@ -51,6 +51,13 @@ Firestore collections: `tripData/` (main doc with all data), `events/{eventId}` 
 - [ ] Data export (JSON/PDF backup)
 - [ ] Refactor trip-planner.jsx into smaller modules (12k+ lines)
 
+## Workflow for Claude
+
+- **Always commit and push** after making changes. Vercel auto-deploys from master, so pushing is how changes go live.
+- **Firestore gotcha**: Firestore rejects `undefined` values anywhere in a document. All save functions use `stripUndefined()` (JSON round-trip) on the entire updates object before calling `setDoc`. Keep this pattern when adding new save functions.
+- **Hook ref pattern**: `useFitness` receives ref *objects* (not `.current` values) from trip-planner.jsx so it always reads the latest save function at call time. Don't change this back to passing `.current`.
+- **Duplicate updateWorkout**: There are two versions — the hook's (dead code) and trip-planner.jsx's (used, has celebration logic). The trip-planner.jsx version is the real one.
+
 ## Git Quick Reference
 ```bash
 cd mikeandadam
