@@ -551,7 +551,7 @@ export default function TripPlanner() {
   const triathlonTrainingPlanRef = useRef([]);
   const indyHalfTrainingPlanRef = useRef([]);
 
-  const fitness = useFitness(saveFitnessRef.current, showToast, generateTrainingWeeksRef.current, triathlonTrainingPlanRef.current, indyHalfTrainingPlanRef.current);
+  const fitness = useFitness(saveFitnessRef, showToast, generateTrainingWeeksRef, triathlonTrainingPlanRef, indyHalfTrainingPlanRef);
   const {
     fitnessEvents, fitnessTrainingPlans, selectedFitnessEvent, fitnessViewMode,
     updateFitnessEvent, deleteFitnessEvent, updateTrainingWeek, addWorkout, deleteWorkout,
@@ -1008,9 +1008,30 @@ export default function TripPlanner() {
   };
 
   const handleWeekPhotoRemove = async (eventId, weekId, existingPhotos, photoId) => {
-    const photos = (existingPhotos || []).filter(p => p.id !== photoId);
-    await updateTrainingWeek(eventId, weekId, { photos });
+    try {
+      const photos = (existingPhotos || []).filter(p => p.id !== photoId);
+      await updateTrainingWeek(eventId, weekId, { photos });
+      showToast('Photo removed', 'success');
+    } catch (error) {
+      console.error('Failed to remove week photo:', error);
+      showToast('Failed to remove photo. Please try again.', 'error');
+    }
   };
+
+  // Debounced weekNotes change handler - avoids a Firestore write per keystroke
+  const handleWeekNotesChange = useCallback((eventId, weekId, value) => {
+    const key = `${eventId}:${weekId}`;
+    setWeekNotesLocal(prev => ({ ...prev, [key]: value }));
+    if (weekNotesSaveTimer.current) clearTimeout(weekNotesSaveTimer.current);
+    weekNotesSaveTimer.current = setTimeout(() => {
+      updateTrainingWeek(eventId, weekId, { weekNotes: value });
+      setWeekNotesLocal(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }, 800);
+  }, [updateTrainingWeek]);
 
   // Upload photo/video to Firebase Storage (with HEIC conversion for images) - for modals
   const uploadMemoryMedia = async (file, isEdit = false) => {
@@ -1160,6 +1181,8 @@ export default function TripPlanner() {
     }
   }, [fitnessTrainingPlans]);
   const [pastWeeksExpanded, setPastWeeksExpanded] = useState(false); // collapse past fitness weeks
+  const [weekNotesLocal, setWeekNotesLocal] = useState({}); // { "eventId:weekId": "notes text" } for debounced editing
+  const weekNotesSaveTimer = useRef(null);
   const [weekPhotoDrag, setWeekPhotoDrag] = useState(null); // weekId of week being dragged onto
   const [isOwner, setIsOwner] = useState(false); // true if Mike or Adam
   const [bouncingEmoji, setBouncingEmoji] = useState(null); // { emoji, x, y, dx, dy } for bouncing animation
@@ -2431,17 +2454,20 @@ export default function TripPlanner() {
     return allEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
   };
 
+  // Deep-strip undefined values to prevent Firestore errors
+  const stripUndefined = useCallback((obj) => JSON.parse(JSON.stringify(obj)), []);
+
   // Save to Firestore whenever data changes
   const saveToFirestore = useCallback(async (newTrips, newWishlist, newTripDetails, newMemories) => {
     if (!user) return;
 
     try {
-      const updates = { lastUpdated: new Date().toISOString(), updatedBy: currentUser };
+      const updates = { lastUpdated: new Date().toISOString(), updatedBy: currentUser || 'unknown' };
       if (newTrips !== null && newTrips !== undefined) updates.trips = newTrips;
       if (newWishlist !== null && newWishlist !== undefined) updates.wishlist = newWishlist;
       if (newTripDetails !== null && newTripDetails !== undefined) updates.tripDetails = newTripDetails;
       if (newMemories !== null && newMemories !== undefined) updates.memories = newMemories;
-      await setDoc(doc(db, 'tripData', 'shared'), updates, { merge: true });
+      await setDoc(doc(db, 'tripData', 'shared'), stripUndefined(updates), { merge: true });
       showToast('Changes saved', 'success');
     } catch (error) {
       console.error('Error saving to Firestore:', error);
@@ -2469,10 +2495,10 @@ export default function TripPlanner() {
     if (!user) return;
 
     try {
-      const updates = { lastUpdated: new Date().toISOString(), updatedBy: currentUser };
+      const updates = { lastUpdated: new Date().toISOString(), updatedBy: currentUser || 'unknown' };
       if (newEvents !== null && newEvents !== undefined) updates.events = newEvents;
       if (newTrainingPlans !== null && newTrainingPlans !== undefined) updates.trainingPlans = newTrainingPlans;
-      await setDoc(doc(db, 'tripData', 'fitness'), updates, { merge: true });
+      await setDoc(doc(db, 'tripData', 'fitness'), stripUndefined(updates), { merge: true });
     } catch (error) {
       console.error('Error saving fitness to Firestore:', error);
       showToast('Failed to save fitness data. Please try again.', 'error');
@@ -2503,9 +2529,9 @@ export default function TripPlanner() {
     if (!user) return;
 
     try {
-      const updates = { lastUpdated: new Date().toISOString(), updatedBy: currentUser };
+      const updates = { lastUpdated: new Date().toISOString(), updatedBy: currentUser || 'unknown' };
       if (newEvents !== null && newEvents !== undefined) updates.events = newEvents;
-      await setDoc(doc(db, 'tripData', 'partyEvents'), updates, { merge: true });
+      await setDoc(doc(db, 'tripData', 'partyEvents'), stripUndefined(updates), { merge: true });
 
       // Also save each event as its own document for guest access
       if (newEvents) {
@@ -2606,13 +2632,13 @@ export default function TripPlanner() {
     try {
       // Only write the fields that were explicitly passed (non-null)
       // This prevents stale closure values from overwriting other fields
-      const updates = { lastUpdated: new Date().toISOString(), updatedBy: currentUser };
+      const updates = { lastUpdated: new Date().toISOString(), updatedBy: currentUser || 'unknown' };
       if (newLists !== null && newLists !== undefined) updates.lists = newLists;
       if (newTasks !== null && newTasks !== undefined) updates.tasks = newTasks;
       if (newIdeas !== null && newIdeas !== undefined) updates.ideas = newIdeas;
       if (newSocial !== null && newSocial !== undefined) updates.social = newSocial;
       if (newHabits !== null && newHabits !== undefined) updates.habits = newHabits;
-      await setDoc(doc(db, 'tripData', 'sharedHub'), updates, { merge: true });
+      await setDoc(doc(db, 'tripData', 'sharedHub'), stripUndefined(updates), { merge: true });
     } catch (error) {
       console.error('Error saving shared hub:', error);
       showToast('Failed to save. Please try again.', 'error');
@@ -2800,6 +2826,8 @@ export default function TripPlanner() {
 
   // Update a workout (run or cross-training)
   const updateWorkout = async (eventId, weekId, workoutType, workoutId, updates) => {
+    if (!eventId || !weekId) return;
+
     const newPlans = { ...fitnessTrainingPlans };
 
     // Initialize plan if it doesn't exist
@@ -2815,7 +2843,8 @@ export default function TripPlanner() {
 
     // Get current workout state before update
     // Find week by id OR weekNumber (for backwards compatibility)
-    const weekIdNum = weekId.includes('week-') ? parseInt(weekId.split('week-')[1]) : null;
+    const weekIdStr = String(weekId);
+    const weekIdNum = weekIdStr.includes('week-') ? parseInt(weekIdStr.split('week-')[1]) : null;
     const findWeek = (w) => w.id === weekId || (weekIdNum && w.weekNumber === weekIdNum);
 
     const currentWeek = newPlans[eventId].find(findWeek);
@@ -2871,10 +2900,12 @@ export default function TripPlanner() {
     const event = fitnessEvents.find(e => e.id === eventId);
     if (!event) return;
 
-    // Use hardcoded plan for Indy Half Marathon
+    // Use hardcoded plan for Indy Half Marathon (deep clone to avoid template mutation)
     let weeks;
     if (eventId === 'indy-half-2026') {
-      weeks = indyHalfTrainingPlan;
+      weeks = JSON.parse(JSON.stringify(indyHalfTrainingPlan));
+    } else if (eventId === 'triathlon-2026') {
+      weeks = JSON.parse(JSON.stringify(triathlonTrainingPlan));
     } else {
       const today = new Date().toISOString().split('T')[0];
       weeks = generateTrainingWeeks(today, event.date, eventId);
@@ -2891,11 +2922,11 @@ export default function TripPlanner() {
     // Helper to merge Firebase data into hardcoded plan
     const mergeWithFirebase = (hardcodedPlan) => {
       const firebasePlan = fitnessTrainingPlans[eventId];
-      if (!firebasePlan) return hardcodedPlan;
+      if (!firebasePlan) return hardcodedPlan.map(w => ({ ...w, id: `week-${w.weekNumber}` }));
 
       return hardcodedPlan.map(week => {
         const fbWeek = firebasePlan.find(w => w.weekNumber === week.weekNumber);
-        if (!fbWeek) return week;
+        if (!fbWeek) return { ...week, id: `week-${week.weekNumber}` };
 
         // Merge runs - iterate over HARDCODED runs first, then add any extra Firebase runs
         const fbRuns = fbWeek.runs || [];
@@ -2969,10 +3000,11 @@ export default function TripPlanner() {
 
         return {
           ...week,
+          id: fbWeek.id || `week-${week.weekNumber}`,
           runs: mergedRuns,
           crossTraining: mergedCrossTraining,
           weekNotes: fbWeek.weekNotes || week.weekNotes,
-          photos: fbWeek.photos || week.photos,
+          photos: fbWeek.photos || week.photos || [],
         };
       });
     };
@@ -5395,7 +5427,7 @@ export default function TripPlanner() {
                                   </div>
                                 </div>
                                 <div className="mt-3">
-                                  <textarea value={week.weekNotes || ''} onChange={(e) => updateTrainingWeek(selectedFitnessEvent.id, week.id, { weekNotes: e.target.value })} placeholder="Notes for this week..." className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 text-sm resize-y" rows={1} />
+                                  <textarea value={weekNotesLocal[`${selectedFitnessEvent.id}:${week.id}`] ?? week.weekNotes ?? ''} onChange={(e) => handleWeekNotesChange(selectedFitnessEvent.id, week.id, e.target.value)} placeholder="Notes for this week..." className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 text-sm resize-y" rows={1} />
                                 </div>
                                 <div
                                   className="mt-3"
@@ -5522,7 +5554,7 @@ export default function TripPlanner() {
                                 </div>
                                 {/* Current Week Notes */}
                                 <div className="mt-4">
-                                  <textarea value={currentWeek.weekNotes || ''} onChange={(e) => updateTrainingWeek(selectedFitnessEvent.id, currentWeek.id, { weekNotes: e.target.value })} placeholder="Add notes for this week..." className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 resize-y" rows={2} />
+                                  <textarea value={weekNotesLocal[`${selectedFitnessEvent.id}:${currentWeek.id}`] ?? currentWeek.weekNotes ?? ''} onChange={(e) => handleWeekNotesChange(selectedFitnessEvent.id, currentWeek.id, e.target.value)} placeholder="Add notes for this week..." className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 resize-y" rows={2} />
                                 </div>
                                 {/* Current Week Photos */}
                                 <div
@@ -9477,11 +9509,11 @@ export default function TripPlanner() {
                   const totalMiles = week.runs?.reduce((sum, run) => sum + (parseFloat(run.distance) || 0), 0) || 0;
 
                   // Update the training plan
-                  updateTrainingWeek(eventId, week.id, {
-                    runs: week.runs,
-                    crossTraining: week.crossTraining,
-                    weekNotes: week.weekNotes,
-                    photos: week.photos,
+                  updateTrainingWeek(eventId, week.id || `week-${week.weekNumber}`, {
+                    runs: week.runs || [],
+                    crossTraining: week.crossTraining || [],
+                    weekNotes: week.weekNotes || '',
+                    photos: week.photos || [],
                     totalMiles: totalMiles
                   });
 

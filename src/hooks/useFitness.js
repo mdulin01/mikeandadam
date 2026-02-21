@@ -1,21 +1,16 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 
 /**
  * useFitness Hook
  * Manages all fitness-related state and operations
  * Handles events, training plans, and workouts
+ *
+ * NOTE: saveRef, genRef, triPlanRef, indyPlanRef are React ref objects
+ * passed from the parent. We read .current at CALL TIME (not render time)
+ * to always get the latest function/data, avoiding stale closure issues.
  */
 
-export const useFitness = (saveFitnessToFirestore, showToast, generateTrainingWeeks, triathlonTrainingPlan, indyHalfTrainingPlan) => {
-  // Keep refs so callbacks always use the latest functions/data
-  const saveRef = useRef(saveFitnessToFirestore);
-  saveRef.current = saveFitnessToFirestore;
-  const genRef = useRef(generateTrainingWeeks);
-  genRef.current = generateTrainingWeeks;
-  const triPlanRef = useRef(triathlonTrainingPlan);
-  triPlanRef.current = triathlonTrainingPlan;
-  const indyPlanRef = useRef(indyHalfTrainingPlan);
-  indyPlanRef.current = indyHalfTrainingPlan;
+export const useFitness = (saveRef, showToast, genRef, triPlanRef, indyPlanRef) => {
   // ========== INITIAL DATA ==========
   const defaultFitnessEvents = [
     {
@@ -50,7 +45,7 @@ export const useFitness = (saveFitnessToFirestore, showToast, generateTrainingWe
     );
     setFitnessEvents(newEvents);
     saveRef.current(newEvents, fitnessTrainingPlans);
-  }, [fitnessEvents, fitnessTrainingPlans]);
+  }, [fitnessEvents, fitnessTrainingPlans, saveRef]);
 
   const deleteFitnessEvent = useCallback((eventId) => {
     const newEvents = fitnessEvents.filter(event => event.id !== eventId);
@@ -59,10 +54,18 @@ export const useFitness = (saveFitnessToFirestore, showToast, generateTrainingWe
     setFitnessEvents(newEvents);
     setFitnessTrainingPlans(newPlans);
     saveRef.current(newEvents, newPlans);
-  }, [fitnessEvents, fitnessTrainingPlans]);
+  }, [fitnessEvents, fitnessTrainingPlans, saveRef]);
 
   // ========== TRAINING PLAN OPERATIONS ==========
   const updateTrainingWeek = useCallback(async (eventId, weekId, updates) => {
+    if (!eventId || !weekId) return;
+
+    // Strip undefined values from updates to avoid Firestore errors
+    const cleanUpdates = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (value !== undefined) cleanUpdates[key] = value;
+    }
+
     const newPlans = { ...fitnessTrainingPlans };
 
     // Initialize plan if it doesn't exist
@@ -84,20 +87,23 @@ export const useFitness = (saveFitnessToFirestore, showToast, generateTrainingWe
     if (!newPlans[eventId]) return;
 
     // Find week by id OR weekNumber (for backwards compatibility)
-    const weekIdNum = weekId.includes('week-') ? parseInt(weekId.split('week-')[1]) : null;
+    const weekIdStr = String(weekId);
+    const weekIdNum = weekIdStr.includes('week-') ? parseInt(weekIdStr.split('week-')[1]) : null;
     newPlans[eventId] = newPlans[eventId].map(week => {
       const matches = week.id === weekId || (weekIdNum && week.weekNumber === weekIdNum);
       if (matches) {
-        return { ...week, ...updates, id: weekId };
+        return { ...week, ...cleanUpdates, id: weekId };
       }
       return week;
     });
 
     setFitnessTrainingPlans(newPlans);
     await saveRef.current(null, newPlans);
-  }, [fitnessEvents, fitnessTrainingPlans]);
+  }, [fitnessEvents, fitnessTrainingPlans, saveRef, triPlanRef, indyPlanRef, genRef]);
 
   const updateWorkout = useCallback(async (eventId, weekId, workoutType, workoutId, updates) => {
+    if (!eventId || !weekId) return;
+
     const newPlans = { ...fitnessTrainingPlans };
 
     // Initialize plan if it doesn't exist
@@ -112,7 +118,8 @@ export const useFitness = (saveFitnessToFirestore, showToast, generateTrainingWe
     }
 
     // Find week by id OR weekNumber (for backwards compatibility)
-    const weekIdNum = weekId.includes('week-') ? parseInt(weekId.split('week-')[1]) : null;
+    const weekIdStr = String(weekId);
+    const weekIdNum = weekIdStr.includes('week-') ? parseInt(weekIdStr.split('week-')[1]) : null;
     const findWeek = (w) => w.id === weekId || (weekIdNum && w.weekNumber === weekIdNum);
 
     newPlans[eventId] = newPlans[eventId].map(week => {
@@ -127,9 +134,11 @@ export const useFitness = (saveFitnessToFirestore, showToast, generateTrainingWe
 
     setFitnessTrainingPlans(newPlans);
     await saveRef.current(null, newPlans);
-  }, [fitnessTrainingPlans]);
+  }, [fitnessTrainingPlans, saveRef, triPlanRef, indyPlanRef]);
 
   const addWorkout = useCallback(async (eventId, weekId, workoutType, workoutData) => {
+    if (!eventId || !weekId) return;
+
     const newPlans = { ...fitnessTrainingPlans };
 
     // Initialize plan if it doesn't exist
@@ -150,7 +159,8 @@ export const useFitness = (saveFitnessToFirestore, showToast, generateTrainingWe
     if (!newPlans[eventId]) return;
 
     // Find week and add workout
-    const weekIdNum = weekId.includes('week-') ? parseInt(weekId.split('week-')[1]) : null;
+    const weekIdStr = String(weekId);
+    const weekIdNum = weekIdStr.includes('week-') ? parseInt(weekIdStr.split('week-')[1]) : null;
     const findWeek = (w) => w.id === weekId || (weekIdNum && w.weekNumber === weekIdNum);
 
     newPlans[eventId] = newPlans[eventId].map(week => {
@@ -164,14 +174,17 @@ export const useFitness = (saveFitnessToFirestore, showToast, generateTrainingWe
 
     setFitnessTrainingPlans(newPlans);
     await saveRef.current(null, newPlans);
-  }, [fitnessEvents, fitnessTrainingPlans]);
+  }, [fitnessEvents, fitnessTrainingPlans, saveRef, triPlanRef, indyPlanRef, genRef]);
 
   const deleteWorkout = useCallback(async (eventId, weekId, workoutType, workoutId) => {
+    if (!eventId || !weekId) return;
+
     const newPlans = { ...fitnessTrainingPlans };
 
     if (!newPlans[eventId]) return;
 
-    const weekIdNum = weekId.includes('week-') ? parseInt(weekId.split('week-')[1]) : null;
+    const weekIdStr = String(weekId);
+    const weekIdNum = weekIdStr.includes('week-') ? parseInt(weekIdStr.split('week-')[1]) : null;
     const findWeek = (w) => w.id === weekId || (weekIdNum && w.weekNumber === weekIdNum);
 
     newPlans[eventId] = newPlans[eventId].map(week => {
@@ -183,7 +196,7 @@ export const useFitness = (saveFitnessToFirestore, showToast, generateTrainingWe
 
     setFitnessTrainingPlans(newPlans);
     await saveRef.current(null, newPlans);
-  }, [fitnessTrainingPlans]);
+  }, [fitnessTrainingPlans, saveRef]);
 
   // ========== RETURN CONTEXT VALUE ==========
   return {
