@@ -11936,6 +11936,11 @@ export default function TripPlanner() {
         </nav>
       )}
 
+      {/* Build info footer */}
+      <div className="w-full text-center py-3 pb-24 md:pb-3">
+        <BuildInfo />
+      </div>
+
       {/* Bottom rainbow bar - hidden on mobile when bottom nav is showing */}
       <div className={`h-1.5 w-full bg-gradient-to-r from-red-500 via-orange-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500 ${!initialAppMode ? 'hidden md:block' : ''}`} />
     </div>
