@@ -116,11 +116,11 @@ const IdeaCard = React.memo(({ idea, onPromoteToTask }) => {
         </div>
 
         {/* Title */}
-        <div className="text-sm font-semibold text-white mb-1 line-clamp-2">{idea.title}</div>
+        <div className="text-sm font-semibold text-white mb-1 line-clamp-2 break-words">{idea.title}</div>
 
         {/* Description */}
         {idea.description && (
-          <div className="text-xs text-white/40 mb-2 line-clamp-2">{idea.description}</div>
+          <div className="text-xs text-white/40 mb-2 line-clamp-2 break-words">{idea.description}</div>
         )}
 
         {/* URL domain */}
@@ -130,10 +130,10 @@ const IdeaCard = React.memo(({ idea, onPromoteToTask }) => {
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-700/50 rounded-lg text-xs text-teal-400 hover:text-teal-300 transition mb-2"
+            className="inline-flex max-w-full items-center gap-1.5 px-2 py-1 bg-slate-700/50 rounded-lg text-xs text-teal-400 hover:text-teal-300 transition mb-2 overflow-hidden"
           >
-            <ExternalLink className="w-3 h-3" />
-            {domain}
+            <ExternalLink className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{domain}</span>
           </a>
         )}
 

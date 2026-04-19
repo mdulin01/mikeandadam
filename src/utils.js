@@ -32,6 +32,16 @@ export const formatDate = (dateStr, options = { month: 'short', day: 'numeric' }
   return date.toLocaleDateString('en-US', options);
 };
 
+// Get "today" as a YYYY-MM-DD string in the user's LOCAL timezone.
+// Never use `new Date().toISOString().split('T')[0]` — that returns UTC, which after 8 PM EDT
+// is already tomorrow, causing past/today/future comparisons to be off by a day.
+export const toLocalDateStr = (d = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 // Validate file size - returns error message or null
 export const validateFileSize = (file) => {
   if (file.size > MAX_FILE_SIZE_BYTES) {
