@@ -6,7 +6,7 @@ export default function BuildInfo() {
     : ''
 
   return (
-    <div className="text-slate-500 text-[10px] mt-1 tracking-wide leading-relaxed hidden md:block">
+    <div className="text-slate-500 text-[10px] mt-1 tracking-wide leading-relaxed">
       <span>{hash}{display ? ` · ${display}` : ''}</span>
       <br />
       <span className="text-slate-600">Made by Mike Dulin, MD</span>

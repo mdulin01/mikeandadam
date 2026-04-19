@@ -17,8 +17,7 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
   const [sharedLists, setSharedLists] = useState([]);
   const [sharedIdeas, setSharedIdeas] = useState([]);
   const [sharedSocial, setSharedSocial] = useState([]);
-  const [sharedGoals, setSharedGoals] = useState([]);
-  const [sharedOdysseyPlans, setSharedOdysseyPlans] = useState([]);
+  const [sharedHabits, setSharedHabits] = useState([]);
 
   // Hub UI state
   const [hubSubView, setHubSubView] = useState('home');
@@ -28,7 +27,7 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
   const [hubIdeaFilter, setHubIdeaFilter] = useState('all');
   const [hubIdeaStatusFilter, setHubIdeaStatusFilter] = useState('all');
   const [hubSocialFilter, setHubSocialFilter] = useState('all');
-  const [hubGoalFilter, setHubGoalFilter] = useState('all');
+  const [hubHabitFilter, setHubHabitFilter] = useState('all');
   const [collapsedSections, setCollapsedSections] = useState({});
 
   // Hub modal states (for card editing/creation)
@@ -36,8 +35,7 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
   const [showSharedListModal, setShowSharedListModal] = useState(null); // null | 'create' | list object (edit)
   const [showAddIdeaModal, setShowAddIdeaModal] = useState(null); // null | 'create' | idea object (edit)
   const [showAddSocialModal, setShowAddSocialModal] = useState(null); // null | 'create' | social object (edit)
-  const [showAddGoalModal, setShowAddGoalModal] = useState(null); // null | 'create' | goal object (edit)
-  const [showOdysseyPlanModal, setShowOdysseyPlanModal] = useState(null); // null | 'create' | plan object (edit)
+  const [showAddHabitModal, setShowAddHabitModal] = useState(null); // null | 'create' | habit object (edit)
 
   // ========== TASK CRUD ==========
   const addTask = useCallback((task) => {
@@ -201,70 +199,43 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
     saveRef.current(null, null, null, newSocial);
   }, [sharedSocial]);
 
-  // ========== GOAL CRUD ==========
-  const addGoal = useCallback((goal) => {
-    const newGoals = [...sharedGoals, goal];
-    setSharedGoals(newGoals);
-    saveRef.current(null, null, null, null, newGoals);
-    showToast('Goal added', 'success');
-  }, [sharedGoals, showToast]);
+  // ========== HABIT CRUD ==========
+  const addHabit = useCallback((habit) => {
+    const newHabits = [...sharedHabits, habit];
+    setSharedHabits(newHabits);
+    saveRef.current(null, null, null, null, newHabits);
+    showToast('Habit created', 'success');
+  }, [sharedHabits, showToast]);
 
-  const updateGoal = useCallback((goalId, updates) => {
-    const newGoals = sharedGoals.map(g => g.id === goalId ? { ...g, ...updates } : g);
-    setSharedGoals(newGoals);
-    saveRef.current(null, null, null, null, newGoals);
-  }, [sharedGoals]);
+  const updateHabit = useCallback((habitId, updates) => {
+    const newHabits = sharedHabits.map(h => h.id === habitId ? { ...h, ...updates } : h);
+    setSharedHabits(newHabits);
+    saveRef.current(null, null, null, null, newHabits);
+  }, [sharedHabits]);
 
-  const deleteGoal = useCallback((goalId) => {
-    const newGoals = sharedGoals.filter(g => g.id !== goalId);
-    setSharedGoals(newGoals);
-    saveRef.current(null, null, null, null, newGoals);
-    showToast('Goal removed', 'info');
-  }, [sharedGoals, showToast]);
+  const deleteHabit = useCallback((habitId) => {
+    const newHabits = sharedHabits.filter(h => h.id !== habitId);
+    setSharedHabits(newHabits);
+    saveRef.current(null, null, null, null, newHabits);
+    showToast('Habit removed', 'info');
+  }, [sharedHabits, showToast]);
 
-  const toggleMilestone = useCallback((goalId, milestoneId) => {
-    const newGoals = sharedGoals.map(g => {
-      if (g.id !== goalId) return g;
-      const newMilestones = (g.milestones || []).map(m => {
-        if (m.id !== milestoneId) return m;
-        return {
-          ...m,
-          completed: !m.completed,
-          completedAt: !m.completed ? new Date().toISOString() : null,
-        };
-      });
-      return { ...g, milestones: newMilestones };
+  const toggleHabitDay = useCallback((habitId, dateKey) => {
+    const newHabits = sharedHabits.map(h => {
+      if (h.id !== habitId) return h;
+      const newLog = { ...(h.log || {}) };
+      newLog[dateKey] = !newLog[dateKey];
+      return { ...h, log: newLog };
     });
-    setSharedGoals(newGoals);
-    saveRef.current(null, null, null, null, newGoals);
-  }, [sharedGoals]);
+    setSharedHabits(newHabits);
+    saveRef.current(null, null, null, null, newHabits);
+  }, [sharedHabits]);
 
-  const highlightGoal = useCallback((goalId) => {
-    const newGoals = sharedGoals.map(g => g.id === goalId ? { ...g, highlighted: !g.highlighted } : g);
-    setSharedGoals(newGoals);
-    saveRef.current(null, null, null, null, newGoals);
-  }, [sharedGoals]);
-
-  // ========== ODYSSEY PLAN CRUD ==========
-  const addOdysseyPlan = useCallback((plan) => {
-    const newPlans = [...sharedOdysseyPlans, plan];
-    setSharedOdysseyPlans(newPlans);
-    saveRef.current(null, null, null, null, null, newPlans);
-    showToast('Odyssey Plan created', 'success');
-  }, [sharedOdysseyPlans, showToast]);
-
-  const updateOdysseyPlan = useCallback((planId, updates) => {
-    const newPlans = sharedOdysseyPlans.map(p => p.id === planId ? { ...p, ...updates } : p);
-    setSharedOdysseyPlans(newPlans);
-    saveRef.current(null, null, null, null, null, newPlans);
-  }, [sharedOdysseyPlans]);
-
-  const deleteOdysseyPlan = useCallback((planId) => {
-    const newPlans = sharedOdysseyPlans.filter(p => p.id !== planId);
-    setSharedOdysseyPlans(newPlans);
-    saveRef.current(null, null, null, null, null, newPlans);
-    showToast('Odyssey Plan removed', 'info');
-  }, [sharedOdysseyPlans, showToast]);
+  const highlightHabit = useCallback((habitId) => {
+    const newHabits = sharedHabits.map(h => h.id === habitId ? { ...h, highlighted: !h.highlighted } : h);
+    setSharedHabits(newHabits);
+    saveRef.current(null, null, null, null, newHabits);
+  }, [sharedHabits]);
 
   // ========== UI HELPERS ==========
   const toggleDashSection = useCallback((section) => {
@@ -281,8 +252,7 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
     sharedLists,
     sharedIdeas,
     sharedSocial,
-    sharedGoals,
-    sharedOdysseyPlans,
+    sharedHabits,
 
     // Task operations
     addTask,
@@ -313,17 +283,12 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
     completeSocial,
     highlightSocial,
 
-    // Goal operations
-    addGoal,
-    updateGoal,
-    deleteGoal,
-    toggleMilestone,
-    highlightGoal,
-
-    // Odyssey Plan operations
-    addOdysseyPlan,
-    updateOdysseyPlan,
-    deleteOdysseyPlan,
+    // Habit operations
+    addHabit,
+    updateHabit,
+    deleteHabit,
+    toggleHabitDay,
+    highlightHabit,
 
     // UI state
     hubSubView,
@@ -340,8 +305,8 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
     setHubIdeaStatusFilter,
     hubSocialFilter,
     setHubSocialFilter,
-    hubGoalFilter,
-    setHubGoalFilter,
+    hubHabitFilter,
+    setHubHabitFilter,
     collapsedSections,
     toggleDashSection,
 
@@ -350,8 +315,7 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
     setSharedLists,
     setSharedIdeas,
     setSharedSocial,
-    setSharedGoals,
-    setSharedOdysseyPlans,
+    setSharedHabits,
 
     // Modal states
     showAddTaskModal,
@@ -362,10 +326,8 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast) => {
     setShowAddIdeaModal,
     showAddSocialModal,
     setShowAddSocialModal,
-    showAddGoalModal,
-    setShowAddGoalModal,
-    showOdysseyPlanModal,
-    setShowOdysseyPlanModal,
+    showAddHabitModal,
+    setShowAddHabitModal,
 
     // Utilities
     showToast,
