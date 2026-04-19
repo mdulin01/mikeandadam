@@ -1760,6 +1760,7 @@ export default function TripPlanner() {
   const [dragOverEventId, setDragOverEventId] = useState(null);
   const [eventCoverImagePreview, setEventCoverImagePreview] = useState(null);
   const [isSavingEvent, setIsSavingEvent] = useState(false);
+  const [showEventEmojiPicker, setShowEventEmojiPicker] = useState(false);
   const [uploadingEventCoverImage, setUploadingEventCoverImage] = useState(false);
   const eventCoverFileRef = useRef(null);
   const eventCoverCameraRef = useRef(null);
@@ -11123,22 +11124,47 @@ export default function TripPlanner() {
             <div className="p-6 space-y-4">
               {/* Event Name & Emoji */}
               <div className="flex gap-3">
-                <button
-                  type="button"
-                  className="w-16 h-16 bg-white/10 rounded-xl flex items-center justify-center text-3xl hover:bg-white/20 transition border border-white/20"
-                  onClick={() => {
-                    const allEmojis = Object.values(eventCategories).flat();
-                    const currentIdx = allEmojis.indexOf(editingEvent ? editingEvent.emoji : newEventData.emoji);
-                    const nextIdx = (currentIdx + 1) % allEmojis.length;
-                    if (editingEvent) {
-                      setEditingEvent({ ...editingEvent, emoji: allEmojis[nextIdx] });
-                    } else {
-                      setNewEventData({ ...newEventData, emoji: allEmojis[nextIdx] });
-                    }
-                  }}
-                >
-                  {editingEvent ? editingEvent.emoji : newEventData.emoji}
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="w-16 h-16 bg-white/10 rounded-xl flex items-center justify-center text-3xl hover:bg-white/20 transition border border-white/20"
+                    onClick={() => setShowEventEmojiPicker(v => !v)}
+                    title="Pick an emoji"
+                  >
+                    {editingEvent ? editingEvent.emoji : newEventData.emoji}
+                  </button>
+                  {showEventEmojiPicker && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowEventEmojiPicker(false)} />
+                      <div className="absolute top-full left-0 mt-2 z-50 bg-slate-800 border border-white/15 rounded-xl shadow-2xl p-3 w-[280px] max-h-[60vh] overflow-y-auto">
+                        {Object.entries(eventCategories).map(([category, emojis]) => (
+                          <div key={category} className="mb-3 last:mb-0">
+                            <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1.5 px-1">{category}</div>
+                            <div className="grid grid-cols-6 gap-1">
+                              {emojis.map(emoji => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={() => {
+                                    if (editingEvent) {
+                                      setEditingEvent({ ...editingEvent, emoji });
+                                    } else {
+                                      setNewEventData({ ...newEventData, emoji });
+                                    }
+                                    setShowEventEmojiPicker(false);
+                                  }}
+                                  className={`w-9 h-9 flex items-center justify-center text-xl rounded-lg hover:bg-white/10 transition ${(editingEvent ? editingEvent.emoji : newEventData.emoji) === emoji ? 'bg-amber-500/30 ring-1 ring-amber-400' : ''}`}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
                 <input
                   type="text"
                   placeholder="Event name"
