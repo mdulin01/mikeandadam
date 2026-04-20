@@ -527,9 +527,11 @@ export default function TripPlanner() {
 
   // Ref to store saveSharedHub function (defined later in useEffect)
   const saveSharedHubRef = useRef(() => {});
+  // Tracks whether the sharedHub Firestore doc has been loaded yet — shared between hook and trip-planner
+  const hubDataLoadedRef = useRef(false);
 
   // ========== SHARED HUB: All state and operations from hook =====
-  const sharedHub = useSharedHub(currentUser, saveSharedHubRef.current, showToast);
+  const sharedHub = useSharedHub(currentUser, saveSharedHubRef.current, showToast, hubDataLoadedRef);
   const {
     sharedTasks, sharedLists, sharedIdeas, sharedSocial, sharedGoals, sharedOdysseyPlans,
     addTask, updateTask, deleteTask, completeTask, highlightTask,
@@ -2668,7 +2670,6 @@ export default function TripPlanner() {
   }, [dataLoading, trips, partyEvents, memories, tripDetails, saveMemoriesToFirestore]);
 
   // ========== SHARED HUB SAVE & CRUD ==========
-  const hubDataLoadedRef = useRef(false);
 
   const saveSharedHub = useCallback(async (newLists, newTasks, newIdeas, newSocial, newGoals, newOdysseyPlans) => {
     if (!user) return;
