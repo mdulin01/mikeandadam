@@ -11536,25 +11536,45 @@ export default function TripPlanner() {
                   onClick={async () => {
                     if (!confirm('Convert this event into a Trip? You\'ll get full trip planning (flights, hotels, packing list, budget, itinerary). The event will be replaced.')) return;
                     const evt = editingEvent;
-                    const tripData = {
+                    // Build the new trip object directly (mirrors useTravel.addNewTrip schema)
+                    const colorSet = tripColors[Math.floor(Math.random() * tripColors.length)];
+                    const newTripId = `trip-${Date.now()}`;
+                    const newTrip = {
+                      id: newTripId,
                       destination: evt.name,
-                      emoji: evt.emoji,
-                      startDate: evt.date,
-                      endDate: evt.endDate || evt.date,
+                      emoji: evt.emoji || '✈️',
+                      dates: { start: evt.date, end: evt.endDate || evt.date },
+                      ...colorSet,
+                      isWishlist: false,
                       notes: evt.description || '',
                       special: '',
+                      guests: evt.guests || [],
+                      coverImage: evt.coverImage || '',
                     };
-                    addNewTrip(tripData, false);
-                    // Remove the source partyEvent
+                    const newTrips = [...trips, newTrip];
+                    const newTripDetails = {
+                      ...tripDetails,
+                      [newTripId]: { flights: [], hotels: [], events: [], links: [], packingList: [], budget: { total: 0, expenses: [] }, photos: [], notes: [] },
+                    };
                     const remaining = partyEvents.filter(e => e.id !== evt.id);
                     try {
+                      // Save trip FIRST and AWAIT — without this the page can reload before the write commits
+                      await saveToFirestore(newTrips, null, newTripDetails);
+                      setTrips(newTrips);
+                      setTripDetails(newTripDetails);
+                      // Then remove the source event
                       await savePartyEventsToFirestore(remaining);
                       setPartyEvents(remaining);
-                    } catch (_) { /* toast already shown */ }
-                    setEditingEvent(null);
-                    setSelectedPartyEvent(null);
-                    setShowAddEventModal(false);
-                    showToast('Converted to Trip — open it from the Events tab', 'success');
+                      setEditingEvent(null);
+                      setSelectedPartyEvent(null);
+                      setShowAddEventModal(false);
+                      // Drop the user straight into the new trip
+                      setSelectedTrip(newTrip);
+                      showToast('Converted to Trip!', 'success');
+                    } catch (err) {
+                      console.error('Convert to Trip failed:', err);
+                      showToast('Convert failed — please try again', 'error');
+                    }
                   }}
                   className="w-full py-2.5 bg-gradient-to-r from-teal-500/30 to-cyan-500/30 text-teal-200 rounded-xl hover:from-teal-500/40 hover:to-cyan-500/40 transition flex items-center justify-center gap-2 border border-teal-500/30"
                 >
