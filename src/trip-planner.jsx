@@ -1750,8 +1750,9 @@ export default function TripPlanner() {
   const [eventsSortAsc, setEventsSortAsc] = useState(true); // true = soonest first
   const [eventsTypeFilter, setEventsTypeFilter] = useState(null); // null | 'datenight' | 'travel' | 'fitness' | 'concert' | 'pride' | 'karaoke' | 'parties'
   const [newEventData, setNewEventData] = useState({
-    name: '', emoji: '🎉', date: '', endDate: '', time: '18:00', endTime: '22:00',
-    location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties'
+    name: '', emoji: '🎉', date: toLocalDateStr(new Date()), endDate: '', time: '18:00', endTime: '22:00',
+    location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties',
+    allDay: false, multiDay: false,
   });
   const [eventGuestEmail, setEventGuestEmail] = useState('');
   const [eventGuestPermission, setEventGuestPermission] = useState('edit');
@@ -2459,8 +2460,8 @@ export default function TripPlanner() {
           id: event.id,
           title: `${event.emoji || '🎉'} ${event.name || event.title || 'Event'}`,
           start: event.date,
-          // Trip events span a date range (endDate); others are single-day
-          end: (event.eventType === 'travel' && event.endDate) ? event.endDate : event.date,
+          // Multi-day events span a range; honor any event with an endDate
+          end: (event.endDate && event.endDate !== event.date) ? event.endDate : event.date,
           type: 'event',
           color: event.color || 'from-amber-400 to-orange-500',
           data: event,
@@ -6448,7 +6449,7 @@ export default function TripPlanner() {
                         {selectedPartyEvent.name}
                       </h2>
                       <p className="text-slate-400">
-                        {selectedPartyEvent.eventType === 'travel' && selectedPartyEvent.endDate ? (
+                        {selectedPartyEvent.endDate && selectedPartyEvent.endDate !== selectedPartyEvent.date ? (
                           <>
                             {formatDate(selectedPartyEvent.date, { weekday: 'short', month: 'long', day: 'numeric' })}
                             {' – '}
@@ -6457,15 +6458,21 @@ export default function TripPlanner() {
                         ) : (
                           <>
                             {formatDate(selectedPartyEvent.date, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                            {selectedPartyEvent.time && ` at ${selectedPartyEvent.time}`}
-                            {selectedPartyEvent.endTime && ` - ${selectedPartyEvent.endTime}`}
+                            {!selectedPartyEvent.allDay && selectedPartyEvent.time && ` at ${selectedPartyEvent.time}`}
+                            {!selectedPartyEvent.allDay && selectedPartyEvent.endTime && ` - ${selectedPartyEvent.endTime}`}
+                            {selectedPartyEvent.allDay && ' · All day'}
                           </>
                         )}
                       </p>
                     </div>
                     {isOwner && (
                       <button
-                        onClick={() => setEditingEvent(selectedPartyEvent)}
+                        onClick={() => setEditingEvent({
+                          ...selectedPartyEvent,
+                          // Derive UI toggles from saved fields so the form opens in the right mode
+                          allDay: selectedPartyEvent.allDay ?? !selectedPartyEvent.time,
+                          multiDay: !!(selectedPartyEvent.endDate && selectedPartyEvent.endDate !== selectedPartyEvent.date),
+                        })}
                         className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"
                         title="Edit event"
                       >
@@ -6506,14 +6513,19 @@ export default function TripPlanner() {
                     <div className="bg-white/10 rounded-2xl p-4 border border-white/20">
                       <div className="flex items-center gap-2 text-purple-400 mb-2">
                         <Clock className="w-5 h-5" />
-                        <span className="font-semibold">Time</span>
+                        <span className="font-semibold">{selectedPartyEvent.allDay ? 'When' : 'Time'}</span>
                       </div>
                       <p className="text-white">
-                        {selectedPartyEvent.time || 'TBD'}
-                        {selectedPartyEvent.endTime && ` - ${selectedPartyEvent.endTime}`}
+                        {selectedPartyEvent.allDay
+                          ? 'All day'
+                          : (selectedPartyEvent.time
+                              ? `${selectedPartyEvent.time}${selectedPartyEvent.endTime ? ` – ${selectedPartyEvent.endTime}` : ''}`
+                              : 'TBD')}
                       </p>
                       <p className="text-slate-400 text-sm mt-1">
-                        {formatDate(selectedPartyEvent.date, { weekday: 'long', month: 'short', day: 'numeric' })}
+                        {selectedPartyEvent.endDate && selectedPartyEvent.endDate !== selectedPartyEvent.date
+                          ? `${formatDate(selectedPartyEvent.date, { month: 'short', day: 'numeric' })} – ${formatDate(selectedPartyEvent.endDate, { month: 'short', day: 'numeric' })}`
+                          : formatDate(selectedPartyEvent.date, { weekday: 'long', month: 'short', day: 'numeric' })}
                       </p>
                     </div>
                   </div>
@@ -7440,16 +7452,19 @@ export default function TripPlanner() {
             const upcomingTrips = sortedTrips
               .filter(t => parseLocalDate(t.dates.start) > today)
               .map(t => ({
-                type: 'travel', id: t.id, name: t.destination, emoji: t.emoji,
+                source: 'trip', type: 'travel', id: t.id, name: t.destination, emoji: t.emoji,
                 date: parseLocalDate(t.dates.start), color: t.color,
                 guests: t.guests, special: t.special, raw: t,
               }));
 
-            // Gather upcoming party events
+            // Gather upcoming party events (multi-day events stay until end date)
             const upcomingEvents = partyEvents
-              .filter(e => parseLocalDate(e.date) >= today)
+              .filter(e => {
+                const ref = (e.endDate && e.endDate !== e.date) ? e.endDate : e.date;
+                return parseLocalDate(ref) >= today;
+              })
               .map(e => ({
-                type: e.eventType || 'parties', id: e.id, name: e.name, emoji: e.emoji,
+                source: 'event', type: e.eventType || 'parties', id: e.id, name: e.name, emoji: e.emoji,
                 date: parseLocalDate(e.date), color: e.color || 'from-amber-400 to-orange-500',
                 guests: e.guests, special: null, raw: e,
               }));
@@ -7465,7 +7480,7 @@ export default function TripPlanner() {
             if (filtered.length === 0) return null;
             const next = filtered[0];
             const daysUntil = Math.ceil((next.date - today) / (1000 * 60 * 60 * 24));
-            const isTrip = next.type === 'travel';
+            const isTrip = next.source === 'trip';
 
             // Trip-specific extras
             const details = isTrip ? (tripDetails[next.id] || { hotels: [], events: [], flights: [] }) : null;
@@ -7473,7 +7488,7 @@ export default function TripPlanner() {
 
             return (
               <div
-                onClick={() => isTrip ? setEditingTrip(next.raw) : setSelectedPartyEvent(next.raw)}
+                onClick={() => isTrip ? setSelectedTrip(next.raw) : setSelectedPartyEvent(next.raw)}
                 className={`mt-6 bg-gradient-to-r ${next.color} rounded-2xl p-4 md:p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] transition-transform`}>
                 <div className="absolute inset-0 bg-black/10" />
                 <div className="relative flex flex-col md:flex-row items-start justify-between gap-4">
@@ -7600,7 +7615,7 @@ export default function TripPlanner() {
                 const tripItems = sortedTrips
                   .filter(t => parseLocalDate(t.dates.start) >= today)
                   .map(t => ({
-                    itemType: 'travel', id: t.id, name: t.destination, emoji: t.emoji,
+                    source: 'trip', itemType: 'travel', id: t.id, name: t.destination, emoji: t.emoji,
                     sortDate: parseLocalDate(t.dates.start),
                     dateLabel: `${formatDate(t.dates.start)} - ${formatDate(t.dates.end)}`,
                     color: t.color, guests: t.guests || [], raw: t,
@@ -7610,16 +7625,16 @@ export default function TripPlanner() {
                 // Normalize events into unified items
                 const eventItems = partyEvents
                   .filter(e => {
-                    // For trips, use the end date as the reference so trips aren't hidden mid-way through
-                    const ref = (e.eventType === 'travel' && e.endDate) ? e.endDate : e.date;
+                    // Multi-day events should stay visible until their end date
+                    const ref = (e.endDate && e.endDate !== e.date) ? e.endDate : e.date;
                     return parseLocalDate(ref) >= today;
                   })
                   .map(e => ({
-                    itemType: e.eventType || 'parties', id: e.id, name: e.name, emoji: e.emoji,
+                    source: 'event', itemType: e.eventType || 'parties', id: e.id, name: e.name, emoji: e.emoji,
                     sortDate: parseLocalDate(e.date),
-                    dateLabel: (e.eventType === 'travel' && e.endDate)
+                    dateLabel: (e.endDate && e.endDate !== e.date)
                       ? `${formatDate(e.date, { month: 'short', day: 'numeric' })} – ${formatDate(e.endDate, { month: 'short', day: 'numeric' })}`
-                      : `${formatDate(e.date, { weekday: 'short', month: 'short', day: 'numeric' })}${e.time ? ` • ${e.time}` : ''}`,
+                      : `${formatDate(e.date, { weekday: 'short', month: 'short', day: 'numeric' })}${(!e.allDay && e.time) ? ` • ${e.time}` : (e.allDay ? ' • All day' : '')}`,
                     color: e.color || 'from-amber-400 to-orange-500', guests: e.guests || [], raw: e,
                     images: e.images || [], tasks: e.tasks || [],
                   }));
@@ -7653,14 +7668,14 @@ export default function TripPlanner() {
                 return gridItems.map(item => {
                   const daysUntil = Math.ceil((item.sortDate - today) / (1000 * 60 * 60 * 24));
                   const isToday = daysUntil === 0;
-                  const isTrip = item.itemType === 'travel';
+                  const isTrip = item.source === 'trip';
                   const typeEmoji = { travel: '✈️', parties: '🎉', datenight: '🥂', concert: '🎵', fitness: '🏆', pride: '🏳️‍🌈', karaoke: '🎤' }[item.itemType] || '📅';
 
                   return (
                     <div
-                      key={`${item.itemType}-${item.id}`}
-                      data-search-id={`${item.itemType}-${item.id}`}
-                      onClick={() => isTrip ? setEditingTrip(item.raw) : setSelectedPartyEvent(item.raw)}
+                      key={`${item.source}-${item.id}`}
+                      data-search-id={`${item.source}-${item.id}`}
+                      onClick={() => isTrip ? setSelectedTrip(item.raw) : setSelectedPartyEvent(item.raw)}
                       className="relative rounded-2xl border border-white/20 cursor-pointer hover:scale-[1.02] transition-all overflow-hidden"
                     >
                       {/* Cover Image */}
@@ -11111,8 +11126,9 @@ export default function TripPlanner() {
                     setEditingEvent(null);
                     setEventCoverImagePreview(null);
                     setNewEventData({
-                      name: '', emoji: '🎉', date: '', endDate: '', time: '18:00', endTime: '22:00',
-                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties'
+                      name: '', emoji: '🎉', date: toLocalDateStr(new Date()), endDate: '', time: '18:00', endTime: '22:00',
+                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties',
+                      allDay: false, multiDay: false,
                     });
                   }}
                   className="p-2 hover:bg-white/10 rounded-full transition"
@@ -11216,90 +11232,97 @@ export default function TripPlanner() {
                 </div>
               </div>
 
-              {/* Date & Time — Trip events get start + end DATE; other events get single date + times */}
-              {((editingEvent ? editingEvent.eventType : newEventData.eventType) === 'travel') ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm text-white/50 mb-1">Start Date</label>
-                    <input
-                      type="date"
-                      value={editingEvent ? editingEvent.date : newEventData.date}
-                      onChange={(e) => {
-                        if (editingEvent) {
-                          setEditingEvent({ ...editingEvent, date: e.target.value });
-                        } else {
-                          setNewEventData({ ...newEventData, date: e.target.value });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-white/50 mb-1">End Date</label>
-                    <input
-                      type="date"
-                      value={editingEvent ? (editingEvent.endDate || '') : (newEventData.endDate || '')}
-                      min={editingEvent ? editingEvent.date : newEventData.date}
-                      onChange={(e) => {
-                        if (editingEvent) {
-                          setEditingEvent({ ...editingEvent, endDate: e.target.value });
-                        } else {
-                          setNewEventData({ ...newEventData, endDate: e.target.value });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm text-white/50 mb-1">Date</label>
-                    <input
-                      type="date"
-                      value={editingEvent ? editingEvent.date : newEventData.date}
-                      onChange={(e) => {
-                        if (editingEvent) {
-                          setEditingEvent({ ...editingEvent, date: e.target.value });
-                        } else {
-                          setNewEventData({ ...newEventData, date: e.target.value });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-white/50 mb-1">Start Time</label>
-                    <input
-                      type="time"
-                      value={editingEvent ? editingEvent.time : newEventData.time}
-                      onChange={(e) => {
-                        if (editingEvent) {
-                          setEditingEvent({ ...editingEvent, time: e.target.value });
-                        } else {
-                          setNewEventData({ ...newEventData, time: e.target.value });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-white/50 mb-1">End Time</label>
-                    <input
-                      type="time"
-                      value={editingEvent ? editingEvent.endTime : newEventData.endTime}
-                      onChange={(e) => {
-                        if (editingEvent) {
-                          setEditingEvent({ ...editingEvent, endTime: e.target.value });
-                        } else {
-                          setNewEventData({ ...newEventData, endTime: e.target.value });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                </div>
-              )}
+              {/* Date & Time — toggles for All Day and Multi-day; travel events always multi-day */}
+              {(() => {
+                const data = editingEvent || newEventData;
+                const updateField = (patch) => {
+                  if (editingEvent) setEditingEvent({ ...editingEvent, ...patch });
+                  else setNewEventData({ ...newEventData, ...patch });
+                };
+                const isTravel = data.eventType === 'travel';
+                // travel events are inherently multi-day; honor the multiDay flag for everything else
+                const showEndDate = isTravel || data.multiDay || !!data.endDate;
+                // travel events are inherently all-day at the date level; honor allDay flag elsewhere
+                const showTimes = !isTravel && !data.allDay;
+                return (
+                  <>
+                    {/* Toggles row — only for non-travel events */}
+                    {!isTravel && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => updateField({ allDay: !data.allDay })}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+                            data.allDay ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20'
+                          }`}
+                        >
+                          <Sun className="w-3.5 h-3.5" />
+                          All Day
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateField({ multiDay: !data.multiDay, endDate: !data.multiDay ? (data.endDate || data.date) : '' })}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+                            data.multiDay || data.endDate ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20'
+                          }`}
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          Multi-day
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Dates */}
+                    <div className={`grid gap-3 ${showEndDate ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                      <div>
+                        <label className="block text-sm text-white/50 mb-1">{showEndDate ? 'Start Date' : 'Date'}</label>
+                        <input
+                          type="date"
+                          value={data.date || ''}
+                          onChange={(e) => updateField({ date: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                      {showEndDate && (
+                        <div>
+                          <label className="block text-sm text-white/50 mb-1">End Date</label>
+                          <input
+                            type="date"
+                            value={data.endDate || ''}
+                            min={data.date || undefined}
+                            onChange={(e) => updateField({ endDate: e.target.value })}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Times — only when not all-day and not a travel event */}
+                    {showTimes && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm text-white/50 mb-1">Start Time</label>
+                          <input
+                            type="time"
+                            value={data.time || ''}
+                            onChange={(e) => updateField({ time: e.target.value })}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-white/50 mb-1">End Time <span className="text-white/30">(optional)</span></label>
+                          <input
+                            type="time"
+                            value={data.endTime || ''}
+                            onChange={(e) => updateField({ endTime: e.target.value })}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Location */}
               <div>
@@ -11531,8 +11554,9 @@ export default function TripPlanner() {
                     setEditingEvent(null);
                     setEventCoverImagePreview(null);
                     setNewEventData({
-                      name: '', emoji: '🎉', date: '', endDate: '', time: '18:00', endTime: '22:00',
-                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties'
+                      name: '', emoji: '🎉', date: toLocalDateStr(new Date()), endDate: '', time: '18:00', endTime: '22:00',
+                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties',
+                      allDay: false, multiDay: false,
                     });
                   }}
                   className="px-5 py-2.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition"
@@ -11543,10 +11567,22 @@ export default function TripPlanner() {
                   onClick={async () => {
                     if (isSavingEvent) return; // prevent double-tap
                     setIsSavingEvent(true);
+                    // Normalize event before save: drop times when allDay, drop endDate when not multi-day
+                    const normalize = (evt) => {
+                      const isTravel = evt.eventType === 'travel';
+                      const isMulti = isTravel || evt.multiDay || (evt.endDate && evt.endDate !== evt.date);
+                      return {
+                        ...evt,
+                        time: (evt.allDay && !isTravel) ? '' : (evt.time || ''),
+                        endTime: (evt.allDay && !isTravel) ? '' : (evt.endTime || ''),
+                        endDate: isMulti ? (evt.endDate || evt.date) : '',
+                      };
+                    };
                     try {
                       if (editingEvent) {
+                        const cleaned = normalize(editingEvent);
                         const newEvents = partyEvents.map(e =>
-                          e.id === editingEvent.id ? { ...editingEvent, updatedAt: new Date().toISOString() } : e
+                          e.id === editingEvent.id ? { ...cleaned, updatedAt: new Date().toISOString() } : e
                         );
                         await savePartyEventsToFirestore(newEvents);
                         setPartyEvents(newEvents);
@@ -11556,7 +11592,7 @@ export default function TripPlanner() {
                         showToast('Event updated!', 'success');
                       } else {
                         const newEvent = {
-                          ...newEventData,
+                          ...normalize(newEventData),
                           id: `event-${Date.now()}`,
                           guests: [],
                           tasks: [],
@@ -11569,8 +11605,9 @@ export default function TripPlanner() {
                         setShowAddEventModal(false);
                         setEventCoverImagePreview(null);
                         setNewEventData({
-                          name: '', emoji: '🎉', date: '', endDate: '', time: '18:00', endTime: '22:00',
-                          location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties'
+                          name: '', emoji: '🎉', date: toLocalDateStr(new Date()), endDate: '', time: '18:00', endTime: '22:00',
+                          location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties',
+                          allDay: false, multiDay: false,
                         });
                         showToast('Event created!', 'success');
                       }
