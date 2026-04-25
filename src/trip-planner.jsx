@@ -11528,6 +11528,42 @@ export default function TripPlanner() {
               </div>
             </div>
 
+            {/* Convert to Trip — only for travel-type events with both dates set */}
+            {editingEvent && editingEvent.eventType === 'travel' && editingEvent.date && (
+              <div className="px-6 pb-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!confirm('Convert this event into a Trip? You\'ll get full trip planning (flights, hotels, packing list, budget, itinerary). The event will be replaced.')) return;
+                    const evt = editingEvent;
+                    const tripData = {
+                      destination: evt.name,
+                      emoji: evt.emoji,
+                      startDate: evt.date,
+                      endDate: evt.endDate || evt.date,
+                      notes: evt.description || '',
+                      special: '',
+                    };
+                    addNewTrip(tripData, false);
+                    // Remove the source partyEvent
+                    const remaining = partyEvents.filter(e => e.id !== evt.id);
+                    try {
+                      await savePartyEventsToFirestore(remaining);
+                      setPartyEvents(remaining);
+                    } catch (_) { /* toast already shown */ }
+                    setEditingEvent(null);
+                    setSelectedPartyEvent(null);
+                    setShowAddEventModal(false);
+                    showToast('Converted to Trip — open it from the Events tab', 'success');
+                  }}
+                  className="w-full py-2.5 bg-gradient-to-r from-teal-500/30 to-cyan-500/30 text-teal-200 rounded-xl hover:from-teal-500/40 hover:to-cyan-500/40 transition flex items-center justify-center gap-2 border border-teal-500/30"
+                >
+                  <Plane className="w-4 h-4" />
+                  Convert to Trip (flights, hotels, itinerary)
+                </button>
+              </div>
+            )}
+
             {/* Footer */}
             <div className="p-6 border-t border-white/10 flex justify-between">
               {editingEvent && (
@@ -12028,7 +12064,7 @@ export default function TripPlanner() {
                     { action: () => setShowAddTaskModal('create'), icon: '✅', label: 'Task', gradient: 'from-blue-400 to-indigo-500' },
                     { action: () => setShowSharedListModal('create'), icon: '🛒', label: 'List', gradient: 'from-emerald-400 to-teal-500' },
                     { action: () => setShowAddIdeaModal('create'), icon: '💡', label: 'Idea', gradient: 'from-yellow-400 to-amber-500' },
-                    { action: () => setShowAddGoalModal('create'), icon: '🎯', label: 'Goal', gradient: 'from-green-400 to-emerald-500' },
+                    { action: () => setShowNewTripModal('new'), icon: '✈️', label: 'Trip', gradient: 'from-teal-400 to-cyan-500' },
                     { action: () => setShowAddEventModal(true), icon: '🎉', label: 'Event', gradient: 'from-amber-400 to-orange-500' },
                     { action: () => setShowAddMemoryModal('milestone'), icon: '💝', label: 'Memory', gradient: 'from-rose-400 to-pink-500' },
                   ].map((item, idx) => (
@@ -12074,7 +12110,7 @@ export default function TripPlanner() {
                     { action: () => setShowAddTaskModal('create'), icon: '✅', label: 'Task', gradient: 'from-blue-400 to-indigo-500' },
                     { action: () => setShowSharedListModal('create'), icon: '🛒', label: 'List', gradient: 'from-emerald-400 to-teal-500' },
                     { action: () => setShowAddIdeaModal('create'), icon: '💡', label: 'Idea', gradient: 'from-yellow-400 to-amber-500' },
-                    { action: () => setShowAddGoalModal('create'), icon: '🎯', label: 'Goal', gradient: 'from-green-400 to-emerald-500' },
+                    { action: () => setShowNewTripModal('new'), icon: '✈️', label: 'Trip', gradient: 'from-teal-400 to-cyan-500' },
                     { action: () => setShowAddEventModal(true), icon: '🎉', label: 'Event', gradient: 'from-amber-400 to-orange-500' },
                     { action: () => setShowAddMemoryModal('milestone'), icon: '💝', label: 'Memory', gradient: 'from-rose-400 to-pink-500' },
                   ].map((item, idx) => {
