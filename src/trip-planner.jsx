@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Plane, Hotel, Music, MapPin, Plus, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Heart, Anchor, Sun, Star, Clock, Users, ExternalLink, Sparkles, Pencil, Check, MoreVertical, Trash2, Palette, Image, ImagePlus, Link, Globe, Loader, LogIn, LogOut, User, UserPlus, Share2, Upload, Folder, Edit3, CheckSquare, RefreshCw, Camera, Search, Bell, BellOff } from 'lucide-react';
 
 // Import constants and utilities
@@ -47,10 +46,8 @@ import ListCard from './components/SharedHub/ListCard';
 import IdeaCard from './components/SharedHub/IdeaCard';
 import AddSocialModal from './components/SharedHub/AddSocialModal';
 import SocialCard from './components/SharedHub/SocialCard';
-import GoalCard from './components/SharedHub/GoalCard';
-import AddGoalModal from './components/SharedHub/AddGoalModal';
-import OdysseyPlanCard from './components/SharedHub/OdysseyPlanCard';
-import AddOdysseyPlanModal from './components/SharedHub/AddOdysseyPlanModal';
+import AddHabitModal from './components/SharedHub/AddHabitModal';
+import HabitCard from './components/SharedHub/HabitCard';
 
 
 // Firebase imports
@@ -494,64 +491,34 @@ export default function TripPlanner() {
     return null;
   })();
 
-  // URL ↔ section slug mapping (pretty URLs like /hub, /fitness)
-  const URL_SECTIONS = { fitness: 'fitness', hub: 'home', events: 'events', memories: 'memories', nutrition: 'nutrition', lifeplanning: 'lifePlanning', business: 'business', calendar: 'calendar', apps: 'apps' };
-  const SECTION_URLS = Object.fromEntries(Object.entries(URL_SECTIONS).map(([u, s]) => [s, u]));
-  const routeParams = useParams();
-  const navigateRoute = useNavigate();
-  const urlSection = routeParams?.section ? URL_SECTIONS[routeParams.section.toLowerCase()] : null;
-  const [activeSection, setActiveSection] = useState(initialAppMode || urlSection || 'fitness'); // 'fitness' | 'home' (hub) | 'events' | 'memories' | 'nutrition' | 'lifePlanning' | 'business'
-
-  // Sync URL when activeSection changes (from tab clicks) — skip if in app mode (PWA standalone override)
-  useEffect(() => {
-    if (initialAppMode) return; // PWA app-mode windows don't mess with URL
-    const slug = SECTION_URLS[activeSection];
-    if (!slug) return;
-    const currentSlug = (routeParams?.section || '').toLowerCase();
-    const desiredPath = slug === 'fitness' && !routeParams?.section ? '/' : '/' + slug;
-    // Only navigate if URL is out of sync (prevents loop)
-    if (currentSlug !== slug && !(currentSlug === '' && activeSection === 'fitness')) {
-      navigateRoute(desiredPath, { replace: false });
-    }
-  }, [activeSection]);
-
-  // Sync activeSection when URL changes (back/forward buttons)
-  useEffect(() => {
-    if (urlSection && urlSection !== activeSection) {
-      setActiveSection(urlSection);
-    }
-  }, [urlSection]);
+  const [activeSection, setActiveSection] = useState(initialAppMode || 'fitness'); // 'fitness' | 'home' (hub) | 'events' | 'memories' | 'nutrition' | 'lifePlanning' | 'business'
 
   // User profile selection
   const [currentUser, setCurrentUser] = useState('Mike');
 
   // Ref to store saveSharedHub function (defined later in useEffect)
   const saveSharedHubRef = useRef(() => {});
-  // Tracks whether the sharedHub Firestore doc has been loaded yet — shared between hook and trip-planner
-  const hubDataLoadedRef = useRef(false);
 
   // ========== SHARED HUB: All state and operations from hook =====
-  const sharedHub = useSharedHub(currentUser, saveSharedHubRef.current, showToast, hubDataLoadedRef);
+  const sharedHub = useSharedHub(currentUser, saveSharedHubRef.current, showToast);
   const {
-    sharedTasks, sharedLists, sharedIdeas, sharedSocial, sharedGoals, sharedOdysseyPlans,
+    sharedTasks, sharedLists, sharedIdeas, sharedSocial, sharedHabits,
     addTask, updateTask, deleteTask, completeTask, highlightTask,
     addList, updateList, deleteList, addListItem, toggleListItem, deleteListItem, highlightList,
     addIdea, updateIdea, deleteIdea, highlightIdea,
     addSocial, updateSocial, deleteSocial, completeSocial, highlightSocial,
-    addGoal, updateGoal, deleteGoal, toggleMilestone, highlightGoal,
-    addOdysseyPlan, updateOdysseyPlan, deleteOdysseyPlan,
+    addHabit, updateHabit, deleteHabit, toggleHabitDay, highlightHabit,
     hubSubView, setHubSubView, hubTaskFilter, setHubTaskFilter, hubTaskSort, setHubTaskSort,
     hubListFilter, setHubListFilter, hubIdeaFilter, setHubIdeaFilter, hubIdeaStatusFilter, setHubIdeaStatusFilter,
-    hubSocialFilter, setHubSocialFilter, hubGoalFilter, setHubGoalFilter,
+    hubSocialFilter, setHubSocialFilter, hubHabitFilter, setHubHabitFilter,
     collapsedSections, toggleDashSection,
-    setSharedTasks, setSharedLists, setSharedIdeas, setSharedSocial, setSharedGoals, setSharedOdysseyPlans,
+    setSharedTasks, setSharedLists, setSharedIdeas, setSharedSocial, setSharedHabits,
     // Hub modal states (now from context)
     showAddTaskModal, setShowAddTaskModal,
     showSharedListModal, setShowSharedListModal,
     showAddIdeaModal, setShowAddIdeaModal,
     showAddSocialModal, setShowAddSocialModal,
-    showAddGoalModal, setShowAddGoalModal,
-    showOdysseyPlanModal, setShowOdysseyPlanModal,
+    showAddHabitModal, setShowAddHabitModal,
   } = sharedHub;
 
   // Deep link state — opens a specific Hub item when the URL contains ?hub=type&id=itemId
@@ -598,7 +565,7 @@ export default function TripPlanner() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchFilters, setSearchFilters] = useState({ tasks: true, lists: true, ideas: true, social: true, goals: true, travel: true, events: true, fitness: true, memories: true });
+  const [searchFilters, setSearchFilters] = useState({ tasks: true, lists: true, ideas: true, social: true, habits: true, travel: true, events: true, fitness: true, memories: true });
   const [searchHighlightId, setSearchHighlightId] = useState(null); // { type, id } - scroll-to target after search nav
   const [memoriesView, setMemoriesView] = useState('timeline'); // 'timeline' | 'events' | 'media'
   const [collapsedMemorySections, setCollapsedMemorySections] = useState({}); // { sectionId: true/false }
@@ -1750,8 +1717,9 @@ export default function TripPlanner() {
   const [eventsSortAsc, setEventsSortAsc] = useState(true); // true = soonest first
   const [eventsTypeFilter, setEventsTypeFilter] = useState(null); // null | 'datenight' | 'travel' | 'fitness' | 'concert' | 'pride' | 'karaoke' | 'parties'
   const [newEventData, setNewEventData] = useState({
-    name: '', emoji: '🎉', date: '', endDate: '', time: '18:00', endTime: '22:00',
-    location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties'
+    name: '', emoji: '🎉', date: toLocalDateStr(new Date()), endDate: '', time: '18:00', endTime: '22:00',
+    location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties',
+    allDay: false, multiDay: false,
   });
   const [eventGuestEmail, setEventGuestEmail] = useState('');
   const [eventGuestPermission, setEventGuestPermission] = useState('edit');
@@ -1762,7 +1730,6 @@ export default function TripPlanner() {
   const [dragOverEventId, setDragOverEventId] = useState(null);
   const [eventCoverImagePreview, setEventCoverImagePreview] = useState(null);
   const [isSavingEvent, setIsSavingEvent] = useState(false);
-  const [showEventEmojiPicker, setShowEventEmojiPicker] = useState(false);
   const [uploadingEventCoverImage, setUploadingEventCoverImage] = useState(false);
   const eventCoverFileRef = useRef(null);
   const eventCoverCameraRef = useRef(null);
@@ -2098,8 +2065,7 @@ export default function TripPlanner() {
           if (data.tasks) setSharedTasks(data.tasks);
           if (data.ideas) setSharedIdeas(data.ideas);
           if (data.social) setSharedSocial(data.social);
-          if (data.goals) setSharedGoals(data.goals);
-          if (data.odysseyPlans) setSharedOdysseyPlans(data.odysseyPlans);
+          if (data.habits) setSharedHabits(data.habits);
         }
         // Mark hub data as loaded so saves are now safe
         hubDataLoadedRef.current = true;
@@ -2128,7 +2094,7 @@ export default function TripPlanner() {
       list: { data: sharedLists, tab: 'lists', open: setShowSharedListModal },
       idea: { data: sharedIdeas, tab: 'ideas', open: setShowAddIdeaModal },
       social: { data: sharedSocial, tab: 'social', open: setShowAddSocialModal },
-      goal: { data: sharedGoals, tab: 'goals', open: setShowAddGoalModal },
+      habit: { data: sharedHabits, tab: 'habits', open: setShowAddHabitModal },
     };
 
     const config = typeMap[type];
@@ -2148,7 +2114,7 @@ export default function TripPlanner() {
       setPendingDeepLink(null);
     }
     // If data is still empty, wait for next render (Firebase may still be loading)
-  }, [pendingDeepLink, sharedTasks, sharedLists, sharedIdeas, sharedSocial, sharedGoals]);
+  }, [pendingDeepLink, sharedTasks, sharedLists, sharedIdeas, sharedSocial, sharedHabits]);
 
   // Compute visible open dates based on user role
   const visibleOpenDates = isOwner
@@ -2459,8 +2425,8 @@ export default function TripPlanner() {
           id: event.id,
           title: `${event.emoji || '🎉'} ${event.name || event.title || 'Event'}`,
           start: event.date,
-          // Trip events span a date range (endDate); others are single-day
-          end: (event.eventType === 'travel' && event.endDate) ? event.endDate : event.date,
+          // Multi-day events span a range; honor any event with an endDate
+          end: (event.endDate && event.endDate !== event.date) ? event.endDate : event.date,
           type: 'event',
           color: event.color || 'from-amber-400 to-orange-500',
           data: event,
@@ -2564,10 +2530,10 @@ export default function TripPlanner() {
     }
   }, [currentUser]);
 
-  // Save party/social events to Firestore (legacy + individual docs)
   // Guard to prevent save-before-load races (mobile cold-start could otherwise wipe events)
   const partyEventsLoadedRef = useRef(false);
 
+  // Save party/social events to Firestore (legacy + individual docs)
   const savePartyEventsToFirestore = useCallback(async (newEvents) => {
     if (!user) throw new Error('not-authenticated');
     // Don't save until Firebase has loaded the existing events — prevents overwriting with a near-empty array
@@ -2670,8 +2636,9 @@ export default function TripPlanner() {
   }, [dataLoading, trips, partyEvents, memories, tripDetails, saveMemoriesToFirestore]);
 
   // ========== SHARED HUB SAVE & CRUD ==========
+  const hubDataLoadedRef = useRef(false);
 
-  const saveSharedHub = useCallback(async (newLists, newTasks, newIdeas, newSocial, newGoals, newOdysseyPlans) => {
+  const saveSharedHub = useCallback(async (newLists, newTasks, newIdeas, newSocial, newHabits) => {
     if (!user) return;
     // Don't save until Firebase data has loaded — prevents overwriting with empty arrays
     if (!hubDataLoadedRef.current) {
@@ -2686,8 +2653,7 @@ export default function TripPlanner() {
       if (newTasks !== null && newTasks !== undefined) updates.tasks = newTasks;
       if (newIdeas !== null && newIdeas !== undefined) updates.ideas = newIdeas;
       if (newSocial !== null && newSocial !== undefined) updates.social = newSocial;
-      if (newGoals !== null && newGoals !== undefined) updates.goals = newGoals;
-      if (newOdysseyPlans !== null && newOdysseyPlans !== undefined) updates.odysseyPlans = newOdysseyPlans;
+      if (newHabits !== null && newHabits !== undefined) updates.habits = newHabits;
       await setDoc(doc(db, 'tripData', 'sharedHub'), stripUndefined(updates), { merge: true });
     } catch (error) {
       console.error('Error saving shared hub:', error);
@@ -2730,8 +2696,8 @@ export default function TripPlanner() {
   // ── Search functions ──
   const getSearchResults = useCallback(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return { tasks: [], lists: [], ideas: [], social: [], goals: [], travel: [], events: [], fitness: [], memories: [] };
-    const r = { tasks: [], lists: [], ideas: [], social: [], goals: [], travel: [], events: [], fitness: [], memories: [] };
+    if (!q) return { tasks: [], lists: [], ideas: [], social: [], habits: [], travel: [], events: [], fitness: [], memories: [] };
+    const r = { tasks: [], lists: [], ideas: [], social: [], habits: [], travel: [], events: [], fitness: [], memories: [] };
     if (searchFilters.tasks) {
       r.tasks = sharedTasks.filter(t =>
         t.title?.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q) || t.tags?.some(tg => tg.toLowerCase().includes(q))
@@ -2752,9 +2718,9 @@ export default function TripPlanner() {
         s.person?.toLowerCase().includes(q) || s.title?.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q)
       ).slice(0, 8);
     }
-    if (searchFilters.goals) {
-      r.goals = sharedGoals.filter(g =>
-        g.title?.toLowerCase().includes(q) || g.description?.toLowerCase().includes(q) || g.milestones?.some(m => m.text?.toLowerCase().includes(q))
+    if (searchFilters.habits) {
+      r.habits = sharedHabits.filter(h =>
+        h.name?.toLowerCase().includes(q) || h.cue?.toLowerCase().includes(q) || h.routine?.toLowerCase().includes(q) || h.reward?.toLowerCase().includes(q) || h.identity?.toLowerCase().includes(q)
       ).slice(0, 8);
     }
     if (searchFilters.travel) {
@@ -2778,16 +2744,16 @@ export default function TripPlanner() {
       ).slice(0, 8);
     }
     return r;
-  }, [searchQuery, searchFilters, sharedTasks, sharedLists, sharedIdeas, sharedSocial, sharedGoals, trips, partyEvents, fitnessEvents, memories]);
+  }, [searchQuery, searchFilters, sharedTasks, sharedLists, sharedIdeas, sharedSocial, sharedHabits, trips, partyEvents, fitnessEvents, memories]);
 
-  const searchResults = searchQuery.trim() ? getSearchResults() : { tasks: [], lists: [], ideas: [], social: [], goals: [], travel: [], events: [], fitness: [], memories: [] };
+  const searchResults = searchQuery.trim() ? getSearchResults() : { tasks: [], lists: [], ideas: [], social: [], habits: [], travel: [], events: [], fitness: [], memories: [] };
   const totalSearchResults = Object.values(searchResults).reduce((sum, arr) => sum + arr.length, 0);
 
   const handleSearchResultClick = (type, itemId) => {
     setShowSearch(false);
     setSearchQuery('');
     setSearchHighlightId({ type, id: itemId });
-    if (['tasks', 'lists', 'ideas', 'social', 'goals'].includes(type)) {
+    if (['tasks', 'lists', 'ideas', 'social', 'habits'].includes(type)) {
       setActiveSection('home');
       setHubSubView(type);
     } else {
@@ -3874,70 +3840,6 @@ export default function TripPlanner() {
               {/* ===== HUB DASHBOARD VIEW ===== */}
               {hubSubView === 'home' && (
                 <>
-                  {/* GOAL PROGRESS STATS */}
-                  {(() => {
-                    const activeGoals = sharedGoals.filter(g => g.status === 'active');
-                    const oneYearGoals = activeGoals.filter(g => g.timeframe === '1year');
-                    const fiveYearGoals = activeGoals.filter(g => g.timeframe === '5year');
-                    const allMilestones = activeGoals.flatMap(g => g.milestones || []);
-                    const completedMilestones = allMilestones.filter(m => m.completed);
-                    const milestonePct = allMilestones.length > 0 ? Math.round((completedMilestones.length / allMilestones.length) * 100) : 0;
-                    const calcGoalPct = (goals) => {
-                      if (goals.length === 0) return 0;
-                      const ms = goals.flatMap(g => g.milestones || []);
-                      if (ms.length === 0) return 0;
-                      return Math.round((ms.filter(m => m.completed).length / ms.length) * 100);
-                    };
-                    const oneYearPct = calcGoalPct(oneYearGoals);
-                    const fiveYearPct = calcGoalPct(fiveYearGoals);
-                    const achievedCount = sharedGoals.filter(g => g.status === 'achieved').length;
-                    const isCollapsed = collapsedSections.goalStats;
-                    if (activeGoals.length === 0 && achievedCount === 0) return null;
-                    return (
-                      <div className="mb-6 bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-sm rounded-3xl border border-emerald-500/20 overflow-hidden">
-                        <button
-                          onClick={() => toggleDashSection('goalStats')}
-                          className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition"
-                        >
-                          <h3 className="text-base font-bold text-white flex items-center gap-2">
-                            <span>📊</span> Goal Progress
-                            {achievedCount > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">🏆 {achievedCount}</span>}
-                          </h3>
-                          <div className="text-white/40">
-                            {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-                          </div>
-                        </button>
-                        {!isCollapsed && (
-                          <div className="p-4 pt-0 grid grid-cols-3 gap-4">
-                            {[
-                              { label: '1-Year', pct: oneYearPct, color: '#34d399' },
-                              { label: '5-Year', pct: fiveYearPct, color: '#60a5fa' },
-                              { label: 'Milestones', pct: milestonePct, color: '#a78bfa' },
-                            ].map(({ label, pct, color }) => {
-                              const r = 28, circ = 2 * Math.PI * r;
-                              return (
-                                <div key={label} className="flex flex-col items-center">
-                                  <div className="relative">
-                                    <svg width={68} height={68} className="transform -rotate-90">
-                                      <circle cx={34} cy={34} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="5" />
-                                      <circle cx={34} cy={34} r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
-                                        strokeDasharray={circ} strokeDashoffset={circ - (pct / 100) * circ}
-                                        style={{ transition: 'stroke-dashoffset 1.5s ease-out' }} />
-                                    </svg>
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                      <span className="text-sm font-bold text-white">{pct}%</span>
-                                    </div>
-                                  </div>
-                                  <span className="text-[10px] text-white/40 mt-1">{label}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-
                   {/* WEEK AHEAD PLANNER */}
                   {(() => {
                     const today = new Date();
@@ -4544,26 +4446,26 @@ export default function TripPlanner() {
                     );
                   })()}
 
-                  {/* GOALS WIDGET */}
+                  {/* HABITS WIDGET */}
                   {(() => {
-                    const activeGoals = sharedGoals.filter(g => g.status === 'active');
-                    const isCollapsed = collapsedSections.goals;
-                    const totalMs = activeGoals.flatMap(g => g.milestones || []);
-                    const doneMs = totalMs.filter(m => m.completed).length;
+                    const activeHabits = sharedHabits.filter(h => h.status === 'active');
+                    const todayKey = toLocalDateStr();
+                    const doneToday = activeHabits.filter(h => h.log?.[todayKey] === true).length;
+                    const isCollapsed = collapsedSections.habits;
                     return (
-                      <div className="mb-6 rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(52,211,153,0.06)]">
+                      <div className="mb-6 rounded-3xl border border-rose-500/20 bg-gradient-to-br from-rose-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(244,63,94,0.06)]">
                         <button
-                          onClick={() => toggleDashSection('goals')}
+                          onClick={() => toggleDashSection('habits')}
                           className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition"
                         >
                           <h3 className="text-base font-bold text-white flex items-center gap-2">
-                            <span>🎯</span> Goals
-                            {activeGoals.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">{doneMs}/{totalMs.length} milestones</span>}
+                            <span>🔄</span> Habits
+                            {activeHabits.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">{doneToday}/{activeHabits.length}</span>}
                           </h3>
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={(e) => { e.stopPropagation(); setShowAddGoalModal('create'); }}
-                              className="w-7 h-7 rounded-full bg-emerald-500/20 hover:bg-emerald-500/40 flex items-center justify-center transition text-emerald-400"
+                              onClick={(e) => { e.stopPropagation(); setShowAddHabitModal('create'); }}
+                              className="w-7 h-7 rounded-full bg-rose-500/20 hover:bg-rose-500/40 flex items-center justify-center transition text-rose-400"
                             >
                               <Plus className="w-4 h-4" />
                             </button>
@@ -4575,29 +4477,25 @@ export default function TripPlanner() {
                         {!isCollapsed && (
                           <>
                             <div className="px-4 pb-1">
-                              <button onClick={() => setHubSubView('goals')} className="text-xs text-emerald-400 hover:text-emerald-300 transition">See All →</button>
+                              <button onClick={() => setHubSubView('habits')} className="text-xs text-emerald-400 hover:text-emerald-300 transition">See All →</button>
                             </div>
                             <div className="p-4 pt-2 space-y-2">
-                              {activeGoals.length === 0 ? (
+                              {activeHabits.length === 0 ? (
                                 <div className="text-center py-6">
-                                  <span className="text-3xl mb-2 block">🎯</span>
-                                  <p className="text-white/40 text-sm">No goals yet</p>
-                                  <button onClick={() => setShowAddGoalModal('create')} className="mt-3 text-xs text-teal-400 hover:text-teal-300 transition">+ Add a goal</button>
+                                  <span className="text-3xl mb-2 block">🔄</span>
+                                  <p className="text-white/40 text-sm">No habits yet</p>
+                                  <button onClick={() => setShowAddHabitModal('create')} className="mt-3 text-xs text-teal-400 hover:text-teal-300 transition">+ Add a habit</button>
                                 </div>
                               ) : (
                                 <>
-                                  {activeGoals.slice(0, 5).map(goal => (
-                                    <GoalCard
-                                      key={goal.id}
-                                      goal={goal}
+                                  {activeHabits.slice(0, 5).map(habit => (
+                                    <HabitCard
+                                      key={habit.id}
+                                      habit={habit}
                                       currentUser={currentUser}
-                                      onToggleMilestone={(milestoneId) => toggleMilestone(goal.id, milestoneId)}
-                                      onEdit={() => setShowAddGoalModal(goal)}
-                                      onDelete={() => deleteGoal(goal.id)}
-                                      onHighlight={() => highlightGoal(goal.id)}
                                     />
                                   ))}
-                                  {activeGoals.length > 5 && <div className="text-xs text-white/30 text-center pt-1">+{activeGoals.length - 5} more</div>}
+                                  {activeHabits.length > 5 && <div className="text-xs text-white/30 text-center pt-1">+{activeHabits.length - 5} more</div>}
                                 </>
                               )}
                             </div>
@@ -4607,64 +4505,193 @@ export default function TripPlanner() {
                     );
                   })()}
 
-                  {/* ODYSSEY PLANS WIDGET */}
+                  {/* Comprehensive Stats Dashboard */}
                   {(() => {
-                    const isCollapsed = collapsedSections.odyssey;
+                    // Compute fitness stats
+                    let totalMilesPlanned = 0;
+                    let totalRunsDone = 0;
+                    let totalCrossDone = 0;
+                    let totalWorkoutsPlanned = 0;
+                    let weeksCompleted = 0;
+                    let currentStreak = 0;
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+
+                    fitnessEvents.forEach(event => {
+                      const plan = getActiveTrainingPlan(event.id);
+                      if (!plan || !Array.isArray(plan)) return;
+                      plan.forEach(week => {
+                        if (week.totalMiles) totalMilesPlanned += week.totalMiles;
+                        const weekEnd = week.endDate ? parseLocalDate(week.endDate) : null;
+                        let weekAllDone = true;
+                        (week.runs || []).forEach(run => {
+                          totalWorkoutsPlanned++;
+                          if (run.mike || run.adam) totalRunsDone++;
+                          else weekAllDone = false;
+                        });
+                        (week.crossTraining || []).forEach(ct => {
+                          totalWorkoutsPlanned++;
+                          if (ct.mike || ct.adam) totalCrossDone++;
+                          else weekAllDone = false;
+                        });
+                        if (weekEnd && weekEnd <= today && weekAllDone && (week.runs?.length > 0 || week.crossTraining?.length > 0)) {
+                          weeksCompleted++;
+                        }
+                      });
+                    });
+
+                    const totalWorkoutsDone = totalRunsDone + totalCrossDone;
+                    const completionPct = totalWorkoutsPlanned > 0 ? Math.round((totalWorkoutsDone / totalWorkoutsPlanned) * 100) : 0;
+                    const tasksDone = sharedTasks.filter(t => t.status === 'done').length;
+                    const tasksPending = sharedTasks.filter(t => t.status !== 'done').length;
+                    const socialDone = sharedSocial.filter(s => s.status === 'done').length;
+                    const upcomingTrips = trips.filter(t => { const d = t.dates?.start ? parseLocalDate(t.dates.start) : null; return d && d >= today; }).length;
+                    const memoriesCount = memories.length;
+                    const eventsCount = partyEvents.length;
+
+                    // Animated radial progress
+                    const RadialProgress = ({ pct, size, color, label, value }) => {
+                      const r = (size - 8) / 2;
+                      const circ = 2 * Math.PI * r;
+                      const offset = circ - (pct / 100) * circ;
+                      return (
+                        <div className="flex flex-col items-center gap-1.5">
+                          <svg width={size} height={size} className="transform -rotate-90">
+                            <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+                            <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round"
+                              strokeDasharray={circ} strokeDashoffset={offset}
+                              style={{ transition: 'stroke-dashoffset 1.5s ease-out' }} />
+                          </svg>
+                          <div className="absolute flex flex-col items-center justify-center" style={{ width: size, height: size }}>
+                            <span className="text-lg font-bold text-white">{value}</span>
+                          </div>
+                        </div>
+                      );
+                    };
+
+                    const isStatsCollapsed = collapsedSections.stats;
                     return (
-                      <div className="mb-6 rounded-3xl border border-violet-500/20 bg-gradient-to-br from-violet-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(139,92,246,0.06)]">
+                      <div className="mb-6 bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden">
                         <button
-                          onClick={() => toggleDashSection('odyssey')}
-                          className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition"
+                          onClick={() => toggleDashSection('stats')}
+                          className="w-full p-5 flex items-center justify-between hover:bg-white/5 transition"
                         >
                           <h3 className="text-base font-bold text-white flex items-center gap-2">
-                            <span>🧭</span> Odyssey Plans
-                            {sharedOdysseyPlans.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400">{sharedOdysseyPlans.length}/3</span>}
+                            <span>📊</span> Stats & Progress
                           </h3>
-                          <div className="flex items-center gap-1">
-                            {sharedOdysseyPlans.length < 3 && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setShowOdysseyPlanModal('create'); }}
-                                className="w-7 h-7 rounded-full bg-violet-500/20 hover:bg-violet-500/40 flex items-center justify-center transition text-violet-400"
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                            )}
-                            <div className="text-white/40">
-                              {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-                            </div>
+                          <div className="text-white/40">
+                            {isStatsCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
                           </div>
                         </button>
-                        {!isCollapsed && (
-                          <>
-                            <div className="px-4 pb-1">
-                              <button onClick={() => setHubSubView('odyssey')} className="text-xs text-violet-400 hover:text-violet-300 transition">See All →</button>
+
+                        {!isStatsCollapsed && <>
+                        {/* Top row: big radial stats */}
+                        <div className="p-5 grid grid-cols-3 gap-4">
+                          {/* Fitness ring */}
+                          <div className="flex flex-col items-center">
+                            <div className="relative">
+                              <svg width={72} height={72} className="transform -rotate-90">
+                                <circle cx={36} cy={36} r={30} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+                                <circle cx={36} cy={36} r={30} fill="none" stroke="#f97316" strokeWidth="6" strokeLinecap="round"
+                                  strokeDasharray={2 * Math.PI * 30} strokeDashoffset={2 * Math.PI * 30 - (completionPct / 100) * 2 * Math.PI * 30}
+                                  style={{ transition: 'stroke-dashoffset 1.5s ease-out' }} />
+                              </svg>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-base font-bold text-white">{completionPct}%</span>
+                              </div>
                             </div>
-                            <div className="p-4 pt-2 space-y-3">
-                              {sharedOdysseyPlans.length === 0 ? (
-                                <div className="text-center py-6">
-                                  <span className="text-3xl mb-2 block">🧭</span>
-                                  <p className="text-white/40 text-sm">No odyssey plans yet</p>
-                                  <p className="text-white/30 text-xs mt-1">Create 3 alternative life plans</p>
-                                  <button onClick={() => setShowOdysseyPlanModal('create')} className="mt-3 text-xs text-violet-400 hover:text-violet-300 transition">+ Create Plan A</button>
+                            <span className="text-[10px] text-white/40 mt-1.5">Fitness</span>
+                          </div>
+
+                          {/* Tasks ring */}
+                          <div className="flex flex-col items-center">
+                            <div className="relative">
+                              <svg width={72} height={72} className="transform -rotate-90">
+                                <circle cx={36} cy={36} r={30} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+                                <circle cx={36} cy={36} r={30} fill="none" stroke="#2dd4bf" strokeWidth="6" strokeLinecap="round"
+                                  strokeDasharray={2 * Math.PI * 30} strokeDashoffset={2 * Math.PI * 30 - ((tasksDone + tasksPending > 0 ? tasksDone / (tasksDone + tasksPending) : 0)) * 2 * Math.PI * 30}
+                                  style={{ transition: 'stroke-dashoffset 1.5s ease-out' }} />
+                              </svg>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-base font-bold text-white">{tasksDone}</span>
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-white/40 mt-1.5">Tasks Done</span>
+                          </div>
+
+                          {/* Social ring */}
+                          <div className="flex flex-col items-center">
+                            <div className="relative">
+                              <svg width={72} height={72} className="transform -rotate-90">
+                                <circle cx={36} cy={36} r={30} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+                                <circle cx={36} cy={36} r={30} fill="none" stroke="#a78bfa" strokeWidth="6" strokeLinecap="round"
+                                  strokeDasharray={2 * Math.PI * 30} strokeDashoffset={2 * Math.PI * 30 - ((socialDone / Math.max(sharedSocial.length, 1))) * 2 * Math.PI * 30}
+                                  style={{ transition: 'stroke-dashoffset 1.5s ease-out' }} />
+                              </svg>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-base font-bold text-white">{socialDone}</span>
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-white/40 mt-1.5">Social</span>
+                          </div>
+                        </div>
+
+                        {/* Fitness detail strip */}
+                        {totalWorkoutsPlanned > 0 && (
+                          <div className="mx-5 mb-4 p-3 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-2xl border border-orange-500/20">
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-3">
+                                <span>🏃</span>
+                                <div>
+                                  <span className="font-semibold text-orange-400">{totalRunsDone}</span>
+                                  <span className="text-white/40"> runs</span>
                                 </div>
-                              ) : (
-                                sharedOdysseyPlans.map(plan => (
-                                  <OdysseyPlanCard
-                                    key={plan.id}
-                                    plan={plan}
-                                    onEdit={() => setShowOdysseyPlanModal(plan)}
-                                    onDelete={() => deleteOdysseyPlan(plan.id)}
-                                  />
-                                ))
-                              )}
+                                <div>
+                                  <span className="font-semibold text-amber-400">{totalCrossDone}</span>
+                                  <span className="text-white/40"> cross</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div>
+                                  <span className="font-semibold text-red-400">{weeksCompleted}</span>
+                                  <span className="text-white/40"> wks</span>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-white">{totalMilesPlanned}</span>
+                                  <span className="text-white/40"> mi plan</span>
+                                </div>
+                              </div>
                             </div>
-                          </>
+                          </div>
                         )}
+
+                        {/* Bottom stat tiles */}
+                        <div className="px-5 pb-5 grid grid-cols-4 gap-2">
+                          <button onClick={() => setActiveSection('travel')}
+                            className="bg-white/5 hover:bg-white/10 rounded-xl p-2.5 text-center transition group">
+                            <div className="text-lg font-bold text-teal-400 group-hover:scale-110 transition-transform">{trips.length}</div>
+                            <div className="text-[9px] text-white/30">Trips</div>
+                          </button>
+                          <button onClick={() => setActiveSection('events')}
+                            className="bg-white/5 hover:bg-white/10 rounded-xl p-2.5 text-center transition group">
+                            <div className="text-lg font-bold text-amber-400 group-hover:scale-110 transition-transform">{eventsCount}</div>
+                            <div className="text-[9px] text-white/30">Events</div>
+                          </button>
+                          <button onClick={() => setActiveSection('memories')}
+                            className="bg-white/5 hover:bg-white/10 rounded-xl p-2.5 text-center transition group">
+                            <div className="text-lg font-bold text-pink-400 group-hover:scale-110 transition-transform">{memoriesCount}</div>
+                            <div className="text-[9px] text-white/30">Memories</div>
+                          </button>
+                          <button onClick={() => setHubSubView('ideas')}
+                            className="bg-white/5 hover:bg-white/10 rounded-xl p-2.5 text-center transition group">
+                            <div className="text-lg font-bold text-yellow-400 group-hover:scale-110 transition-transform">{sharedIdeas.length}</div>
+                            <div className="text-[9px] text-white/30">Ideas</div>
+                          </button>
+                        </div>
+                        </>}
                       </div>
                     );
                   })()}
-
-                  {/* Stats section removed — replaced by Goal Progress at top */}
                 </>
               )}
 
@@ -4845,124 +4872,63 @@ export default function TripPlanner() {
               )}
 
               {/* ===== HABITS FULL VIEW ===== */}
-              {/* ===== GOALS FULL VIEW ===== */}
-              {hubSubView === 'goals' && (
+              {hubSubView === 'habits' && (
                 <div>
                   <button onClick={() => setHubSubView('home')} className="flex items-center gap-1 text-sm text-white/60 hover:text-white mb-3 transition">
                     <ChevronLeft className="w-4 h-4" /> Back to Hub
                   </button>
-                  {/* Timeframe + scope filter */}
+                  {/* Identity statements banner */}
+                  {(() => {
+                    const identities = sharedHabits.filter(h => h.identity && h.status === 'active');
+                    return identities.length > 0 && (
+                      <div className="mb-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-4">
+                        <div className="text-[10px] text-amber-400 uppercase tracking-wider font-semibold mb-2">We are a couple that...</div>
+                        <div className="space-y-1">
+                          {identities.map(h => (
+                            <p key={h.id} className="text-xs text-amber-200/70 italic">• {h.identity.replace(/^"?(we are a couple that\s*)/i, '')}</p>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Category filter */}
                   <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
-                    {[
-                      { value: 'all', label: 'All', emoji: '🎯' },
-                      { value: '1year', label: '1 Year', emoji: '📅' },
-                      { value: '5year', label: '5 Year', emoji: '🗓️' },
-                      { value: 'Mike', label: 'Mike', emoji: '👤' },
-                      { value: 'Adam', label: 'Adam', emoji: '👤' },
-                      { value: 'Couple', label: 'Couple', emoji: '💕' },
-                    ].map(f => (
-                      <button key={f.value} onClick={() => setHubGoalFilter(f.value)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition ${hubGoalFilter === f.value ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}>
-                        {f.emoji} {f.label}
+                    {[{ value: 'all', label: 'All', emoji: '🔄' }, ...habitCategories].map(cat => (
+                      <button key={cat.value} onClick={() => setHubHabitFilter(cat.value)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition ${hubHabitFilter === cat.value ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}>
+                        {cat.emoji} {cat.label}
                       </button>
                     ))}
                   </div>
 
-                  {/* Active goals */}
+                  {/* Active habits */}
                   <div className="space-y-3 mb-4">
-                    {sharedGoals
-                      .filter(g => g.status === 'active')
-                      .filter(g => {
-                        if (hubGoalFilter === 'all') return true;
-                        if (hubGoalFilter === '1year' || hubGoalFilter === '5year') return g.timeframe === hubGoalFilter;
-                        return g.scope === hubGoalFilter;
-                      })
-                      .map(goal => (
-                        <div key={goal.id} data-search-id={`goals-${goal.id}`}>
-                          <GoalCard
-                            goal={goal}
+                    {sharedHabits
+                      .filter(h => h.status === 'active')
+                      .filter(h => hubHabitFilter === 'all' || h.category === hubHabitFilter)
+                      .map(habit => (
+                        <div key={habit.id} data-search-id={`habits-${habit.id}`}>
+                          <HabitCard
+                            habit={habit}
                             currentUser={currentUser}
-                            onToggleMilestone={(milestoneId) => toggleMilestone(goal.id, milestoneId)}
-                            onEdit={() => setShowAddGoalModal(goal)}
-                            onDelete={() => deleteGoal(goal.id)}
-                            onHighlight={() => highlightGoal(goal.id)}
+                           
                           />
                         </div>
                       ))
                     }
-                    {sharedGoals.filter(g => g.status === 'active').length === 0 && (
+                    {sharedHabits.filter(h => h.status === 'active' && (hubHabitFilter === 'all' || h.category === hubHabitFilter)).length === 0 && (
                       <div className="text-center py-12">
-                        <span className="text-4xl mb-3 block">🎯</span>
-                        <p className="text-white/40 text-sm">No goals yet</p>
-                        <p className="text-white/30 text-xs mt-1">Set goals together and track your progress</p>
+                        <span className="text-4xl mb-3 block">🔄</span>
+                        <p className="text-white/40 text-sm">No habits yet</p>
+                        <p className="text-white/30 text-xs mt-1">Build consistency, not streaks</p>
                       </div>
                     )}
                   </div>
-
-                  {/* Achieved goals */}
-                  {sharedGoals.filter(g => g.status === 'achieved').length > 0 && (
-                    <div className="mt-6">
-                      <h4 className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-3">🏆 Achieved</h4>
-                      <div className="space-y-3">
-                        {sharedGoals.filter(g => g.status === 'achieved').map(goal => (
-                          <GoalCard
-                            key={goal.id}
-                            goal={goal}
-                            currentUser={currentUser}
-                            onToggleMilestone={(milestoneId) => toggleMilestone(goal.id, milestoneId)}
-                            onEdit={() => setShowAddGoalModal(goal)}
-                            onDelete={() => deleteGoal(goal.id)}
-                            onHighlight={() => highlightGoal(goal.id)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <button onClick={() => setShowAddGoalModal('create')}
+                  <button onClick={() => setShowAddHabitModal('create')}
                     className="w-full mt-4 py-3 rounded-2xl border-2 border-dashed border-white/10 text-white/40 hover:border-emerald-500/30 hover:text-emerald-400 transition text-sm">
-                    + New Goal
+                    + New Habit
                   </button>
-                </div>
-              )}
-
-              {/* ===== ODYSSEY PLANS FULL VIEW ===== */}
-              {hubSubView === 'odyssey' && (
-                <div>
-                  <button onClick={() => setHubSubView('home')} className="flex items-center gap-1 text-sm text-white/60 hover:text-white mb-3 transition">
-                    <ChevronLeft className="w-4 h-4" /> Back to Hub
-                  </button>
-                  <div className="mb-4">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-1">
-                      <span>🧭</span> Odyssey Plans
-                    </h3>
-                    <p className="text-xs text-white/40">Create 3 alternative 5-year life plans — from "Designing Your Life"</p>
-                  </div>
-
-                  <div className="space-y-4 mb-4">
-                    {sharedOdysseyPlans.map(plan => (
-                      <OdysseyPlanCard
-                        key={plan.id}
-                        plan={plan}
-                        onEdit={() => setShowOdysseyPlanModal(plan)}
-                        onDelete={() => deleteOdysseyPlan(plan.id)}
-                      />
-                    ))}
-                    {sharedOdysseyPlans.length === 0 && (
-                      <div className="text-center py-12">
-                        <span className="text-4xl mb-3 block">🧭</span>
-                        <p className="text-white/40 text-sm">No odyssey plans yet</p>
-                        <p className="text-white/30 text-xs mt-1">Design 3 possible futures together</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {sharedOdysseyPlans.length < 3 && (
-                    <button onClick={() => setShowOdysseyPlanModal('create')}
-                      className="w-full mt-4 py-3 rounded-2xl border-2 border-dashed border-white/10 text-white/40 hover:border-violet-500/30 hover:text-violet-400 transition text-sm">
-                      + New Odyssey Plan ({sharedOdysseyPlans.length}/3)
-                    </button>
-                  )}
                 </div>
               )}
 
@@ -5087,13 +5053,13 @@ export default function TripPlanner() {
                               <h3 className="text-2xl font-bold text-white mt-2">{event.name}</h3>
                               <p className="text-white/80">{formatDate(event.date, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
                             </div>
-                            <div className={`text-right px-4 py-2 rounded-full whitespace-nowrap shrink-0 ${isPast ? 'bg-green-500/30' : 'bg-white/20'}`}>
+                            <div className={`text-right px-4 py-2 rounded-full ${isPast ? 'bg-green-500/30' : 'bg-white/20'}`}>
                               {isPast ? (
                                 <span className="text-white font-bold">✓ Completed!</span>
                               ) : (
                                 <>
-                                  <div className="text-3xl font-bold text-white leading-none">{daysUntil}</div>
-                                  <div className="text-[10px] text-white/80 uppercase tracking-wider mt-1">days to go</div>
+                                  <div className="text-3xl font-bold text-white">{daysUntil}</div>
+                                  <div className="text-xs text-white/80 uppercase">days to go</div>
                                 </>
                               )}
                             </div>
@@ -5285,7 +5251,7 @@ export default function TripPlanner() {
                                     navigator.share({ title: 'Triathlon Progress', text }).catch(() => {});
                                   } else {
                                     navigator.clipboard.writeText(text);
-                                    showToast('Progress copied to clipboard📋', 'success');
+                                    showToast('Progress copied to clipboard! 📋', 'success');
                                   }
                                 }}
                                 className="mt-4 w-full py-2 bg-orange-500/30 hover:bg-orange-500/40 text-orange-300 rounded-lg transition flex items-center justify-center gap-2"
@@ -6448,7 +6414,7 @@ export default function TripPlanner() {
                         {selectedPartyEvent.name}
                       </h2>
                       <p className="text-slate-400">
-                        {selectedPartyEvent.eventType === 'travel' && selectedPartyEvent.endDate ? (
+                        {selectedPartyEvent.endDate && selectedPartyEvent.endDate !== selectedPartyEvent.date ? (
                           <>
                             {formatDate(selectedPartyEvent.date, { weekday: 'short', month: 'long', day: 'numeric' })}
                             {' – '}
@@ -6457,15 +6423,21 @@ export default function TripPlanner() {
                         ) : (
                           <>
                             {formatDate(selectedPartyEvent.date, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                            {selectedPartyEvent.time && ` at ${selectedPartyEvent.time}`}
-                            {selectedPartyEvent.endTime && ` - ${selectedPartyEvent.endTime}`}
+                            {!selectedPartyEvent.allDay && selectedPartyEvent.time && ` at ${selectedPartyEvent.time}`}
+                            {!selectedPartyEvent.allDay && selectedPartyEvent.endTime && ` - ${selectedPartyEvent.endTime}`}
+                            {selectedPartyEvent.allDay && ' · All day'}
                           </>
                         )}
                       </p>
                     </div>
                     {isOwner && (
                       <button
-                        onClick={() => setEditingEvent(selectedPartyEvent)}
+                        onClick={() => setEditingEvent({
+                          ...selectedPartyEvent,
+                          // Derive UI toggles from saved fields so the form opens in the right mode
+                          allDay: selectedPartyEvent.allDay ?? !selectedPartyEvent.time,
+                          multiDay: !!(selectedPartyEvent.endDate && selectedPartyEvent.endDate !== selectedPartyEvent.date),
+                        })}
                         className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"
                         title="Edit event"
                       >
@@ -6506,14 +6478,19 @@ export default function TripPlanner() {
                     <div className="bg-white/10 rounded-2xl p-4 border border-white/20">
                       <div className="flex items-center gap-2 text-purple-400 mb-2">
                         <Clock className="w-5 h-5" />
-                        <span className="font-semibold">Time</span>
+                        <span className="font-semibold">{selectedPartyEvent.allDay ? 'When' : 'Time'}</span>
                       </div>
                       <p className="text-white">
-                        {selectedPartyEvent.time || 'TBD'}
-                        {selectedPartyEvent.endTime && ` - ${selectedPartyEvent.endTime}`}
+                        {selectedPartyEvent.allDay
+                          ? 'All day'
+                          : (selectedPartyEvent.time
+                              ? `${selectedPartyEvent.time}${selectedPartyEvent.endTime ? ` – ${selectedPartyEvent.endTime}` : ''}`
+                              : 'TBD')}
                       </p>
                       <p className="text-slate-400 text-sm mt-1">
-                        {formatDate(selectedPartyEvent.date, { weekday: 'long', month: 'short', day: 'numeric' })}
+                        {selectedPartyEvent.endDate && selectedPartyEvent.endDate !== selectedPartyEvent.date
+                          ? `${formatDate(selectedPartyEvent.date, { month: 'short', day: 'numeric' })} – ${formatDate(selectedPartyEvent.endDate, { month: 'short', day: 'numeric' })}`
+                          : formatDate(selectedPartyEvent.date, { weekday: 'long', month: 'short', day: 'numeric' })}
                       </p>
                     </div>
                   </div>
@@ -7440,16 +7417,19 @@ export default function TripPlanner() {
             const upcomingTrips = sortedTrips
               .filter(t => parseLocalDate(t.dates.start) > today)
               .map(t => ({
-                type: 'travel', id: t.id, name: t.destination, emoji: t.emoji,
+                source: 'trip', type: 'travel', id: t.id, name: t.destination, emoji: t.emoji,
                 date: parseLocalDate(t.dates.start), color: t.color,
                 guests: t.guests, special: t.special, raw: t,
               }));
 
-            // Gather upcoming party events
+            // Gather upcoming party events (multi-day events stay until end date)
             const upcomingEvents = partyEvents
-              .filter(e => parseLocalDate(e.date) >= today)
+              .filter(e => {
+                const ref = (e.endDate && e.endDate !== e.date) ? e.endDate : e.date;
+                return parseLocalDate(ref) >= today;
+              })
               .map(e => ({
-                type: e.eventType || 'parties', id: e.id, name: e.name, emoji: e.emoji,
+                source: 'event', type: e.eventType || 'parties', id: e.id, name: e.name, emoji: e.emoji,
                 date: parseLocalDate(e.date), color: e.color || 'from-amber-400 to-orange-500',
                 guests: e.guests, special: null, raw: e,
               }));
@@ -7465,7 +7445,7 @@ export default function TripPlanner() {
             if (filtered.length === 0) return null;
             const next = filtered[0];
             const daysUntil = Math.ceil((next.date - today) / (1000 * 60 * 60 * 24));
-            const isTrip = next.type === 'travel';
+            const isTrip = next.source === 'trip';
 
             // Trip-specific extras
             const details = isTrip ? (tripDetails[next.id] || { hotels: [], events: [], flights: [] }) : null;
@@ -7473,7 +7453,7 @@ export default function TripPlanner() {
 
             return (
               <div
-                onClick={() => isTrip ? setEditingTrip(next.raw) : setSelectedPartyEvent(next.raw)}
+                onClick={() => isTrip ? setSelectedTrip(next.raw) : setSelectedPartyEvent(next.raw)}
                 className={`mt-6 bg-gradient-to-r ${next.color} rounded-2xl p-4 md:p-6 relative overflow-hidden cursor-pointer hover:scale-[1.01] transition-transform`}>
                 <div className="absolute inset-0 bg-black/10" />
                 <div className="relative flex flex-col md:flex-row items-start justify-between gap-4">
@@ -7600,7 +7580,7 @@ export default function TripPlanner() {
                 const tripItems = sortedTrips
                   .filter(t => parseLocalDate(t.dates.start) >= today)
                   .map(t => ({
-                    itemType: 'travel', id: t.id, name: t.destination, emoji: t.emoji,
+                    source: 'trip', itemType: 'travel', id: t.id, name: t.destination, emoji: t.emoji,
                     sortDate: parseLocalDate(t.dates.start),
                     dateLabel: `${formatDate(t.dates.start)} - ${formatDate(t.dates.end)}`,
                     color: t.color, guests: t.guests || [], raw: t,
@@ -7610,16 +7590,16 @@ export default function TripPlanner() {
                 // Normalize events into unified items
                 const eventItems = partyEvents
                   .filter(e => {
-                    // For trips, use the end date as the reference so trips aren't hidden mid-way through
-                    const ref = (e.eventType === 'travel' && e.endDate) ? e.endDate : e.date;
+                    // Multi-day events should stay visible until their end date
+                    const ref = (e.endDate && e.endDate !== e.date) ? e.endDate : e.date;
                     return parseLocalDate(ref) >= today;
                   })
                   .map(e => ({
-                    itemType: e.eventType || 'parties', id: e.id, name: e.name, emoji: e.emoji,
+                    source: 'event', itemType: e.eventType || 'parties', id: e.id, name: e.name, emoji: e.emoji,
                     sortDate: parseLocalDate(e.date),
-                    dateLabel: (e.eventType === 'travel' && e.endDate)
+                    dateLabel: (e.endDate && e.endDate !== e.date)
                       ? `${formatDate(e.date, { month: 'short', day: 'numeric' })} – ${formatDate(e.endDate, { month: 'short', day: 'numeric' })}`
-                      : `${formatDate(e.date, { weekday: 'short', month: 'short', day: 'numeric' })}${e.time ? ` • ${e.time}` : ''}`,
+                      : `${formatDate(e.date, { weekday: 'short', month: 'short', day: 'numeric' })}${(!e.allDay && e.time) ? ` • ${e.time}` : (e.allDay ? ' • All day' : '')}`,
                     color: e.color || 'from-amber-400 to-orange-500', guests: e.guests || [], raw: e,
                     images: e.images || [], tasks: e.tasks || [],
                   }));
@@ -7653,14 +7633,14 @@ export default function TripPlanner() {
                 return gridItems.map(item => {
                   const daysUntil = Math.ceil((item.sortDate - today) / (1000 * 60 * 60 * 24));
                   const isToday = daysUntil === 0;
-                  const isTrip = item.itemType === 'travel';
+                  const isTrip = item.source === 'trip';
                   const typeEmoji = { travel: '✈️', parties: '🎉', datenight: '🥂', concert: '🎵', fitness: '🏆', pride: '🏳️‍🌈', karaoke: '🎤' }[item.itemType] || '📅';
 
                   return (
                     <div
-                      key={`${item.itemType}-${item.id}`}
-                      data-search-id={`${item.itemType}-${item.id}`}
-                      onClick={() => isTrip ? setEditingTrip(item.raw) : setSelectedPartyEvent(item.raw)}
+                      key={`${item.source}-${item.id}`}
+                      data-search-id={`${item.source}-${item.id}`}
+                      onClick={() => isTrip ? setSelectedTrip(item.raw) : setSelectedPartyEvent(item.raw)}
                       className="relative rounded-2xl border border-white/20 cursor-pointer hover:scale-[1.02] transition-all overflow-hidden"
                     >
                       {/* Cover Image */}
@@ -8853,34 +8833,18 @@ export default function TripPlanner() {
         />
       )}
 
-      {showAddGoalModal && (
-        <AddGoalModal
-          onClose={() => setShowAddGoalModal(null)}
-          onSave={(goal) => {
-            if (typeof showAddGoalModal === 'object' && showAddGoalModal?.id) {
-              updateGoal(showAddGoalModal.id, goal);
+      {showAddHabitModal && (
+        <AddHabitModal
+          onClose={() => setShowAddHabitModal(null)}
+          onSave={(habit) => {
+            if (typeof showAddHabitModal === 'object' && showAddHabitModal?.id) {
+              updateHabit(showAddHabitModal.id, habit);
             } else {
-              addGoal(goal);
+              addHabit(habit);
             }
-            setShowAddGoalModal(null);
+            setShowAddHabitModal(null);
           }}
-          editGoal={typeof showAddGoalModal === 'object' && showAddGoalModal?.id ? showAddGoalModal : null}
-          currentUser={currentUser}
-        />
-      )}
-
-      {showOdysseyPlanModal && (
-        <AddOdysseyPlanModal
-          onClose={() => setShowOdysseyPlanModal(null)}
-          onSave={(plan) => {
-            if (typeof showOdysseyPlanModal === 'object' && showOdysseyPlanModal?.id) {
-              updateOdysseyPlan(showOdysseyPlanModal.id, plan);
-            } else {
-              addOdysseyPlan(plan);
-            }
-            setShowOdysseyPlanModal(null);
-          }}
-          editPlan={typeof showOdysseyPlanModal === 'object' && showOdysseyPlanModal?.id ? showOdysseyPlanModal : null}
+          editHabit={typeof showAddHabitModal === 'object' && showAddHabitModal?.id ? showAddHabitModal : null}
           currentUser={currentUser}
         />
       )}
@@ -9673,7 +9637,7 @@ export default function TripPlanner() {
                 { key: 'lists', label: 'Lists', emoji: '📝' },
                 { key: 'ideas', label: 'Ideas', emoji: '💡' },
                 { key: 'social', label: 'Social', emoji: '👥' },
-                { key: 'goals', label: 'Goals', emoji: '🎯' },
+                { key: 'habits', label: 'Habits', emoji: '🔄' },
                 { key: 'travel', label: 'Travel', emoji: '✈️' },
                 { key: 'events', label: 'Events', emoji: '🎉' },
                 { key: 'fitness', label: 'Fitness', emoji: '🏃' },
@@ -9781,18 +9745,18 @@ export default function TripPlanner() {
                     </div>
                   )}
 
-                  {/* Goals */}
-                  {searchResults.goals.length > 0 && (
+                  {/* Habits */}
+                  {searchResults.habits.length > 0 && (
                     <div>
-                      <h4 className="text-[11px] font-semibold text-white/50 uppercase tracking-wider mb-2 px-1">Goals ({searchResults.goals.length})</h4>
+                      <h4 className="text-[11px] font-semibold text-white/50 uppercase tracking-wider mb-2 px-1">Habits ({searchResults.habits.length})</h4>
                       <div className="space-y-1">
-                        {searchResults.goals.map(g => (
-                          <button key={g.id} onClick={() => handleSearchResultClick('goals', g.id)}
+                        {searchResults.habits.map(h => (
+                          <button key={h.id} onClick={() => handleSearchResultClick('habits', h.id)}
                             className="w-full text-left p-2.5 rounded-lg bg-white/5 hover:bg-white/10 transition flex items-center gap-3">
-                            <span className="text-base">{g.emoji || '🎯'}</span>
+                            <span className="text-base">🔄</span>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-white truncate">{g.title}</p>
-                              {g.description && <p className="text-xs text-white/40 truncate mt-0.5">{g.description}</p>}
+                              <p className="text-sm text-white truncate">{h.name}</p>
+                              {h.identity && <p className="text-xs text-white/40 truncate mt-0.5">{h.identity}</p>}
                             </div>
                             <ChevronRight className="w-3.5 h-3.5 text-white/20 shrink-0" />
                           </button>
@@ -11111,8 +11075,9 @@ export default function TripPlanner() {
                     setEditingEvent(null);
                     setEventCoverImagePreview(null);
                     setNewEventData({
-                      name: '', emoji: '🎉', date: '', endDate: '', time: '18:00', endTime: '22:00',
-                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties'
+                      name: '', emoji: '🎉', date: toLocalDateStr(new Date()), endDate: '', time: '18:00', endTime: '22:00',
+                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties',
+                      allDay: false, multiDay: false,
                     });
                   }}
                   className="p-2 hover:bg-white/10 rounded-full transition"
@@ -11125,47 +11090,22 @@ export default function TripPlanner() {
             <div className="p-6 space-y-4">
               {/* Event Name & Emoji */}
               <div className="flex gap-3">
-                <div className="relative">
-                  <button
-                    type="button"
-                    className="w-16 h-16 bg-white/10 rounded-xl flex items-center justify-center text-3xl hover:bg-white/20 transition border border-white/20"
-                    onClick={() => setShowEventEmojiPicker(v => !v)}
-                    title="Pick an emoji"
-                  >
-                    {editingEvent ? editingEvent.emoji : newEventData.emoji}
-                  </button>
-                  {showEventEmojiPicker && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setShowEventEmojiPicker(false)} />
-                      <div className="absolute top-full left-0 mt-2 z-50 bg-slate-800 border border-white/15 rounded-xl shadow-2xl p-3 w-[280px] max-h-[60vh] overflow-y-auto">
-                        {Object.entries(eventCategories).map(([category, emojis]) => (
-                          <div key={category} className="mb-3 last:mb-0">
-                            <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1.5 px-1">{category}</div>
-                            <div className="grid grid-cols-6 gap-1">
-                              {emojis.map(emoji => (
-                                <button
-                                  key={emoji}
-                                  type="button"
-                                  onClick={() => {
-                                    if (editingEvent) {
-                                      setEditingEvent({ ...editingEvent, emoji });
-                                    } else {
-                                      setNewEventData({ ...newEventData, emoji });
-                                    }
-                                    setShowEventEmojiPicker(false);
-                                  }}
-                                  className={`w-9 h-9 flex items-center justify-center text-xl rounded-lg hover:bg-white/10 transition ${(editingEvent ? editingEvent.emoji : newEventData.emoji) === emoji ? 'bg-amber-500/30 ring-1 ring-amber-400' : ''}`}
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  className="w-16 h-16 bg-white/10 rounded-xl flex items-center justify-center text-3xl hover:bg-white/20 transition border border-white/20"
+                  onClick={() => {
+                    const allEmojis = Object.values(eventCategories).flat();
+                    const currentIdx = allEmojis.indexOf(editingEvent ? editingEvent.emoji : newEventData.emoji);
+                    const nextIdx = (currentIdx + 1) % allEmojis.length;
+                    if (editingEvent) {
+                      setEditingEvent({ ...editingEvent, emoji: allEmojis[nextIdx] });
+                    } else {
+                      setNewEventData({ ...newEventData, emoji: allEmojis[nextIdx] });
+                    }
+                  }}
+                >
+                  {editingEvent ? editingEvent.emoji : newEventData.emoji}
+                </button>
                 <input
                   type="text"
                   placeholder="Event name"
@@ -11216,90 +11156,97 @@ export default function TripPlanner() {
                 </div>
               </div>
 
-              {/* Date & Time — Trip events get start + end DATE; other events get single date + times */}
-              {((editingEvent ? editingEvent.eventType : newEventData.eventType) === 'travel') ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm text-white/50 mb-1">Start Date</label>
-                    <input
-                      type="date"
-                      value={editingEvent ? editingEvent.date : newEventData.date}
-                      onChange={(e) => {
-                        if (editingEvent) {
-                          setEditingEvent({ ...editingEvent, date: e.target.value });
-                        } else {
-                          setNewEventData({ ...newEventData, date: e.target.value });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-white/50 mb-1">End Date</label>
-                    <input
-                      type="date"
-                      value={editingEvent ? (editingEvent.endDate || '') : (newEventData.endDate || '')}
-                      min={editingEvent ? editingEvent.date : newEventData.date}
-                      onChange={(e) => {
-                        if (editingEvent) {
-                          setEditingEvent({ ...editingEvent, endDate: e.target.value });
-                        } else {
-                          setNewEventData({ ...newEventData, endDate: e.target.value });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm text-white/50 mb-1">Date</label>
-                    <input
-                      type="date"
-                      value={editingEvent ? editingEvent.date : newEventData.date}
-                      onChange={(e) => {
-                        if (editingEvent) {
-                          setEditingEvent({ ...editingEvent, date: e.target.value });
-                        } else {
-                          setNewEventData({ ...newEventData, date: e.target.value });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-white/50 mb-1">Start Time</label>
-                    <input
-                      type="time"
-                      value={editingEvent ? editingEvent.time : newEventData.time}
-                      onChange={(e) => {
-                        if (editingEvent) {
-                          setEditingEvent({ ...editingEvent, time: e.target.value });
-                        } else {
-                          setNewEventData({ ...newEventData, time: e.target.value });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-white/50 mb-1">End Time</label>
-                    <input
-                      type="time"
-                      value={editingEvent ? editingEvent.endTime : newEventData.endTime}
-                      onChange={(e) => {
-                        if (editingEvent) {
-                          setEditingEvent({ ...editingEvent, endTime: e.target.value });
-                        } else {
-                          setNewEventData({ ...newEventData, endTime: e.target.value });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                </div>
-              )}
+              {/* Date & Time — toggles for All Day and Multi-day; travel events always multi-day */}
+              {(() => {
+                const data = editingEvent || newEventData;
+                const updateField = (patch) => {
+                  if (editingEvent) setEditingEvent({ ...editingEvent, ...patch });
+                  else setNewEventData({ ...newEventData, ...patch });
+                };
+                const isTravel = data.eventType === 'travel';
+                // travel events are inherently multi-day; honor the multiDay flag for everything else
+                const showEndDate = isTravel || data.multiDay || !!data.endDate;
+                // travel events are inherently all-day at the date level; honor allDay flag elsewhere
+                const showTimes = !isTravel && !data.allDay;
+                return (
+                  <>
+                    {/* Toggles row — only for non-travel events */}
+                    {!isTravel && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => updateField({ allDay: !data.allDay })}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+                            data.allDay ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20'
+                          }`}
+                        >
+                          <Sun className="w-3.5 h-3.5" />
+                          All Day
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateField({ multiDay: !data.multiDay, endDate: !data.multiDay ? (data.endDate || data.date) : '' })}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+                            data.multiDay || data.endDate ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20'
+                          }`}
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          Multi-day
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Dates */}
+                    <div className={`grid gap-3 ${showEndDate ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                      <div>
+                        <label className="block text-sm text-white/50 mb-1">{showEndDate ? 'Start Date' : 'Date'}</label>
+                        <input
+                          type="date"
+                          value={data.date || ''}
+                          onChange={(e) => updateField({ date: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                      {showEndDate && (
+                        <div>
+                          <label className="block text-sm text-white/50 mb-1">End Date</label>
+                          <input
+                            type="date"
+                            value={data.endDate || ''}
+                            min={data.date || undefined}
+                            onChange={(e) => updateField({ endDate: e.target.value })}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Times — only when not all-day and not a travel event */}
+                    {showTimes && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm text-white/50 mb-1">Start Time</label>
+                          <input
+                            type="time"
+                            value={data.time || ''}
+                            onChange={(e) => updateField({ time: e.target.value })}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-white/50 mb-1">End Time <span className="text-white/30">(optional)</span></label>
+                          <input
+                            type="time"
+                            value={data.endTime || ''}
+                            onChange={(e) => updateField({ endTime: e.target.value })}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Location */}
               <div>
@@ -11531,8 +11478,9 @@ export default function TripPlanner() {
                     setEditingEvent(null);
                     setEventCoverImagePreview(null);
                     setNewEventData({
-                      name: '', emoji: '🎉', date: '', endDate: '', time: '18:00', endTime: '22:00',
-                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties'
+                      name: '', emoji: '🎉', date: toLocalDateStr(new Date()), endDate: '', time: '18:00', endTime: '22:00',
+                      location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties',
+                      allDay: false, multiDay: false,
                     });
                   }}
                   className="px-5 py-2.5 bg-white/10 text-white rounded-lg hover:bg-white/20 transition"
@@ -11543,11 +11491,24 @@ export default function TripPlanner() {
                   onClick={async () => {
                     if (isSavingEvent) return; // prevent double-tap
                     setIsSavingEvent(true);
+                    // Normalize event before save: drop times when allDay, drop endDate when not multi-day
+                    const normalize = (evt) => {
+                      const isTravel = evt.eventType === 'travel';
+                      const isMulti = isTravel || evt.multiDay || (evt.endDate && evt.endDate !== evt.date);
+                      return {
+                        ...evt,
+                        time: (evt.allDay && !isTravel) ? '' : (evt.time || ''),
+                        endTime: (evt.allDay && !isTravel) ? '' : (evt.endTime || ''),
+                        endDate: isMulti ? (evt.endDate || evt.date) : '',
+                      };
+                    };
                     try {
                       if (editingEvent) {
+                        const cleaned = normalize(editingEvent);
                         const newEvents = partyEvents.map(e =>
-                          e.id === editingEvent.id ? { ...editingEvent, updatedAt: new Date().toISOString() } : e
+                          e.id === editingEvent.id ? { ...cleaned, updatedAt: new Date().toISOString() } : e
                         );
+                        // Write first — only update UI after save succeeds
                         await savePartyEventsToFirestore(newEvents);
                         setPartyEvents(newEvents);
                         setSelectedPartyEvent(newEvents.find(e => e.id === editingEvent.id));
@@ -11556,7 +11517,7 @@ export default function TripPlanner() {
                         showToast('Event updated!', 'success');
                       } else {
                         const newEvent = {
-                          ...newEventData,
+                          ...normalize(newEventData),
                           id: `event-${Date.now()}`,
                           guests: [],
                           tasks: [],
@@ -11564,17 +11525,20 @@ export default function TripPlanner() {
                           createdAt: new Date().toISOString()
                         };
                         const newEvents = [...partyEvents, newEvent];
+                        // Write first — only update UI and close modal after save succeeds
                         await savePartyEventsToFirestore(newEvents);
                         setPartyEvents(newEvents);
                         setShowAddEventModal(false);
                         setEventCoverImagePreview(null);
                         setNewEventData({
-                          name: '', emoji: '🎉', date: '', endDate: '', time: '18:00', endTime: '22:00',
-                          location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties'
+                          name: '', emoji: '🎉', date: toLocalDateStr(new Date()), endDate: '', time: '18:00', endTime: '22:00',
+                          location: '', entryCode: '', description: '', color: 'from-amber-400 to-orange-500', tasks: [], eventType: 'parties',
+                          allDay: false, multiDay: false,
                         });
                         showToast('Event created!', 'success');
                       }
                     } catch (err) {
+                      // Error toast already shown by savePartyEventsToFirestore; keep modal open so user can retry
                       console.error('Event save failed:', err);
                     } finally {
                       setIsSavingEvent(false);
@@ -11970,7 +11934,7 @@ export default function TripPlanner() {
       `}</style>
 
       {/* Desktop FAB - Top left, only on desktop */}
-      {isOwner && !initialAppMode && !showAddMemoryModal && !editingMemory && !editingTrip && !editingPartyEvent && !showOpenDateModal && !showCompanionsModal && !showAddModal && !showNewTripModal && !showLinkModal && !showImportModal && !showGuestModal && !showMyProfileModal && !showAddFitnessEventModal && !editingFitnessEvent && !showAddEventModal && !editingEvent && !editingTrainingWeek && !showAddTaskModal && !showSharedListModal && !showAddIdeaModal && !showAddSocialModal && !showAddGoalModal && !showOdysseyPlanModal && (
+      {isOwner && !initialAppMode && !showAddMemoryModal && !editingMemory && !editingTrip && !editingPartyEvent && !showOpenDateModal && !showCompanionsModal && !showAddModal && !showNewTripModal && !showLinkModal && !showImportModal && !showGuestModal && !showMyProfileModal && !showAddFitnessEventModal && !editingFitnessEvent && !showAddEventModal && !editingEvent && !editingTrainingWeek && !showAddTaskModal && !showSharedListModal && !showAddIdeaModal && !showAddSocialModal && !showAddHabitModal && (
         <div className="hidden md:block fixed top-24 left-6 z-[90]">
           {showAddNewMenu && (
             <>
@@ -11991,7 +11955,7 @@ export default function TripPlanner() {
                     { action: () => setShowAddTaskModal('create'), icon: '✅', label: 'Task', gradient: 'from-blue-400 to-indigo-500' },
                     { action: () => setShowSharedListModal('create'), icon: '🛒', label: 'List', gradient: 'from-emerald-400 to-teal-500' },
                     { action: () => setShowAddIdeaModal('create'), icon: '💡', label: 'Idea', gradient: 'from-yellow-400 to-amber-500' },
-                    { action: () => setShowAddGoalModal('create'), icon: '🎯', label: 'Goal', gradient: 'from-green-400 to-emerald-500' },
+                    { action: () => setShowAddHabitModal('create'), icon: '🔄', label: 'Habit', gradient: 'from-green-400 to-emerald-500' },
                     { action: () => setShowAddEventModal(true), icon: '🎉', label: 'Event', gradient: 'from-amber-400 to-orange-500' },
                     { action: () => setShowAddMemoryModal('milestone'), icon: '💝', label: 'Memory', gradient: 'from-rose-400 to-pink-500' },
                   ].map((item, idx) => (
@@ -12015,7 +11979,7 @@ export default function TripPlanner() {
       )}
 
       {/* Mobile Bottom Navigation with integrated FAB */}
-      {!initialAppMode && !showAddMemoryModal && !editingMemory && !editingTrip && !editingPartyEvent && !showOpenDateModal && !showCompanionsModal && !showAddModal && !showNewTripModal && !showLinkModal && !showImportModal && !showGuestModal && !showMyProfileModal && !showAddFitnessEventModal && !editingFitnessEvent && !showAddEventModal && !editingEvent && !editingTrainingWeek && !showAddTaskModal && !showSharedListModal && !showAddIdeaModal && !showAddSocialModal && !showAddGoalModal && !showOdysseyPlanModal && (
+      {!initialAppMode && !showAddMemoryModal && !editingMemory && !editingTrip && !editingPartyEvent && !showOpenDateModal && !showCompanionsModal && !showAddModal && !showNewTripModal && !showLinkModal && !showImportModal && !showGuestModal && !showMyProfileModal && !showAddFitnessEventModal && !editingFitnessEvent && !showAddEventModal && !editingEvent && !editingTrainingWeek && !showAddTaskModal && !showSharedListModal && !showAddIdeaModal && !showAddSocialModal && !showAddHabitModal && (
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[100]" style={{ transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}>
           {/* FAB Menu Popup - anchored to center of nav */}
           {showAddNewMenu && isOwner && (
@@ -12037,7 +12001,7 @@ export default function TripPlanner() {
                     { action: () => setShowAddTaskModal('create'), icon: '✅', label: 'Task', gradient: 'from-blue-400 to-indigo-500' },
                     { action: () => setShowSharedListModal('create'), icon: '🛒', label: 'List', gradient: 'from-emerald-400 to-teal-500' },
                     { action: () => setShowAddIdeaModal('create'), icon: '💡', label: 'Idea', gradient: 'from-yellow-400 to-amber-500' },
-                    { action: () => setShowAddGoalModal('create'), icon: '🎯', label: 'Goal', gradient: 'from-green-400 to-emerald-500' },
+                    { action: () => setShowAddHabitModal('create'), icon: '🔄', label: 'Habit', gradient: 'from-green-400 to-emerald-500' },
                     { action: () => setShowAddEventModal(true), icon: '🎉', label: 'Event', gradient: 'from-amber-400 to-orange-500' },
                     { action: () => setShowAddMemoryModal('milestone'), icon: '💝', label: 'Memory', gradient: 'from-rose-400 to-pink-500' },
                   ].map((item, idx) => {
