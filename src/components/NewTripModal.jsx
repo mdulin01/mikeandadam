@@ -1,6 +1,6 @@
 // NewTripModal Component - Comprehensive trip planning modal
 import React, { useState, useRef } from 'react';
-import { X, Sparkles, UserPlus, Plane, Car, Train, Hotel, Calendar, MapPin, Clock, Plus, Trash2, ChevronDown, ChevronUp, Camera, Image, Loader } from 'lucide-react';
+import { X, Sparkles, UserPlus, Plane, Car, Train, Hotel, Calendar, MapPin, Clock, Plus, Trash2, ChevronDown, ChevronUp, Camera, Image, Loader, ExternalLink } from 'lucide-react';
 import { travelEmojis } from '../constants';
 import { getEmojiSuggestion } from '../utils';
 
@@ -194,25 +194,34 @@ const NewTripModal = ({
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
-  const handleSubmit = () => {
-    if (isConvert) {
-      const newWishlist = wishlist.filter(w => w.id !== type.item.id);
-      setWishlist(newWishlist);
-      saveToFirestore(null, newWishlist, null);
+  const [submitting, setSubmitting] = useState(false);
+  const handleSubmit = async () => {
+    if (submitting) return; // prevent double-tap losing the trip
+    setSubmitting(true);
+    try {
+      if (isConvert) {
+        const newWishlist = wishlist.filter(w => w.id !== type.item.id);
+        await saveToFirestore(null, newWishlist, null);
+        setWishlist(newWishlist);
+      }
+
+      // Include all the detailed information
+      const tripData = {
+        ...formData,
+        emoji: currentEmoji,
+        transportMode,
+        coverImage: coverImage || null,
+        flights: transportMode === 'air' ? flights.filter(f => f.airline || f.flightNumber) : [],
+        hotels: hotels.filter(h => h.name),
+        events: events.filter(e => e.name)
+      };
+
+      await addNewTrip(tripData, isWishlist);
+    } catch (err) {
+      console.error('Trip creation failed:', err);
+    } finally {
+      setSubmitting(false);
     }
-
-    // Include all the detailed information
-    const tripData = {
-      ...formData,
-      emoji: currentEmoji,
-      transportMode,
-      coverImage: coverImage || null,
-      flights: transportMode === 'air' ? flights.filter(f => f.airline || f.flightNumber) : [],
-      hotels: hotels.filter(h => h.name),
-      events: events.filter(e => e.name)
-    };
-
-    addNewTrip(tripData, isWishlist);
   };
 
   const transportOptions = [
@@ -352,6 +361,18 @@ const NewTripModal = ({
                   onChange={handleImageSelect}
                   className="hidden"
                 />
+
+                {/* iCloud Photos shortcut */}
+                <a
+                  href="https://www.icloud.com/photos/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex flex-col items-center gap-2 p-3 border border-dashed border-white/30 rounded-xl hover:border-teal-400 hover:bg-white/5 transition"
+                  title="Open iCloud Photos in a new tab — download a photo, then click Choose Photo"
+                >
+                  <ExternalLink className="w-5 h-5 text-white/50" />
+                  <span className="text-xs text-white/50">iCloud Photos</span>
+                </a>
               </div>
             )}
           </div>
@@ -843,11 +864,11 @@ const NewTripModal = ({
         <div className="p-6 border-t border-white/10 space-y-3">
           <button
             onClick={handleSubmit}
-            disabled={!formData.destination}
+            disabled={!formData.destination || submitting}
             className="w-full py-3 bg-gradient-to-r from-teal-400 via-cyan-400 to-teal-500 text-white font-bold rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Sparkles className="w-5 h-5" />
-            {isWishlist ? 'Add to Wishlist' : isConvert ? 'Book This Dream!' : 'Create Adventure'}
+            {submitting ? <Loader className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+            {submitting ? 'Saving…' : (isWishlist ? 'Add to Wishlist' : isConvert ? 'Book This Dream!' : 'Create Adventure')}
           </button>
           <p className="text-xs text-white/40 text-center">
             💡 Tip: You can add more details later by clicking on the trip card

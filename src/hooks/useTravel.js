@@ -61,7 +61,7 @@ export const useTravel = (user, currentUser, saveToFirestore, showToast, getEmoj
   }, [canEditTrip]);
 
   // ========== TRIP CRUD ==========
-  const addNewTrip = useCallback((tripData, isWishlist) => {
+  const addNewTrip = useCallback(async (tripData, isWishlist) => {
     const colorSet = tripColors[Math.floor(Math.random() * tripColors.length)];
     const suggestedEmoji = getEmojiSuggestion(tripData.destination);
     const newTrip = {
@@ -78,19 +78,22 @@ export const useTravel = (user, currentUser, saveToFirestore, showToast, getEmoj
 
     if (isWishlist) {
       const newWishlist = [...wishlist, newTrip];
+      // AWAIT the save so the trip can't be lost if the modal closes / page reloads first
+      await saveRef.current(null, newWishlist, null);
       setWishlist(newWishlist);
-      saveRef.current(null, newWishlist, null);
     } else {
       const newTrips = [...trips, newTrip];
       const newTripDetails = {
         ...tripDetails,
         [newTrip.id]: { flights: [], hotels: [], events: [], links: [], packingList: [], budget: { total: 0, expenses: [] }, photos: [], notes: [] }
       };
+      // AWAIT the save so the trip can't be lost if the modal closes / page reloads first
+      await saveRef.current(newTrips, null, newTripDetails);
       setTrips(newTrips);
       setTripDetails(newTripDetails);
-      saveRef.current(newTrips, null, newTripDetails);
     }
     setShowNewTripModal(null);
+    return newTrip;
   }, [trips, wishlist, tripDetails, tripColors, getEmojiSuggestion]);
 
   const updateTripDates = useCallback(async (tripId, newStart, newEnd) => {

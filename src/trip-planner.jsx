@@ -11005,6 +11005,16 @@ export default function TripPlanner() {
                         onChange={(e) => e.target.files?.[0] && uploadMemoryPhoto(e.target.files[0], false)}
                       />
                     </label>
+                    <a
+                      href="https://www.icloud.com/photos/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex flex-col items-center gap-2 p-3 border border-dashed border-white/30 rounded-xl hover:border-rose-400 hover:bg-white/5 text-white/50 transition"
+                      title="Open iCloud Photos in a new tab — download a photo, then click Choose Photo"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                      <span className="text-xs">iCloud Photos</span>
+                    </a>
                   </div>
                   {dragOver && (
                     <div className="text-center text-rose-400 mt-2 text-sm">Drop image here to add</div>
@@ -11416,39 +11426,52 @@ export default function TripPlanner() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => eventCoverCameraRef.current?.click()}
-                      className="flex-1 flex flex-col items-center gap-2 p-3 border border-dashed border-white/30 rounded-xl hover:border-amber-400 hover:bg-white/5 transition"
-                    >
-                      <Camera className="w-5 h-5 text-white/50" />
-                      <span className="text-xs text-white/50">Take Photo</span>
-                    </button>
-                    <input
-                      ref={eventCoverCameraRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleEventCoverImageSelect}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => eventCoverFileRef.current?.click()}
-                      className="flex-1 flex flex-col items-center gap-2 p-3 border border-dashed border-white/30 rounded-xl hover:border-amber-400 hover:bg-white/5 transition"
-                    >
-                      <Image className="w-5 h-5 text-white/50" />
-                      <span className="text-xs text-white/50">Choose Photo</span>
-                    </button>
-                    <input
-                      ref={eventCoverFileRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleEventCoverImageSelect}
-                      className="hidden"
-                    />
-                  </div>
+                  <>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => eventCoverCameraRef.current?.click()}
+                        className="flex-1 flex flex-col items-center gap-2 p-3 border border-dashed border-white/30 rounded-xl hover:border-amber-400 hover:bg-white/5 transition"
+                      >
+                        <Camera className="w-5 h-5 text-white/50" />
+                        <span className="text-xs text-white/50">Take Photo</span>
+                      </button>
+                      <input
+                        ref={eventCoverCameraRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleEventCoverImageSelect}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => eventCoverFileRef.current?.click()}
+                        className="flex-1 flex flex-col items-center gap-2 p-3 border border-dashed border-white/30 rounded-xl hover:border-amber-400 hover:bg-white/5 transition"
+                      >
+                        <Image className="w-5 h-5 text-white/50" />
+                        <span className="text-xs text-white/50">Choose Photo</span>
+                      </button>
+                      <input
+                        ref={eventCoverFileRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEventCoverImageSelect}
+                        className="hidden"
+                      />
+                      <a
+                        href="https://www.icloud.com/photos/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 flex flex-col items-center gap-2 p-3 border border-dashed border-white/30 rounded-xl hover:border-amber-400 hover:bg-white/5 transition"
+                        title="Open iCloud Photos in a new tab — download a photo, then click Choose Photo"
+                      >
+                        <ExternalLink className="w-5 h-5 text-white/50" />
+                        <span className="text-xs text-white/50">iCloud Photos</span>
+                      </a>
+                    </div>
+                    <p className="text-[11px] text-white/40 mt-2">Tip: you can also drag a photo straight from the macOS Photos app onto the event after saving.</p>
+                  </>
                 )}
               </div>
 
