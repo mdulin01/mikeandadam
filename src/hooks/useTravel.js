@@ -61,6 +61,9 @@ export const useTravel = (user, currentUser, saveToFirestore, showToast, getEmoj
   }, [canEditTrip]);
 
   // ========== TRIP CRUD ==========
+  // Stamp ids onto modal-supplied subitems so they're addressable for edit/delete later.
+  const stampIds = (arr) => (Array.isArray(arr) ? arr.map((it, i) => ({ ...it, id: it.id || (Date.now() + i) })) : []);
+
   const addNewTrip = useCallback(async (tripData, isWishlist) => {
     const colorSet = tripColors[Math.floor(Math.random() * tripColors.length)];
     const suggestedEmoji = getEmojiSuggestion(tripData.destination);
@@ -73,7 +76,10 @@ export const useTravel = (user, currentUser, saveToFirestore, showToast, getEmoj
       isWishlist,
       notes: tripData.notes || '',
       special: tripData.special || '',
-      guests: []
+      guests: [],
+      // Preserve cover image and transport mode from the modal — these were silently dropped before.
+      coverImage: tripData.coverImage || '',
+      transportMode: tripData.transportMode || 'air',
     };
 
     if (isWishlist) {
@@ -83,9 +89,16 @@ export const useTravel = (user, currentUser, saveToFirestore, showToast, getEmoj
       setWishlist(newWishlist);
     } else {
       const newTrips = [...trips, newTrip];
+      // Carry over the flights / hotels / events the user filled in during creation —
+      // these were previously discarded, leaving every new trip's details empty.
       const newTripDetails = {
         ...tripDetails,
-        [newTrip.id]: { flights: [], hotels: [], events: [], links: [], packingList: [], budget: { total: 0, expenses: [] }, photos: [], notes: [] }
+        [newTrip.id]: {
+          flights: stampIds(tripData.flights),
+          hotels: stampIds(tripData.hotels),
+          events: stampIds(tripData.events),
+          links: [], packingList: [], budget: { total: 0, expenses: [] }, photos: [], notes: []
+        }
       };
       // AWAIT the save so the trip can't be lost if the modal closes / page reloads first
       await saveRef.current(newTrips, null, newTripDetails);
@@ -149,55 +162,80 @@ export const useTravel = (user, currentUser, saveToFirestore, showToast, getEmoj
   }, []);
 
   // ========== TRIP DETAILS CRUD ==========
-  const addItem = useCallback((tripId, type, item) => {
+  // Skeleton used whenever a trip has no tripDetails entry yet (e.g. trips created before
+  // we wired up cover/flights/etc. through addNewTrip). Prevents `undefined[type]` crashes.
+  const emptyDetails = () => ({ flights: [], hotels: [], events: [], links: [], packingList: [], budget: { total: 0, expenses: [] }, photos: [], notes: [] });
+
+  const addItem = useCallback(async (tripId, type, item) => {
     if (!canEditTrip(tripId)) {
       showToast('You don\'t have permission to edit this trip', 'error');
       return;
     }
+    const existing = tripDetails[tripId] || emptyDetails();
+    const list = Array.isArray(existing[type]) ? existing[type] : [];
     const newTripDetails = {
       ...tripDetails,
       [tripId]: {
-        ...tripDetails[tripId],
-        [type]: [...tripDetails[tripId][type], { ...item, id: Date.now(), addedBy: currentUser }]
-      }
+        ...existing,
+        [type]: [...list, { ...item, id: Date.now(), addedBy: currentUser }],
+      },
     };
     setTripDetails(newTripDetails);
-    saveRef.current(null, null, newTripDetails);
     setShowAddModal(null);
+    try {
+      await saveRef.current(null, null, newTripDetails);
+    } catch (err) {
+      console.error('addItem save failed:', err);
+      showToast('Failed to save — please try again', 'error');
+    }
   }, [tripDetails, currentUser, canEditTrip, saveToFirestore, showToast]);
 
-  const removeItem = useCallback((tripId, type, itemId) => {
+  const removeItem = useCallback(async (tripId, type, itemId) => {
     if (!canEditTrip(tripId)) {
       showToast('You don\'t have permission to edit this trip', 'error');
       return;
     }
+    const existing = tripDetails[tripId] || emptyDetails();
+    const list = Array.isArray(existing[type]) ? existing[type] : [];
     const newTripDetails = {
       ...tripDetails,
       [tripId]: {
-        ...tripDetails[tripId],
-        [type]: tripDetails[tripId][type].filter(item => item.id !== itemId)
-      }
+        ...existing,
+        [type]: list.filter(item => item.id !== itemId),
+      },
     };
     setTripDetails(newTripDetails);
-    saveRef.current(null, null, newTripDetails);
+    try {
+      await saveRef.current(null, null, newTripDetails);
+    } catch (err) {
+      console.error('removeItem save failed:', err);
+      showToast('Failed to save — please try again', 'error');
+    }
   }, [tripDetails, canEditTrip, saveToFirestore, showToast]);
 
-  const updateItem = useCallback((tripId, type, itemId, updatedData) => {
+  const updateItem = useCallback(async (tripId, type, itemId, updatedData) => {
     if (!canEditTrip(tripId)) {
       showToast('You don\'t have permission to edit this trip', 'error');
       return;
     }
+    const existing = tripDetails[tripId] || emptyDetails();
+    const list = Array.isArray(existing[type]) ? existing[type] : [];
     const newTripDetails = {
       ...tripDetails,
       [tripId]: {
-        ...tripDetails[tripId],
-        [type]: tripDetails[tripId][type].map(item =>
+        ...existing,
+        [type]: list.map(item =>
           item.id === itemId ? { ...item, ...updatedData } : item
-        )
-      }
+        ),
+      },
     };
     setTripDetails(newTripDetails);
-    saveRef.current(null, null, newTripDetails);
+    try {
+      await saveRef.current(null, null, newTripDetails);
+    } catch (err) {
+      console.error('updateItem save failed:', err);
+      showToast('Failed to save — please try again', 'error');
+    }
   }, [tripDetails, canEditTrip, saveToFirestore, showToast]);
 
   // ========== RETURN CONTEXT VALUE ==========

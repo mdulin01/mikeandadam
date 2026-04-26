@@ -1,12 +1,14 @@
 // AddModal Component - uses local state to prevent focus loss, syncs with parent only on submit
 import React, { useState } from 'react';
-import { Plane, Hotel, Music, X, Check } from 'lucide-react';
+import { Plane, Hotel, Music, X, Check, Loader } from 'lucide-react';
 import { airlines } from '../constants';
 
 const AddModal = React.memo(({ type, tripId, onClose, addItem, updateItem, editItem }) => {
   // Local state - initialize with editItem data if editing
   const [formData, setFormData] = useState(editItem || {});
   const [showConfirmClose, setShowConfirmClose] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const isEditing = !!editItem;
 
   const updateField = (field, value) => {
@@ -313,20 +315,37 @@ const AddModal = React.memo(({ type, tripId, onClose, addItem, updateItem, editI
 
         {getFormContent()}
 
+        {submitError && (
+          <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            {submitError}
+          </div>
+        )}
+
         <button
-          onClick={() => {
-            if (isEditing) {
-              updateItem(tripId, type, editItem.id, formData);
-            } else {
-              addItem(tripId, type, formData);
+          disabled={submitting}
+          onClick={async () => {
+            if (submitting) return;
+            setSubmitting(true);
+            setSubmitError('');
+            try {
+              if (isEditing) {
+                await updateItem(tripId, type, editItem.id, formData);
+              } else {
+                await addItem(tripId, type, formData);
+              }
+              setFormData({});
+              onClose();
+            } catch (err) {
+              console.error('AddModal save failed:', err);
+              setSubmitError(err?.message || 'Save failed — please try again');
+            } finally {
+              setSubmitting(false);
             }
-            setFormData({});
-            onClose();
           }}
-          className="w-full mt-6 py-3 bg-gradient-to-r from-teal-400 to-cyan-500 text-white font-bold rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2"
+          className="w-full mt-6 py-3 bg-gradient-to-r from-teal-400 to-cyan-500 text-white font-bold rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <Check className="w-5 h-5" />
-          {isEditing ? 'Save Changes' : 'Add to Trip'}
+          {submitting ? <Loader className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+          {submitting ? 'Saving…' : (isEditing ? 'Save Changes' : 'Add to Trip')}
         </button>
       </div>
     </div>
