@@ -3154,59 +3154,84 @@ export default function TripPlanner() {
 
   const { firstDay, daysInMonth } = getDaysInMonth(currentMonth);
 
-  const addItem = (tripId, type, item) => {
-    // Check edit permission
+  // Skeleton used whenever a trip has no tripDetails entry yet (newly-created trips, converted
+  // events, etc.). Without this fallback, [type]: [...tripDetails[tripId][type], …] threw
+  // "Cannot read properties of undefined (reading 'flights')" and the Save click looked dead.
+  const emptyTripDetails = () => ({ flights: [], hotels: [], events: [], links: [], packingList: [], budget: { total: 0, expenses: [] }, photos: [], notes: [] });
+
+  const addItem = async (tripId, type, item) => {
     if (!canEditTrip(tripId)) {
       showToast('You don\'t have permission to edit this trip', 'error');
       return;
     }
+    const existing = tripDetails[tripId] || emptyTripDetails();
+    const list = Array.isArray(existing[type]) ? existing[type] : [];
     const newTripDetails = {
       ...tripDetails,
       [tripId]: {
-        ...tripDetails[tripId],
-        [type]: [...tripDetails[tripId][type], { ...item, id: Date.now(), addedBy: currentUser }]
-      }
+        ...existing,
+        [type]: [...list, { ...item, id: Date.now(), addedBy: currentUser }],
+      },
     };
     setTripDetails(newTripDetails);
-    saveToFirestore(null, null, newTripDetails);
     setShowAddModal(null);
+    try {
+      await saveToFirestore(null, null, newTripDetails);
+    } catch (err) {
+      console.error('addItem save failed:', err);
+      showToast('Failed to save — please try again', 'error');
+      throw err;
+    }
   };
 
-  const removeItem = (tripId, type, itemId) => {
-    // Check edit permission
+  const removeItem = async (tripId, type, itemId) => {
     if (!canEditTrip(tripId)) {
       showToast('You don\'t have permission to edit this trip', 'error');
       return;
     }
+    const existing = tripDetails[tripId] || emptyTripDetails();
+    const list = Array.isArray(existing[type]) ? existing[type] : [];
     const newTripDetails = {
       ...tripDetails,
       [tripId]: {
-        ...tripDetails[tripId],
-        [type]: tripDetails[tripId][type].filter(item => item.id !== itemId)
-      }
+        ...existing,
+        [type]: list.filter(item => item.id !== itemId),
+      },
     };
     setTripDetails(newTripDetails);
-    saveToFirestore(null, null, newTripDetails);
+    try {
+      await saveToFirestore(null, null, newTripDetails);
+    } catch (err) {
+      console.error('removeItem save failed:', err);
+      showToast('Failed to save — please try again', 'error');
+    }
   };
 
-  const updateItem = (tripId, type, itemId, updatedData) => {
-    // Check edit permission
+  const updateItem = async (tripId, type, itemId, updatedData) => {
     if (!canEditTrip(tripId)) {
       showToast('You don\'t have permission to edit this trip', 'error');
       return;
     }
+    const existing = tripDetails[tripId] || emptyTripDetails();
+    const list = Array.isArray(existing[type]) ? existing[type] : [];
     const newTripDetails = {
       ...tripDetails,
       [tripId]: {
-        ...tripDetails[tripId],
-        [type]: tripDetails[tripId][type].map(item =>
+        ...existing,
+        [type]: list.map(item =>
           item.id === itemId ? { ...item, ...updatedData } : item
-        )
-      }
+        ),
+      },
     };
     setTripDetails(newTripDetails);
-    saveToFirestore(null, null, newTripDetails);
     setShowAddModal(null);
+    try {
+      await saveToFirestore(null, null, newTripDetails);
+    } catch (err) {
+      console.error('updateItem save failed:', err);
+      showToast('Failed to save — please try again', 'error');
+      throw err;
+    }
   };
 
   // Travel operations now in useTravel hook
