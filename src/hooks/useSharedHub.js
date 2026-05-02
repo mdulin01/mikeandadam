@@ -12,15 +12,12 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast, isLoadedRef)
   const saveRef = useRef(saveSharedHub);
   saveRef.current = saveSharedHub;
 
-  // Guard that blocks CRUD before the sharedHub Firestore doc has loaded.
-  // Without this, any add/update/delete fired during cold-start would write the
-  // stale empty state to the server, and the incoming snapshot would overwrite
-  // the user's new item — the infamous "I added it and it disappeared" bug.
-  const ensureHubLoaded = (actionLabel) => {
-    if (isLoadedRef && isLoadedRef.current) return true;
-    showToast(`Still syncing — try ${actionLabel} again in a moment.`, 'warning');
-    return false;
-  };
+  // ensureHubLoaded was previously a blocking guard that stopped CRUD until the
+  // initial sharedHub snapshot fired. It blocked too aggressively (buttons did
+  // nothing for users where the snapshot was slow), so it now always returns true.
+  // Data-loss protection on cold-start is handled by saveSharedHub in
+  // trip-planner.jsx, which silently drops writes before snapshot load.
+  const ensureHubLoaded = (_actionLabel) => true;
 
   // ========== STATE ==========
   const [sharedTasks, setSharedTasks] = useState([]);
