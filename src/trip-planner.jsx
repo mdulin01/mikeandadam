@@ -1041,6 +1041,63 @@ export default function TripPlanner() {
     }
   };
 
+  // ========== RACE DAY (post-event details + photos) ==========
+  const updateRaceDay = async (eventId, raceDayUpdates) => {
+    const updatedEvents = fitnessEvents.map(e =>
+      e.id === eventId ? { ...e, raceDay: { ...(e.raceDay || {}), ...raceDayUpdates } } : e
+    );
+    setFitnessEvents(updatedEvents);
+    if (selectedFitnessEvent?.id === eventId) {
+      setSelectedFitnessEvent(updatedEvents.find(e => e.id === eventId));
+    }
+    await saveFitnessToFirestore(updatedEvents, null);
+  };
+
+  const handleRaceDayPhotoAdd = async (eventId, file) => {
+    if (!file) return;
+    const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic|heif|bmp)$/i.test(file.name);
+    if (!isImage) {
+      showToast('Please select an image file', 'error');
+      return;
+    }
+    const sizeError = validateFileSize(file);
+    if (sizeError) {
+      showToast(sizeError, 'error');
+      return;
+    }
+    try {
+      let fileToUpload = file;
+      let fileName = file.name || 'photo.jpg';
+      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
+                     fileName.toLowerCase().endsWith('.heic') || fileName.toLowerCase().endsWith('.heif');
+      if (isHeic) {
+        const convertedBlob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+        fileToUpload = new File([convertedBlob], fileName.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
+        fileName = fileToUpload.name;
+      }
+      const timestamp = Date.now();
+      const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const storageRef = ref(storage, `memories/race-${eventId}-${timestamp}_${safeName}`);
+      await uploadBytes(storageRef, fileToUpload);
+      const downloadURL = await getDownloadURL(storageRef);
+      const event = fitnessEvents.find(e => e.id === eventId);
+      const existing = event?.raceDay?.photos || [];
+      const photos = [...existing, { id: timestamp, url: downloadURL, addedAt: new Date().toISOString() }];
+      await updateRaceDay(eventId, { photos });
+      showToast('Race photo added', 'success');
+    } catch (err) {
+      console.error('Race photo upload failed:', err);
+      showToast('Failed to upload photo', 'error');
+    }
+  };
+
+  const handleRaceDayPhotoRemove = async (eventId, photoId) => {
+    const event = fitnessEvents.find(e => e.id === eventId);
+    const existing = event?.raceDay?.photos || [];
+    const photos = existing.filter(p => p.id !== photoId);
+    await updateRaceDay(eventId, { photos });
+  };
+
   const handleWeekPhotoRemove = async (eventId, weekId, existingPhotos, photoId) => {
     try {
       const photos = (existingPhotos || []).filter(p => p.id !== photoId);
@@ -2093,8 +2150,10 @@ export default function TripPlanner() {
     const hubUnsubscribe = onSnapshot(
       doc(db, 'tripData', 'sharedHub'),
       (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
+        const exists = docSnap.exists();
+        const data = exists ? docSnap.data() : null;
+        console.log('[hubSnapshot] fired', { exists, listsCount: data?.lists?.length, alreadyLoaded: hubDataLoadedRef.current });
+        if (exists) {
           if (data.lists) setSharedLists(data.lists);
           if (data.tasks) setSharedTasks(data.tasks);
           if (data.ideas) setSharedIdeas(data.ideas);
@@ -2102,7 +2161,6 @@ export default function TripPlanner() {
           if (data.goals) setSharedGoals(data.goals);
           if (data.odysseyPlans) setSharedOdysseyPlans(data.odysseyPlans);
         }
-        // Mark hub data as loaded so saves are now safe
         hubDataLoadedRef.current = true;
       },
       (error) => {
@@ -2673,18 +2731,18 @@ export default function TripPlanner() {
   // ========== SHARED HUB SAVE & CRUD ==========
 
   const saveSharedHub = useCallback(async (newLists, newTasks, newIdeas, newSocial, newGoals, newOdysseyPlans) => {
-    if (!user) return;
-    // Wait for the initial snapshot before writing — otherwise we'd overwrite the
-    // server with stale empty arrays from cold-start. Hook ADD callbacks already
-    // wait + use functional setState, so by the time saveSharedHub runs the data
-    // they pass should be on top of real server state. This is a belt-and-suspenders.
+    console.log('[saveSharedHub] called', { hasUser: !!user, isLoaded: hubDataLoadedRef.current, listsCount: newLists?.length });
+    if (!user) { console.warn('[saveSharedHub] no user, returning'); return; }
     if (!hubDataLoadedRef.current) {
+      console.log('[saveSharedHub] waiting for snapshot...');
       for (let i = 0; i < 200; i++) {
         if (hubDataLoadedRef.current) break;
         await new Promise(r => setTimeout(r, 50));
       }
       if (!hubDataLoadedRef.current) {
-        console.warn('saveSharedHub: snapshot still not loaded after 10s, proceeding');
+        console.warn('[saveSharedHub] snapshot still not loaded after 10s, proceeding');
+      } else {
+        console.log('[saveSharedHub] snapshot loaded, proceeding');
       }
     }
     try {
@@ -2697,8 +2755,11 @@ export default function TripPlanner() {
       if (newSocial !== null && newSocial !== undefined) updates.social = newSocial;
       if (newGoals !== null && newGoals !== undefined) updates.goals = newGoals;
       if (newOdysseyPlans !== null && newOdysseyPlans !== undefined) updates.odysseyPlans = newOdysseyPlans;
+      console.log('[saveSharedHub] writing setDoc', { keys: Object.keys(updates) });
       await setDoc(doc(db, 'tripData', 'sharedHub'), stripUndefined(updates), { merge: true });
+      console.log('[saveSharedHub] setDoc complete');
     } catch (error) {
+      console.error('[saveSharedHub] setDoc error', error);
       console.error('Error saving shared hub:', error);
       showToast('Failed to save. Please try again.', 'error');
     }
@@ -5234,6 +5295,81 @@ export default function TripPlanner() {
 
                   {selectedFitnessEvent && getActiveTrainingPlan(selectedFitnessEvent.id) && (
                     <div className="space-y-4">
+                      {/* Race Day — appears on/after race date */}
+                      {(() => {
+                        const eventDate = parseLocalDate(selectedFitnessEvent.date);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        eventDate.setHours(0, 0, 0, 0);
+                        const isPastRace = eventDate <= today;
+                        if (!isPastRace) return null;
+                        const raceDay = selectedFitnessEvent.raceDay || {};
+                        const racePhotos = raceDay.photos || [];
+                        const finishTime = raceDay.finishTime || '';
+                        const raceNotes = raceDay.notes || '';
+                        return (
+                          <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-2xl p-6 border border-green-500/30">
+                            <div className="flex items-center gap-2 mb-4">
+                              <span className="text-3xl">🏆</span>
+                              <h3 className="text-xl font-bold text-white">Race Day — {formatDate(selectedFitnessEvent.date, { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-4 mb-4">
+                              <div>
+                                <label className="block text-sm text-white/70 mb-1">Finish Time</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 1:45:32"
+                                  defaultValue={finishTime}
+                                  onBlur={(e) => { if (e.target.value !== finishTime) updateRaceDay(selectedFitnessEvent.id, { finishTime: e.target.value }); }}
+                                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-green-400"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm text-white/70 mb-1">How did it go?</label>
+                                <textarea
+                                  placeholder="Splits, weather, highlights..."
+                                  defaultValue={raceNotes}
+                                  onBlur={(e) => { if (e.target.value !== raceNotes) updateRaceDay(selectedFitnessEvent.id, { notes: e.target.value }); }}
+                                  rows={2}
+                                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-green-400 resize-none"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-sm text-white/70 mb-2">Race Photos ({racePhotos.length})</label>
+                              <div className="flex flex-wrap gap-2">
+                                {racePhotos.map((p, idx) => (
+                                  <div key={p.id} className="relative group/photo">
+                                    <img src={p.url} alt="" className="w-20 h-20 rounded-lg object-cover border border-white/10 cursor-pointer" onClick={() => openLightbox(racePhotos.map(rp => rp.url), idx)} />
+                                    <button onClick={() => handleRaceDayPhotoRemove(selectedFitnessEvent.id, p.id)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition">
+                                      <X className="w-3 h-3 text-white" />
+                                    </button>
+                                  </div>
+                                ))}
+                                <label className="w-20 h-20 border-2 border-dashed border-white/30 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-400 hover:bg-white/5 transition">
+                                  <Camera className="w-5 h-5 text-white/50" />
+                                  <span className="text-[10px] text-white/50 mt-1">Add photo</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const files = Array.from(e.target.files || []);
+                                      for (const file of files) {
+                                        await handleRaceDayPhotoAdd(selectedFitnessEvent.id, file);
+                                      }
+                                      e.target.value = '';
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                              <p className="text-xs text-white/40 mt-2">Photos auto-sync to Memories.</p>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {/* Stats and Encouragement */}
                       {(() => {
                         const plan = getActiveTrainingPlan(selectedFitnessEvent.id);
