@@ -2674,10 +2674,18 @@ export default function TripPlanner() {
 
   const saveSharedHub = useCallback(async (newLists, newTasks, newIdeas, newSocial, newGoals, newOdysseyPlans) => {
     if (!user) return;
-    // Don't save until Firebase data has loaded — prevents overwriting with empty arrays
+    // Wait for the initial snapshot before writing — otherwise we'd overwrite the
+    // server with stale empty arrays from cold-start. Hook ADD callbacks already
+    // wait + use functional setState, so by the time saveSharedHub runs the data
+    // they pass should be on top of real server state. This is a belt-and-suspenders.
     if (!hubDataLoadedRef.current) {
-      console.warn('saveSharedHub blocked: data not yet loaded from Firebase');
-      return;
+      for (let i = 0; i < 200; i++) {
+        if (hubDataLoadedRef.current) break;
+        await new Promise(r => setTimeout(r, 50));
+      }
+      if (!hubDataLoadedRef.current) {
+        console.warn('saveSharedHub: snapshot still not loaded after 10s, proceeding');
+      }
     }
     try {
       // Only write the fields that were explicitly passed (non-null)

@@ -228,13 +228,15 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast, isLoadedRef)
   }, [sharedSocial]);
 
   // ========== GOAL CRUD ==========
-  const addGoal = useCallback((goal) => {
-    if (!ensureHubLoaded('adding the goal')) return;
-    const newGoals = [...sharedGoals, goal];
-    setSharedGoals(newGoals);
-    saveRef.current(null, null, null, null, newGoals);
+  const addGoal = useCallback(async (goal) => {
+    await waitForHubLoad();
+    setSharedGoals(prev => {
+      const newGoals = [...prev, goal];
+      saveRef.current(null, null, null, null, newGoals);
+      return newGoals;
+    });
     showToast('Goal added', 'success');
-  }, [sharedGoals, showToast]);
+  }, [showToast]);
 
   const updateGoal = useCallback((goalId, updates) => {
     if (!ensureHubLoaded('editing the goal')) return;
@@ -277,13 +279,15 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast, isLoadedRef)
   }, [sharedGoals]);
 
   // ========== ODYSSEY PLAN CRUD ==========
-  const addOdysseyPlan = useCallback((plan) => {
-    if (!ensureHubLoaded('adding the plan')) return;
-    const newPlans = [...sharedOdysseyPlans, plan];
-    setSharedOdysseyPlans(newPlans);
-    saveRef.current(null, null, null, null, null, newPlans);
+  const addOdysseyPlan = useCallback(async (plan) => {
+    await waitForHubLoad();
+    setSharedOdysseyPlans(prev => {
+      const newPlans = [...prev, plan];
+      saveRef.current(null, null, null, null, null, newPlans);
+      return newPlans;
+    });
     showToast('Odyssey Plan created', 'success');
-  }, [sharedOdysseyPlans, showToast]);
+  }, [showToast]);
 
   const updateOdysseyPlan = useCallback((planId, updates) => {
     if (!ensureHubLoaded('editing the plan')) return;
