@@ -2355,6 +2355,8 @@ export default function TripPlanner() {
     // filter strips it from persisted state so old Firestore data doesn't resurrect it.
     // Also merges hardcoded defaultFitnessEvents with persisted ones so newly-added
     // events (Cary 10K, GSO Half) appear immediately even if Firestore has only Indy.
+    // Persisted events that EXIST get fields from defaults patched in (status, location)
+    // — defaults win for these "structural" fields since they're how we mark archived state.
     const fitnessUnsubscribe = onSnapshot(
       doc(db, 'tripData', 'fitness'),
       (docSnap) => {
@@ -2362,9 +2364,22 @@ export default function TripPlanner() {
           const data = docSnap.data();
           if (data.events) {
             const filtered = data.events.filter(e => e.id !== 'triathlon-2026');
-            const persistedIds = new Set(filtered.map(e => e.id));
+            const defaultsById = new Map(defaultFitnessEvents.map(e => [e.id, e]));
+            // Patch persisted events with current defaults for status/location (defaults win).
+            const patched = filtered.map(e => {
+              const d = defaultsById.get(e.id);
+              if (!d) return e;
+              return {
+                ...e,
+                status: d.status ?? e.status,
+                location: d.location ?? e.location,
+                color: d.color ?? e.color,
+                type: d.type ?? e.type,
+              };
+            });
+            const persistedIds = new Set(patched.map(e => e.id));
             const missingDefaults = defaultFitnessEvents.filter(e => !persistedIds.has(e.id));
-            setFitnessEvents([...filtered, ...missingDefaults]);
+            setFitnessEvents([...patched, ...missingDefaults]);
           }
           if (data.trainingPlans) {
             // Drop the orphan triathlon plan from persisted state too.
