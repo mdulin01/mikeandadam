@@ -580,12 +580,14 @@ export default function TripPlanner() {
   const saveFitnessRef = useRef(() => {});
 
   // ========== FITNESS: All state and operations from hook =====
-  // Note: generateTrainingWeeks, triathlonTrainingPlan, indyHalfTrainingPlan are defined later
+  // Note: plan templates (cary10k, gsoHalf, indyHalf) are defined later in this file.
+  // Each gets a ref so useFitness can lazy-init the plan into Firestore on first edit.
   const generateTrainingWeeksRef = useRef(() => []);
-  const triathlonTrainingPlanRef = useRef([]);
   const indyHalfTrainingPlanRef = useRef([]);
+  const cary10kTrainingPlanRef = useRef([]);
+  const gsoHalfTrainingPlanRef = useRef([]);
 
-  const fitness = useFitness(saveFitnessRef, showToast, generateTrainingWeeksRef, triathlonTrainingPlanRef, indyHalfTrainingPlanRef);
+  const fitness = useFitness(saveFitnessRef, showToast, generateTrainingWeeksRef, indyHalfTrainingPlanRef, cary10kTrainingPlanRef, gsoHalfTrainingPlanRef);
   const {
     fitnessEvents, fitnessTrainingPlans, selectedFitnessEvent, fitnessViewMode,
     updateFitnessEvent, deleteFitnessEvent, updateTrainingWeek, addWorkout, deleteWorkout,
@@ -1336,7 +1338,8 @@ export default function TripPlanner() {
   };
 
   // ========== FITNESS SECTION STATE ==========
-  // Default fitness events
+  // Default fitness events. `status: 'completed'` => race is done; show as memorial.
+  // The triathlon (Mike-only) lives in mikesfitness.app, not here.
   const defaultFitnessEvents = [
     {
       id: 'indy-half-2026',
@@ -1344,16 +1347,30 @@ export default function TripPlanner() {
       emoji: '🏃',
       date: '2026-05-02',
       type: 'half-marathon',
-      color: 'from-orange-400 to-red-500'
+      location: 'Indianapolis, IN',
+      color: 'from-orange-400 to-red-500',
+      status: 'completed',
     },
     {
-      id: 'triathlon-2026',
-      name: 'Triathlon',
-      emoji: '🏊',
-      date: '2026-09-26',
-      type: 'triathlon',
-      color: 'from-blue-400 to-cyan-500'
-    }
+      id: 'cary-10k-2026',
+      name: 'Cary 10K',
+      emoji: '🏃',
+      date: '2026-07-11',
+      type: '10k',
+      location: 'Cary, NC',
+      color: 'from-emerald-400 to-green-500',
+      status: 'active',
+    },
+    {
+      id: 'gso-half-2026',
+      name: 'Greensboro Half Marathon',
+      emoji: '🏃',
+      date: '2026-11-21',
+      type: 'half-marathon',
+      location: 'Greensboro, NC',
+      color: 'from-purple-400 to-indigo-500',
+      status: 'active',
+    },
   ];
 
   // Hardcoded Indy Half Marathon Training Plan - "Salad, Run, Salad"
@@ -1488,10 +1505,226 @@ export default function TripPlanner() {
     ], totalMiles: 18.1, weekNotes: '🏁 RACE WEEK! You got this! 🎉', isRaceWeek: true }
   ].map(week => ({ ...week, id: `indy-half-2026-week-${week.weekNumber}` }));
 
-  // Hardcoded Triathlon Training Plan - Mike only
-  // Pre-season (Feb-May): Swimming cross-training while doing Half Marathon runs
-  // Main training (May onwards): Full swim/bike/run/bricks
-  const triathlonTrainingPlan = [
+  /* eslint-disable */
+  // ============================================================
+  // CARY 10K TRAINING PLAN — 9 weeks, 3 runs/week, 2-week taper
+  // Race: Saturday 2026-07-11 in Cary, NC
+  // Coming off the Indy Half so base fitness is good — focus on speed.
+  // ============================================================
+  const cary10kTrainingPlan = [
+    { weekNumber: 1, startDate: '2026-05-10', endDate: '2026-05-16', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: 'Easy recovery from Indy Half' },
+      { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '5 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 11, weekNotes: '🟢 Recovery + base — first week post-Indy' },
+    { weekNumber: 2, startDate: '2026-05-17', endDate: '2026-05-23', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '6 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 13, weekNotes: '' },
+    { weekNumber: 3, startDate: '2026-05-24', endDate: '2026-05-30', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '6.5 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 13.5, weekNotes: '' },
+    { weekNumber: 4, startDate: '2026-05-31', endDate: '2026-06-06', runs: [
+      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 15, weekNotes: '' },
+    { weekNumber: 5, startDate: '2026-06-07', endDate: '2026-06-13', runs: [
+      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 16, weekNotes: '' },
+    { weekNumber: 6, startDate: '2026-06-14', endDate: '2026-06-20', runs: [
+      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 17, weekNotes: '' },
+    { weekNumber: 7, startDate: '2026-06-21', endDate: '2026-06-27', runs: [
+      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 17, weekNotes: '🔝 Peak week' },
+    { weekNumber: 8, startDate: '2026-06-28', endDate: '2026-07-04', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '5 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 12, weekNotes: '📉 Taper Week 1' },
+    { weekNumber: 9, startDate: '2026-07-05', endDate: '2026-07-11', runs: [
+      { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: 'Easy shakeout' },
+      { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '6.2 mi', mike: false, adam: false, notes: '🏁 RACE!' }
+    ], crossTraining: [
+      { id: 1, label: 'Race Day Prep', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Rest', mike: false, adam: false, notes: '' }
+    ], totalMiles: 11.2, weekNotes: '🏁 RACE WEEK! Cary 10K — go get it! 🎉', isRaceWeek: true }
+  ].map(week => ({ ...week, id: `cary-10k-2026-week-${week.weekNumber}` }));
+
+  // ============================================================
+  // GREENSBORO HALF MARATHON TRAINING PLAN — 16 weeks, 3 runs/week, 2-week taper
+  // Race: Saturday 2026-11-21 in Greensboro, NC
+  // Plan starts Aug 2 (3 weeks of base after 10K). Wrightsville Tri Sep 27 falls in week 9.
+  // ============================================================
+  const gsoHalfTrainingPlan = [
+    { weekNumber: 1, startDate: '2026-08-02', endDate: '2026-08-08', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '5 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 12, weekNotes: 'Plan begins — easy build from 10K base' },
+    { weekNumber: 2, startDate: '2026-08-09', endDate: '2026-08-15', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '6 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 13, weekNotes: '' },
+    { weekNumber: 3, startDate: '2026-08-16', endDate: '2026-08-22', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 14, weekNotes: '' },
+    { weekNumber: 4, startDate: '2026-08-23', endDate: '2026-08-29', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 14, weekNotes: '' },
+    { weekNumber: 5, startDate: '2026-08-30', endDate: '2026-09-05', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 15, weekNotes: '' },
+    { weekNumber: 6, startDate: '2026-09-06', endDate: '2026-09-12', runs: [
+      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 17, weekNotes: '' },
+    { weekNumber: 7, startDate: '2026-09-13', endDate: '2026-09-19', runs: [
+      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '9 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 18, weekNotes: '' },
+    { weekNumber: 8, startDate: '2026-09-20', endDate: '2026-09-26', runs: [
+      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: 'Easy — Mike has tri Sat' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 15, weekNotes: '⚠️ Mike racing Wrightsville Tri this Sun (9/27) — light week' },
+    { weekNumber: 9, startDate: '2026-09-27', endDate: '2026-10-03', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: 'Recovery' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '9 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 17, weekNotes: 'Post-tri recovery + back to half build' },
+    { weekNumber: 10, startDate: '2026-10-04', endDate: '2026-10-10', runs: [
+      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '10 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 19, weekNotes: '' },
+    { weekNumber: 11, startDate: '2026-10-11', endDate: '2026-10-17', runs: [
+      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '11 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 20, weekNotes: '' },
+    { weekNumber: 12, startDate: '2026-10-18', endDate: '2026-10-24', runs: [
+      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '12 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 21, weekNotes: '' },
+    { weekNumber: 13, startDate: '2026-10-25', endDate: '2026-10-31', runs: [
+      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '12 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 21, weekNotes: '🔝 Peak week' },
+    { weekNumber: 14, startDate: '2026-11-01', endDate: '2026-11-07', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 15, weekNotes: '📉 Taper Week 1' },
+    { weekNumber: 15, startDate: '2026-11-08', endDate: '2026-11-14', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '6 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 13, weekNotes: '📉 Taper Week 2' },
+    { weekNumber: 16, startDate: '2026-11-15', endDate: '2026-11-21', runs: [
+      { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: 'Easy shakeout' },
+      { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '13.1 mi', mike: false, adam: false, notes: '🏁 RACE!' }
+    ], crossTraining: [
+      { id: 1, label: 'Race Day Prep', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Rest', mike: false, adam: false, notes: '' }
+    ], totalMiles: 18.1, weekNotes: '🏁 RACE WEEK! Greensboro Half — let\'s do this! 🎉', isRaceWeek: true }
+  ].map(week => ({ ...week, id: `gso-half-2026-week-${week.weekNumber}` }));
+  /* eslint-enable */
+
+  // The Triathlon plan was REMOVED from mikeandadam — Mike's tri lives in mikesfitness.app now.
+  const _removedTriathlonPlan = [
     // === PRE-SEASON: Swimming Cross-Training (Feb 2 - May 9) ===
     // During this phase, runs are tracked in Half Marathon plan
     { weekNumber: 1, startDate: '2026-02-02', endDate: '2026-02-08', phase: 'pre-season', runs: [
@@ -1698,13 +1931,15 @@ export default function TripPlanner() {
       { id: 1, label: 'Race Day Prep', mike: false, notes: '' },
       { id: 2, label: 'Rest', mike: false, notes: '' }
     ], totalMiles: 0, weekNotes: '🏁 RACE WEEK! Sprint Tri - You got this! 🎉', isRaceWeek: true }
-  ].map(week => ({ ...week, id: `triathlon-2026-week-${week.weekNumber}` }));
+  ];
+  void _removedTriathlonPlan; // suppress unused warning; data kept for reference until next cleanup pass
 
   // Update refs for training plans (used by fitness hook)
   useEffect(() => {
-    triathlonTrainingPlanRef.current = triathlonTrainingPlan;
     indyHalfTrainingPlanRef.current = indyHalfTrainingPlan;
-  }, [triathlonTrainingPlan, indyHalfTrainingPlan]);
+    cary10kTrainingPlanRef.current = cary10kTrainingPlan;
+    gsoHalfTrainingPlanRef.current = gsoHalfTrainingPlan;
+  }, [indyHalfTrainingPlan, cary10kTrainingPlan, gsoHalfTrainingPlan]);
 
   // Generate generic training weeks for other events
   const generateTrainingWeeks = (startDate, eventDate, eventId) => {
@@ -2115,14 +2350,28 @@ export default function TripPlanner() {
       }
     );
 
-    // Subscribe to fitness collection
+    // Subscribe to fitness collection.
+    // Triathlon was removed from this app (lives in mikesfitness now). Defensive
+    // filter strips it from persisted state so old Firestore data doesn't resurrect it.
+    // Also merges hardcoded defaultFitnessEvents with persisted ones so newly-added
+    // events (Cary 10K, GSO Half) appear immediately even if Firestore has only Indy.
     const fitnessUnsubscribe = onSnapshot(
       doc(db, 'tripData', 'fitness'),
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (data.events) setFitnessEvents(data.events);
-          if (data.trainingPlans) setFitnessTrainingPlans(data.trainingPlans);
+          if (data.events) {
+            const filtered = data.events.filter(e => e.id !== 'triathlon-2026');
+            const persistedIds = new Set(filtered.map(e => e.id));
+            const missingDefaults = defaultFitnessEvents.filter(e => !persistedIds.has(e.id));
+            setFitnessEvents([...filtered, ...missingDefaults]);
+          }
+          if (data.trainingPlans) {
+            // Drop the orphan triathlon plan from persisted state too.
+            const cleanedPlans = { ...data.trainingPlans };
+            delete cleanedPlans['triathlon-2026'];
+            setFitnessTrainingPlans(cleanedPlans);
+          }
         }
       },
       (error) => {
@@ -2950,12 +3199,16 @@ export default function TripPlanner() {
 
     const newPlans = { ...fitnessTrainingPlans };
 
-    // Initialize plan if it doesn't exist
+    // Initialize plan from hardcoded template if Firestore doesn't have one yet.
     if (!newPlans[eventId]) {
-      if (eventId === 'triathlon-2026') {
-        newPlans[eventId] = JSON.parse(JSON.stringify(triathlonTrainingPlan));
-      } else if (eventId === 'indy-half-2026') {
-        newPlans[eventId] = JSON.parse(JSON.stringify(indyHalfTrainingPlan));
+      const template = (
+        eventId === 'indy-half-2026' ? indyHalfTrainingPlan :
+        eventId === 'cary-10k-2026' ? cary10kTrainingPlan :
+        eventId === 'gso-half-2026' ? gsoHalfTrainingPlan :
+        null
+      );
+      if (template) {
+        newPlans[eventId] = JSON.parse(JSON.stringify(template));
       } else {
         return; // Can't update non-existent plan
       }
@@ -3020,12 +3273,14 @@ export default function TripPlanner() {
     const event = fitnessEvents.find(e => e.id === eventId);
     if (!event) return;
 
-    // Use hardcoded plan for Indy Half Marathon (deep clone to avoid template mutation)
+    // Use hardcoded plan when one exists; deep clone to avoid template mutation.
     let weeks;
     if (eventId === 'indy-half-2026') {
       weeks = JSON.parse(JSON.stringify(indyHalfTrainingPlan));
-    } else if (eventId === 'triathlon-2026') {
-      weeks = JSON.parse(JSON.stringify(triathlonTrainingPlan));
+    } else if (eventId === 'cary-10k-2026') {
+      weeks = JSON.parse(JSON.stringify(cary10kTrainingPlan));
+    } else if (eventId === 'gso-half-2026') {
+      weeks = JSON.parse(JSON.stringify(gsoHalfTrainingPlan));
     } else {
       const today = toLocalDateStr();
       weeks = generateTrainingWeeks(today, event.date, eventId);
@@ -3132,8 +3387,11 @@ export default function TripPlanner() {
     if (eventId === 'indy-half-2026') {
       return mergeWithFirebase(indyHalfTrainingPlan);
     }
-    if (eventId === 'triathlon-2026') {
-      return mergeWithFirebase(triathlonTrainingPlan);
+    if (eventId === 'cary-10k-2026') {
+      return mergeWithFirebase(cary10kTrainingPlan);
+    }
+    if (eventId === 'gso-half-2026') {
+      return mergeWithFirebase(gsoHalfTrainingPlan);
     }
     return fitnessTrainingPlans[eventId] || [];
   };
@@ -5277,7 +5535,7 @@ export default function TripPlanner() {
                           {event.name}
                         </button>
                         {/* Edit button - only show for non-hardcoded events */}
-                        {!['indy-half-2026', 'triathlon-2026'].includes(event.id) && (
+                        {!['indy-half-2026', 'cary-10k-2026', 'gso-half-2026'].includes(event.id) && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -5373,8 +5631,10 @@ export default function TripPlanner() {
                       {/* Stats and Encouragement */}
                       {(() => {
                         const plan = getActiveTrainingPlan(selectedFitnessEvent.id);
-                        const isTriathlon = selectedFitnessEvent.id === 'triathlon-2026';
+                        // Triathlon is gone from this app; isTriathlon kept as a no-op
+                        // alias of isMikeOnlyPlan so downstream UI branches keep working.
                         const isMikeOnlyPlan = plan[0]?.runs?.[0] && !('adam' in plan[0].runs[0]);
+                        const isTriathlon = isMikeOnlyPlan;
 
                         // A week is "done" based on plan type
                         const completedWeeks = plan.filter(w => {
@@ -5585,7 +5845,8 @@ export default function TripPlanner() {
                         const currentWeek = allWeeks.find(w => w.startDate <= todayStr && w.endDate >= todayStr);
                         const currentWeekIndex = allWeeks.findIndex(w => w.startDate <= todayStr && w.endDate >= todayStr);
                         const futureWeeks = allWeeks.filter(w => w.startDate > todayStr);
-                        const isTriathlon = selectedFitnessEvent?.id === 'triathlon-2026';
+                        // Triathlon removed; isTriathlon is now a Mike-only-plan check (same UI behavior).
+                        const isTriathlon = allWeeks[0]?.runs?.[0] && !('adam' in allWeeks[0].runs[0]);
 
                         const renderWeekAccordion = (week, index, opts = {}) => {
                           const isPast = week.endDate < todayStr;
@@ -6097,7 +6358,11 @@ export default function TripPlanner() {
                     <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                       <span>🔥</span> Adam's Training Consistency
                     </h3>
-                    {fitnessEvents.filter(e => e.id !== 'triathlon-2026').map(event => {
+                    {/* Adam's stats: skip Mike-only events (no `adam` field on workouts) */}
+                    {fitnessEvents.filter(e => {
+                      const plan = fitnessTrainingPlans[e.id];
+                      return !plan?.[0]?.runs?.[0] || ('adam' in plan[0].runs[0]);
+                    }).map(event => {
                       const plan = getActiveTrainingPlan(event.id);
                       return (
                         <div key={event.id} className="mb-4">
@@ -8230,7 +8495,8 @@ export default function TripPlanner() {
                       // Add completed fitness events to timeline
                       const fitnessEvents = [
                         { id: 'indy-half-2026', name: 'Indy Half Marathon', date: '2026-05-02', emoji: '🏃' },
-                        { id: 'triathlon-2026', name: 'Triathlon', date: '2026-09-20', emoji: '🏊' },
+                        { id: 'cary-10k-2026', name: 'Cary 10K', date: '2026-07-11', emoji: '🏃' },
+                        { id: 'gso-half-2026', name: 'Greensboro Half Marathon', date: '2026-11-21', emoji: '🏃' },
                       ];
                       fitnessEvents.forEach(event => {
                         const eventDate = parseLocalDate(event.date);
@@ -8450,7 +8716,8 @@ export default function TripPlanner() {
                     const completedFitnessEvents = [];
                     const fitnessEventsData = [
                       { id: 'indy-half-2026', name: 'Indy Half Marathon', date: '2026-05-02', location: 'Indianapolis, IN', emoji: '🏃' },
-                      { id: 'triathlon-2026', name: 'Triathlon', date: '2026-09-20', location: 'TBD', emoji: '🏊' },
+                      { id: 'cary-10k-2026', name: 'Cary 10K', date: '2026-07-11', location: 'Cary, NC', emoji: '🏃' },
+                      { id: 'gso-half-2026', name: 'Greensboro Half Marathon', date: '2026-11-21', location: 'Greensboro, NC', emoji: '🏃' },
                     ];
                     fitnessEventsData.forEach(event => {
                       const eventDate = parseLocalDate(event.date);
@@ -9518,7 +9785,8 @@ export default function TripPlanner() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
-                        const isMikeOnly = editingTrainingWeek.eventId === 'triathlon-2026';
+                        // Triathlon was removed; detect Mike-only plans by missing `adam` field on existing workouts.
+                        const isMikeOnly = editingTrainingWeek.runs?.[0] && !('adam' in editingTrainingWeek.runs[0]);
                         const newRun = {
                           id: Date.now(),
                           label: 'Run',
@@ -9542,7 +9810,8 @@ export default function TripPlanner() {
                     </button>
                     <button
                       onClick={() => {
-                        const isMikeOnly = editingTrainingWeek.eventId === 'triathlon-2026';
+                        // Triathlon was removed; detect Mike-only plans by missing `adam` field on existing workouts.
+                        const isMikeOnly = editingTrainingWeek.runs?.[0] && !('adam' in editingTrainingWeek.runs[0]);
                         const newSwim = {
                           id: Date.now(),
                           label: '🏊 Swim',
@@ -9566,7 +9835,8 @@ export default function TripPlanner() {
                     </button>
                     <button
                       onClick={() => {
-                        const isMikeOnly = editingTrainingWeek.eventId === 'triathlon-2026';
+                        // Triathlon was removed; detect Mike-only plans by missing `adam` field on existing workouts.
+                        const isMikeOnly = editingTrainingWeek.runs?.[0] && !('adam' in editingTrainingWeek.runs[0]);
                         const newBike = {
                           id: Date.now(),
                           label: 'Bike',

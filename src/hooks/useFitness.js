@@ -5,28 +5,20 @@ import { useState, useCallback } from 'react';
  * Manages all fitness-related state and operations
  * Handles events, training plans, and workouts
  *
- * NOTE: saveRef, genRef, triPlanRef, indyPlanRef are React ref objects
- * passed from the parent. We read .current at CALL TIME (not render time)
- * to always get the latest function/data, avoiding stale closure issues.
+ * NOTE: saveRef, genRef, indyPlanRef, cary10kPlanRef, gsoHalfPlanRef are React refs
+ * passed from the parent. We read .current at CALL TIME (not render time) to always
+ * get the latest function/data, avoiding stale closure issues.
+ *
+ * The triathlon was removed from mikeandadam (it was Mike-only) and lives in
+ * mikesfitness.app. Don't add a triPlanRef back here — keep this app couples-only.
  */
 
-export const useFitness = (saveRef, showToast, genRef, triPlanRef, indyPlanRef) => {
+export const useFitness = (saveRef, showToast, genRef, indyPlanRef, cary10kPlanRef, gsoHalfPlanRef) => {
   // ========== INITIAL DATA ==========
-  const defaultFitnessEvents = [
-    {
-      id: 'triathlon-2026',
-      name: 'Triathlon 2026',
-      emoji: '🏊',
-      type: 'triathlon',
-      date: '2026-06-15',
-      location: 'Greensboro, NC',
-      trainingWeeks: 16,
-      participants: ['Mike', 'Adam'],
-      url: 'https://www.ironman.com',
-      description: 'Full Ironman triathlon',
-      color: '#3b82f6',
-    },
-  ];
+  // Empty by default — defaults come from trip-planner.jsx defaultFitnessEvents and
+  // are merged via setFitnessEvents on first load. Keeping this empty avoids two
+  // sources of truth for the seed list.
+  const defaultFitnessEvents = [];
 
   // ========== STATE ==========
   const [fitnessEvents, setFitnessEvents] = useState(defaultFitnessEvents);
@@ -57,6 +49,27 @@ export const useFitness = (saveRef, showToast, genRef, triPlanRef, indyPlanRef) 
   }, [fitnessEvents, fitnessTrainingPlans, saveRef]);
 
   // ========== TRAINING PLAN OPERATIONS ==========
+  // Map event IDs → ref holding the hardcoded plan template. Adding a new race?
+  // Add the entry here and pass the ref through trip-planner.jsx → useFitness().
+  const planRefByEventId = {
+    'indy-half-2026': indyPlanRef,
+    'cary-10k-2026': cary10kPlanRef,
+    'gso-half-2026': gsoHalfPlanRef,
+  };
+
+  // Initialize a plan from its hardcoded template if Firestore doesn't have one yet.
+  // For events without a hardcoded template, fall back to the generic generator.
+  const lazyInitPlan = (eventId) => {
+    const ref = planRefByEventId[eventId];
+    if (ref?.current?.length) return JSON.parse(JSON.stringify(ref.current));
+    const event = fitnessEvents.find(e => e.id === eventId);
+    if (event) {
+      const today = new Date().toISOString().split('T')[0];
+      return genRef.current(today, event.date, eventId);
+    }
+    return null;
+  };
+
   const updateTrainingWeek = useCallback(async (eventId, weekId, updates) => {
     if (!eventId || !weekId) return;
 
@@ -67,21 +80,8 @@ export const useFitness = (saveRef, showToast, genRef, triPlanRef, indyPlanRef) 
     }
 
     const newPlans = { ...fitnessTrainingPlans };
-
-    // Initialize plan if it doesn't exist
     if (!newPlans[eventId]) {
-      if (eventId === 'triathlon-2026') {
-        newPlans[eventId] = JSON.parse(JSON.stringify(triPlanRef.current));
-      } else if (eventId === 'indy-half-2026') {
-        newPlans[eventId] = JSON.parse(JSON.stringify(indyPlanRef.current));
-      } else {
-        // Generate training weeks for other events
-        const event = fitnessEvents.find(e => e.id === eventId);
-        if (event) {
-          const today = new Date().toISOString().split('T')[0];
-          newPlans[eventId] = genRef.current(today, event.date, eventId);
-        }
-      }
+      newPlans[eventId] = lazyInitPlan(eventId);
     }
 
     if (!newPlans[eventId]) return;
@@ -99,22 +99,15 @@ export const useFitness = (saveRef, showToast, genRef, triPlanRef, indyPlanRef) 
 
     setFitnessTrainingPlans(newPlans);
     await saveRef.current(null, newPlans);
-  }, [fitnessEvents, fitnessTrainingPlans, saveRef, triPlanRef, indyPlanRef, genRef]);
+  }, [fitnessEvents, fitnessTrainingPlans, saveRef, indyPlanRef, cary10kPlanRef, gsoHalfPlanRef, genRef]);
 
   const updateWorkout = useCallback(async (eventId, weekId, workoutType, workoutId, updates) => {
     if (!eventId || !weekId) return;
 
     const newPlans = { ...fitnessTrainingPlans };
-
-    // Initialize plan if it doesn't exist
     if (!newPlans[eventId]) {
-      if (eventId === 'triathlon-2026') {
-        newPlans[eventId] = JSON.parse(JSON.stringify(triPlanRef.current));
-      } else if (eventId === 'indy-half-2026') {
-        newPlans[eventId] = JSON.parse(JSON.stringify(indyPlanRef.current));
-      } else {
-        return; // Can't update non-existent plan
-      }
+      newPlans[eventId] = lazyInitPlan(eventId);
+      if (!newPlans[eventId]) return; // Can't update non-existent plan
     }
 
     // Find week by id OR weekNumber (for backwards compatibility)
@@ -134,26 +127,14 @@ export const useFitness = (saveRef, showToast, genRef, triPlanRef, indyPlanRef) 
 
     setFitnessTrainingPlans(newPlans);
     await saveRef.current(null, newPlans);
-  }, [fitnessTrainingPlans, saveRef, triPlanRef, indyPlanRef]);
+  }, [fitnessTrainingPlans, saveRef, indyPlanRef, cary10kPlanRef, gsoHalfPlanRef]);
 
   const addWorkout = useCallback(async (eventId, weekId, workoutType, workoutData) => {
     if (!eventId || !weekId) return;
 
     const newPlans = { ...fitnessTrainingPlans };
-
-    // Initialize plan if it doesn't exist
     if (!newPlans[eventId]) {
-      if (eventId === 'triathlon-2026') {
-        newPlans[eventId] = JSON.parse(JSON.stringify(triPlanRef.current));
-      } else if (eventId === 'indy-half-2026') {
-        newPlans[eventId] = JSON.parse(JSON.stringify(indyPlanRef.current));
-      } else {
-        const event = fitnessEvents.find(e => e.id === eventId);
-        if (event) {
-          const today = new Date().toISOString().split('T')[0];
-          newPlans[eventId] = genRef.current(today, event.date, eventId);
-        }
-      }
+      newPlans[eventId] = lazyInitPlan(eventId);
     }
 
     if (!newPlans[eventId]) return;
@@ -174,7 +155,7 @@ export const useFitness = (saveRef, showToast, genRef, triPlanRef, indyPlanRef) 
 
     setFitnessTrainingPlans(newPlans);
     await saveRef.current(null, newPlans);
-  }, [fitnessEvents, fitnessTrainingPlans, saveRef, triPlanRef, indyPlanRef, genRef]);
+  }, [fitnessEvents, fitnessTrainingPlans, saveRef, indyPlanRef, cary10kPlanRef, gsoHalfPlanRef, genRef]);
 
   const deleteWorkout = useCallback(async (eventId, weekId, workoutType, workoutId) => {
     if (!eventId || !weekId) return;
