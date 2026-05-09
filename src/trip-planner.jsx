@@ -1350,6 +1350,7 @@ export default function TripPlanner() {
       location: 'Indianapolis, IN',
       color: 'from-orange-400 to-red-500',
       status: 'completed',
+      finishTime: '2:22',
     },
     {
       id: 'cary-10k-2026',
@@ -2375,6 +2376,7 @@ export default function TripPlanner() {
                 location: d.location ?? e.location,
                 color: d.color ?? e.color,
                 type: d.type ?? e.type,
+                finishTime: d.finishTime ?? e.finishTime,
               };
             });
             const persistedIds = new Set(patched.map(e => e.id));
@@ -6505,6 +6507,14 @@ export default function TripPlanner() {
                               {allPhotos.length > 5 && (
                                 <div className="w-14 h-14 rounded-lg bg-white/20 flex items-center justify-center text-white text-xs flex-shrink-0">+{allPhotos.length - 5}</div>
                               )}
+                            </div>
+                          )}
+
+                          {/* Finish time hero (only for races with a recorded time) */}
+                          {event.finishTime && (
+                            <div className="mt-3 bg-white/15 backdrop-blur-sm rounded-xl p-3 text-center">
+                              <div className="text-[10px] text-white/70 uppercase tracking-widest font-semibold">Finish Time</div>
+                              <div className="text-3xl font-bold text-white tracking-tight">{event.finishTime}</div>
                             </div>
                           )}
 
