@@ -5369,18 +5369,22 @@ export default function TripPlanner() {
           {/* ========== FITNESS SECTION ========== */}
           {activeSection === 'fitness' && (
             <div>
-              {/* Fitness View Mode Toggle (left padding for FAB on mobile) */}
+              {/* Fitness View Mode Toggle (left padding for FAB on mobile)
+                   The 'training' viewMode is still active when an event card is clicked,
+                   but no longer has its own button — it was a useless empty placeholder
+                   without an event selected. Tab bar now: Active Races · Stats · Past Races. */}
               <div className="flex gap-1.5 md:gap-2 mb-4 items-center justify-start sticky top-0 z-20 bg-slate-800/95 backdrop-blur-md py-3 -mx-6 px-6">
                 {[
-                  { id: 'events', emoji: '🎯' },
-                  { id: 'training', emoji: '📋' },
-                  { id: 'stats', emoji: '📊' },
+                  { id: 'events',     emoji: '🎯', label: 'Active Races' },
+                  { id: 'stats',      emoji: '📊', label: 'Stats' },
+                  { id: 'past-races', emoji: '🏆', label: 'Past Races' },
                 ].map(mode => (
                   <button
                     key={mode.id}
                     onClick={() => setFitnessViewMode(mode.id)}
+                    title={mode.label}
                     className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-xl font-medium transition text-base md:text-lg text-center ${
-                      fitnessViewMode === mode.id
+                      fitnessViewMode === mode.id || (mode.id === 'events' && fitnessViewMode === 'training')
                         ? 'bg-orange-500 text-white shadow-lg'
                         : 'bg-white/10 text-slate-300 hover:bg-white/20'
                     }`}
@@ -5393,7 +5397,7 @@ export default function TripPlanner() {
               {/* Events View */}
               {fitnessViewMode === 'events' && (
                 <div className="grid md:grid-cols-2 gap-6">
-                  {fitnessEvents.map(event => {
+                  {fitnessEvents.filter(e => e.status !== 'completed').map(event => {
                     const eventDate = parseLocalDate(event.date);
                     const today = new Date();
                     const daysUntil = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
@@ -6413,6 +6417,107 @@ export default function TripPlanner() {
                   </div>
                 </div>
               )}
+
+              {/* Past Races View — memorial cards for completed events */}
+              {fitnessViewMode === 'past-races' && (() => {
+                const pastEvents = fitnessEvents
+                  .filter(e => e.status === 'completed')
+                  .sort((a, b) => b.date.localeCompare(a.date)); // most recent first
+
+                if (pastEvents.length === 0) {
+                  return (
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-3">🏆</div>
+                      <p className="text-white/70">No past races yet — finish one and the memorial lives here forever.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {pastEvents.map(event => {
+                      const plan = getActiveTrainingPlan(event.id);
+                      const isMikeOnlyPlan = plan[0]?.runs?.[0] && !('adam' in plan[0].runs[0]);
+                      const isAdamOnlyPlan = plan[0]?.runs?.[0] && !('mike' in plan[0].runs[0]);
+                      const completedWorkouts = plan.reduce((acc, week) => {
+                        let runsDone, crossDone;
+                        if (isMikeOnlyPlan) {
+                          runsDone = week.runs?.filter(r => r.mike).length || 0;
+                          crossDone = week.crossTraining?.filter(c => c.mike).length || 0;
+                        } else if (isAdamOnlyPlan) {
+                          runsDone = week.runs?.filter(r => r.adam).length || 0;
+                          crossDone = week.crossTraining?.filter(c => c.adam).length || 0;
+                        } else {
+                          runsDone = week.runs?.filter(r => r.mike && r.adam).length || 0;
+                          crossDone = week.crossTraining?.filter(c => c.mike && c.adam).length || 0;
+                        }
+                        return acc + runsDone + crossDone;
+                      }, 0);
+                      const totalWorkouts = plan.reduce((acc, week) => acc + (week.runs?.length || 0) + (week.crossTraining?.length || 0), 0);
+                      const totalMiles = plan.reduce((acc, week) => acc + (week.totalMiles || 0), 0);
+                      // Photos persist on the week object (Storage URLs); collect any for hero display
+                      const allPhotos = plan.flatMap(week => week.photos || []);
+
+                      return (
+                        <div
+                          key={event.id}
+                          onClick={() => { setSelectedFitnessEvent(event); setFitnessViewMode('training'); }}
+                          className={`bg-gradient-to-br ${event.color} rounded-3xl p-6 shadow-xl relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform`}
+                        >
+                          {/* Trophy badge */}
+                          <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
+                            <span className="text-lg">🏆</span>
+                            <span className="text-white text-xs font-semibold">Completed</span>
+                          </div>
+
+                          <div className="flex items-start gap-3 mb-2">
+                            <span className="text-4xl">{event.emoji}</span>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-2xl font-bold text-white">{event.name}</h3>
+                              <p className="text-white/80 text-sm">
+                                {parseLocalDate(event.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                              </p>
+                              {event.location && <p className="text-white/70 text-xs">📍 {event.location}</p>}
+                            </div>
+                          </div>
+
+                          {/* Photo strip if any */}
+                          {allPhotos.length > 0 && (
+                            <div className="flex gap-1.5 mt-3 overflow-x-auto">
+                              {allPhotos.slice(0, 5).map((p, i) => (
+                                <img key={i} src={p.url || p} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0 ring-2 ring-white/30" />
+                              ))}
+                              {allPhotos.length > 5 && (
+                                <div className="w-14 h-14 rounded-lg bg-white/20 flex items-center justify-center text-white text-xs flex-shrink-0">+{allPhotos.length - 5}</div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Memorial stats */}
+                          <div className="grid grid-cols-3 gap-2 mt-4 bg-black/20 rounded-xl p-3">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-white">{plan.length}</div>
+                              <div className="text-[10px] text-white/70 uppercase tracking-wide">weeks</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-white">{completedWorkouts}<span className="text-sm text-white/60">/{totalWorkouts}</span></div>
+                              <div className="text-[10px] text-white/70 uppercase tracking-wide">workouts</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-white">{totalMiles}</div>
+                              <div className="text-[10px] text-white/70 uppercase tracking-wide">miles</div>
+                            </div>
+                          </div>
+
+                          <div className="text-white/80 text-xs mt-3 group-hover:text-white transition-colors">
+                            Tap to relive the training journey →
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
               {/* Love Note for Fitness */}
               <div className="text-center mt-12">
