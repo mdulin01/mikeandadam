@@ -2364,7 +2364,9 @@ export default function TripPlanner() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data.events) {
-            const filtered = data.events.filter(e => e.id !== 'triathlon-2026');
+            // Strip the legacy triathlon-2026 AND any Mike-only events seeded by
+            // mikesfitness (owner: 'mike') — those don't belong in the couples app.
+            const filtered = data.events.filter(e => e.id !== 'triathlon-2026' && e.owner !== 'mike');
             const defaultsById = new Map(defaultFitnessEvents.map(e => [e.id, e]));
             // Patch persisted events with current defaults for status/location (defaults win).
             const patched = filtered.map(e => {
@@ -5538,9 +5540,9 @@ export default function TripPlanner() {
               {/* Training Plan View */}
               {fitnessViewMode === 'training' && (
                 <div>
-                  {/* Event Selector */}
+                  {/* Event Selector — only active races (completed ones live on the Past Races tab) */}
                   <div className="flex gap-2 mb-6 flex-wrap items-center">
-                    {fitnessEvents.map(event => (
+                    {fitnessEvents.filter(e => e.status !== 'completed').map(event => (
                       <div key={event.id} className="relative group">
                         <button
                           onClick={() => {
@@ -6324,7 +6326,7 @@ export default function TripPlanner() {
                     <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                       <span>🔥</span> Mike's Training Consistency
                     </h3>
-                    {fitnessEvents.map(event => {
+                    {fitnessEvents.filter(e => e.status !== 'completed').map(event => {
                       const plan = getActiveTrainingPlan(event.id);
                       return (
                         <div key={event.id} className="mb-4">
