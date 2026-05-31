@@ -95,6 +95,7 @@ export default function GuestEventPage() {
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPhone, setSignupPhone] = useState('');
+  const [signupPlusOne, setSignupPlusOne] = useState(0);
   const [signingUp, setSigningUp] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
@@ -180,7 +181,7 @@ export default function GuestEventPage() {
         token: newToken,
         rsvp: 'going',
         rsvpAt: new Date().toISOString(),
-        plusOne: 0,
+        plusOne: signupPlusOne,
         note: '',
         permission: 'view',
         addedBy: 'self',
@@ -200,7 +201,7 @@ export default function GuestEventPage() {
       setSearchParams({ t: newToken }, { replace: true });
       setCurrentGuest(newGuest);
       setPendingRsvp('going');
-      setPendingPlusOne(0);
+      setPendingPlusOne(signupPlusOne);
       setPendingNote('');
     } catch (err) {
       console.error('Self-signup failed:', err);
@@ -566,14 +567,33 @@ export default function GuestEventPage() {
         @import url('https://fonts.googleapis.com/css2?family=Bungee&family=Pacifico&display=swap');
         .ggp-display{font-family:'Bungee',system-ui,sans-serif;letter-spacing:.5px;line-height:1.02;}
         .ggp-script{font-family:'Pacifico',cursive;}
-        .ggp-sunburst::before{content:"";position:absolute;inset:-30% -20%;
-          background:repeating-conic-gradient(from 0deg at 50% 35%, rgba(255,255,255,.14) 0deg 9deg, transparent 9deg 18deg);
-          pointer-events:none;}
-        .ggp-stripe{height:10px;display:flex;width:100%;}
-        .ggp-stripe span{flex:1;}
+        /* Animated rainbow wash for the hero */
+        .ggp-rainbow{
+          background:linear-gradient(120deg,#ff3b3b,#ff8a00,#ffd000,#1fbf5f,#1f8fff,#a64bf4,#ff3b3b);
+          background-size:300% 300%;
+          animation:ggp-rainbow 12s ease infinite;
+        }
+        @keyframes ggp-rainbow{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+        /* Slowly rotating sunburst rays */
+        .ggp-sunburst::before{content:"";position:absolute;inset:-60% -40%;
+          background:repeating-conic-gradient(from 0deg at 50% 45%, rgba(255,255,255,.16) 0deg 9deg, transparent 9deg 18deg);
+          pointer-events:none;animation:ggp-spin 60s linear infinite;transform-origin:50% 45%;}
+        @keyframes ggp-spin{to{transform:rotate(360deg)}}
+        /* Floating emoji */
+        .ggp-float{animation:ggp-float 3.5s ease-in-out infinite;}
+        @keyframes ggp-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        /* Animated rainbow accent stripe */
+        .ggp-animbar{
+          background:linear-gradient(90deg,#ff3b3b,#ff8a00,#ffd000,#1fbf5f,#1f8fff,#a64bf4,#ff3b3b);
+          background-size:200% 100%;animation:ggp-slide 6s linear infinite;
+        }
+        @keyframes ggp-slide{to{background-position:-200% 0}}
+        @media (prefers-reduced-motion: reduce){
+          .ggp-rainbow,.ggp-sunburst::before,.ggp-float,.ggp-animbar{animation:none!important;}
+        }
       `}</style>
-      {/* Rainbow accent bar */}
-      <div className="h-1 bg-gradient-to-r from-red-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500 w-full" />
+      {/* Rainbow accent bar (animated) */}
+      <div className="ggp-animbar h-1.5 w-full" />
 
       {/* Confetti overlay */}
       {showConfetti && (
@@ -610,21 +630,32 @@ export default function GuestEventPage() {
           </div>
         ) : (
           <div
-            className={`ggp-sunburst h-64 md:h-80 bg-gradient-to-br ${
-              event.color || 'from-purple-500 to-pink-500'
-            } relative overflow-hidden`}
+            className={`ggp-sunburst h-72 md:h-96 relative overflow-hidden ${
+              event.eventType === 'pride'
+                ? 'ggp-rainbow'
+                : `bg-gradient-to-br ${event.color || 'from-purple-500 to-pink-500'}`
+            }`}
           >
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-slate-900" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-slate-900" />
+          </div>
+        )}
+
+        {/* Floating rainbow emoji */}
+        {!event.coverImage && (
+          <div className="absolute inset-x-0 top-4 flex justify-center gap-4 md:gap-7 text-2xl md:text-4xl pointer-events-none">
+            {['🏳️‍🌈', '✨', '🌈', '💖', '🎉'].map((e, i) => (
+              <span key={i} className="ggp-float drop-shadow-lg" style={{ animationDelay: `${i * 0.35}s` }}>{e}</span>
+            ))}
           </div>
         )}
 
         {/* Event emoji and name overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
-          <div className="text-6xl md:text-8xl mb-3 drop-shadow-lg">{event.emoji || '🎉'}</div>
-          <h1 className="ggp-display text-3xl md:text-5xl text-center mb-2" style={{ textShadow: '2px 2px 0 rgba(0,0,0,.35)' }}>
+          <div className="ggp-float text-6xl md:text-8xl mb-3 drop-shadow-lg">{event.emoji || '🎉'}</div>
+          <h1 className="ggp-display text-3xl md:text-5xl text-center mb-2" style={{ textShadow: '2px 2px 0 rgba(0,0,0,.45)' }}>
             {event.name}
           </h1>
-          <p className="ggp-script text-white/90 text-lg md:text-2xl" style={{ textShadow: '1px 1px 0 rgba(0,0,0,.35)' }}>
+          <p className="ggp-script text-white text-lg md:text-2xl" style={{ textShadow: '1px 1px 0 rgba(0,0,0,.45)' }}>
             Hosted by Mike &amp; Adam 💕
           </p>
         </div>
@@ -635,9 +666,10 @@ export default function GuestEventPage() {
         {/* Public self-signup (shown when the visitor hasn't joined yet) */}
         {!currentGuest && (
           <div className="mt-8 mb-8 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-6 md:p-8">
-            <h2 className="text-2xl md:text-3xl font-bold mb-2">You're invited! 🎉</h2>
+            <h2 className="ggp-display text-2xl md:text-3xl mb-2">You're invited! 🎉</h2>
             <p className="text-white/70 mb-6">
-              Add your name to RSVP, see who else is coming, and offer to bring something.
+              Add your name to RSVP and see who else is coming. Bring something along if you like,
+              and add a plus-one if you're bringing a date.
             </p>
             <div className="space-y-3 mb-4">
               <input
@@ -661,6 +693,23 @@ export default function GuestEventPage() {
                 placeholder="Phone (optional)"
                 className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
+              {/* Plus-one (bringing a date) */}
+              <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3">
+                <span className="text-sm text-white/80">Bringing a date? Add a plus-one</span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSignupPlusOne((n) => Math.max(0, n - 1))}
+                    className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+                  >−</button>
+                  <span className="text-lg font-bold min-w-8 text-center">{signupPlusOne}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSignupPlusOne((n) => Math.min(2, n + 1))}
+                    className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+                  >+</button>
+                </div>
+              </div>
             </div>
             <button
               onClick={handleSelfSignup}
@@ -730,7 +779,7 @@ export default function GuestEventPage() {
           {/* Plus one counter */}
           {pendingRsvp === 'going' && (
             <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
-              <p className="text-sm text-white/70 mb-3">Bringing anyone with you?</p>
+              <p className="text-sm text-white/70 mb-3">Bringing a date? Add a plus-one</p>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setPendingPlusOne(Math.max(0, pendingPlusOne - 1))}
