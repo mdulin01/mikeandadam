@@ -44,6 +44,27 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
+// Turn any URLs inside free text into clickable links.
+const linkifyText = (text) => {
+  if (!text) return null;
+  const parts = String(text).split(/(https?:\/\/[^\s]+)/g);
+  return parts.map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-purple-300 underline decoration-purple-400/50 hover:text-purple-200 break-words"
+      >
+        {part.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+};
+
 // Generate a unique guest token (mirrors the host app's generator)
 const generateGuestToken = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -539,7 +560,18 @@ export default function GuestEventPage() {
     event.guests?.filter((g) => g.rsvp === 'pending').length || 0;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white overflow-x-hidden">
+    <div className="ggp min-h-screen bg-slate-900 text-white overflow-x-hidden">
+      {/* Scoped retro-Pride styling (matches the printable flier) */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bungee&family=Pacifico&display=swap');
+        .ggp-display{font-family:'Bungee',system-ui,sans-serif;letter-spacing:.5px;line-height:1.02;}
+        .ggp-script{font-family:'Pacifico',cursive;}
+        .ggp-sunburst::before{content:"";position:absolute;inset:-30% -20%;
+          background:repeating-conic-gradient(from 0deg at 50% 35%, rgba(255,255,255,.14) 0deg 9deg, transparent 9deg 18deg);
+          pointer-events:none;}
+        .ggp-stripe{height:10px;display:flex;width:100%;}
+        .ggp-stripe span{flex:1;}
+      `}</style>
       {/* Rainbow accent bar */}
       <div className="h-1 bg-gradient-to-r from-red-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500 w-full" />
 
@@ -578,9 +610,9 @@ export default function GuestEventPage() {
           </div>
         ) : (
           <div
-            className={`h-64 md:h-80 bg-gradient-to-br ${
+            className={`ggp-sunburst h-64 md:h-80 bg-gradient-to-br ${
               event.color || 'from-purple-500 to-pink-500'
-            } relative`}
+            } relative overflow-hidden`}
           >
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-slate-900" />
           </div>
@@ -588,12 +620,12 @@ export default function GuestEventPage() {
 
         {/* Event emoji and name overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
-          <div className="text-6xl md:text-8xl mb-4">{event.emoji || '🎉'}</div>
-          <h1 className="text-3xl md:text-5xl font-bold text-center mb-2">
+          <div className="text-6xl md:text-8xl mb-3 drop-shadow-lg">{event.emoji || '🎉'}</div>
+          <h1 className="ggp-display text-3xl md:text-5xl text-center mb-2" style={{ textShadow: '2px 2px 0 rgba(0,0,0,.35)' }}>
             {event.name}
           </h1>
-          <p className="text-white/80 text-sm md:text-base">
-            Hosted by Mike & Adam 💕
+          <p className="ggp-script text-white/90 text-lg md:text-2xl" style={{ textShadow: '1px 1px 0 rgba(0,0,0,.35)' }}>
+            Hosted by Mike &amp; Adam 💕
           </p>
         </div>
       </div>
@@ -764,10 +796,15 @@ export default function GuestEventPage() {
 
         {/* Event Details */}
         <div className="space-y-4 mb-8">
-          {/* Date & Time */}
-          <div className="rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-4 md:p-6 flex gap-4">
+          {/* Date & Time — tap to add to your calendar */}
+          <a
+            href={generateCalendarLink()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-4 md:p-6 flex gap-4 hover:bg-white/15 transition-colors group"
+          >
             <Calendar className="w-6 h-6 text-purple-400 flex-shrink-0 mt-1" />
-            <div>
+            <div className="flex-1">
               <p className="text-white/70 text-sm mb-1">Date & Time</p>
               <p className="text-white font-semibold">
                 {formatDate(event.date)}
@@ -775,26 +812,41 @@ export default function GuestEventPage() {
               <p className="text-white/80">
                 {formatTime(event.time)} — {formatTime(event.endTime)}
               </p>
+              <p className="text-purple-300 text-xs mt-2 group-hover:text-purple-200">📅 Tap to add to your calendar →</p>
             </div>
-          </div>
+          </a>
 
-          {/* Location */}
-          <div className="rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-4 md:p-6 flex gap-4">
+          {/* Location — tap to open in Maps */}
+          <a
+            href={`https://www.google.com/maps/search/${encodeURIComponent(event.location)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-4 md:p-6 flex gap-4 hover:bg-white/15 transition-colors group"
+          >
             <MapPin className="w-6 h-6 text-pink-400 flex-shrink-0 mt-1" />
-            <div>
+            <div className="flex-1">
               <p className="text-white/70 text-sm mb-1">Location</p>
-              <a
-                href={`https://www.google.com/maps/search/${encodeURIComponent(
-                  event.location
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-white font-semibold hover:text-purple-400 transition-colors"
-              >
-                {event.location}
-              </a>
+              <p className="text-white font-semibold">{event.location}</p>
+              <p className="text-pink-300 text-xs mt-2 group-hover:text-pink-200">📍 Tap for directions →</p>
             </div>
-          </div>
+          </a>
+
+          {/* Tickets / external link (e.g. The Pyrle) */}
+          {event.ticketUrl && (
+            <a
+              href={event.ticketUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-4 md:p-6 flex gap-4 hover:bg-white/15 transition-colors group"
+            >
+              <span className="text-2xl flex-shrink-0">🎟️</span>
+              <div className="flex-1">
+                <p className="text-white/70 text-sm mb-1">Tickets</p>
+                <p className="text-white font-semibold">{event.ticketLabel || 'Get tickets'}</p>
+                <p className="text-yellow-300 text-xs mt-2 group-hover:text-yellow-200">Tap to buy →</p>
+              </div>
+            </a>
+          )}
 
           {/* Entry Code */}
           {event.entryCode && (
@@ -817,7 +869,7 @@ export default function GuestEventPage() {
           {event.description && (
             <div className="rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-4 md:p-6">
               <p className="text-white/70 text-sm mb-2">About This Event</p>
-              <p className="text-white/90 leading-relaxed">{event.description}</p>
+              <p className="text-white/90 leading-relaxed whitespace-pre-line">{linkifyText(event.description)}</p>
             </div>
           )}
 
@@ -1096,6 +1148,17 @@ export default function GuestEventPage() {
           </div>
         </div>
         )}
+
+        {/* Questions? Text the hosts */}
+        <div className="mb-4 rounded-2xl bg-gradient-to-br from-purple-500/15 to-pink-500/15 border border-purple-400/30 p-6 text-center">
+          <p className="ggp-display text-base text-white mb-2">Questions?</p>
+          <p className="text-white/80">
+            Text us at{' '}
+            <a href="sms:+17046412157" className="text-purple-300 font-semibold hover:text-purple-200 whitespace-nowrap">704-641-2157 (Mike)</a>
+            {' '}or{' '}
+            <a href="sms:+12489745944" className="text-pink-300 font-semibold hover:text-pink-200 whitespace-nowrap">248-974-5944 (Adam)</a>
+          </p>
+        </div>
       </div>
 
       {/* Photo Lightbox */}
