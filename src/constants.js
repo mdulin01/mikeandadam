@@ -108,6 +108,7 @@ export const achievementDefinitions = [
 
 export const eventCategories = {
   'Party': ['🎉', '🥳', '🎊', '🪩', '🎈'],
+  'Pride': ['🏳️‍🌈', '🏳️‍⚧️', '🦄', '🌈', '✨', '💖', '💜', '💙', '🎀'],
   'Food': ['🍖', '🍕', '🍽️', '🥘', '🍰', '🧁', '🍷', '🍸', '🥂'],
   'Celebration': ['🎂', '🎁', '💍', '👶', '🎓', '🏆'],
   'Social': ['👥', '🏠', '🎬', '🎮', '🎤', '🎭'],
