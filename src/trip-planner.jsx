@@ -7593,7 +7593,7 @@ export default function TripPlanner() {
                           <option value="Mike">Mike</option>
                           <option value="Adam">Adam</option>
                           {(selectedPartyEvent.guests || []).map(g => (
-                            <option key={g.id} value={g.email}>{g.email.split('@')[0]}</option>
+                            <option key={g.id} value={g.email || g.name || g.id}>{g.name || g.email?.split('@')[0] || 'Guest'}</option>
                           ))}
                         </select>
                         <button
