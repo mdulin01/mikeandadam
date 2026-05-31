@@ -114,7 +114,8 @@ export default function GuestEventPage() {
         if (!guest) {
           // No matching guest. If the event is open to the public, let them
           // add themselves; otherwise it's an invite-only link they can't use.
-          if (eventData.isPublic) {
+          // Public by default — only an explicit isPublic === false is invite-only.
+          if (eventData.isPublic !== false) {
             setCurrentGuest(null);
             setError(null);
           } else {
@@ -169,7 +170,7 @@ export default function GuestEventPage() {
         const snap = await tx.get(eventRef);
         if (!snap.exists()) throw new Error('Event not found');
         const data = snap.data();
-        if (!data.isPublic) throw new Error('This event is not open for public RSVPs.');
+        if (data.isPublic === false) throw new Error('This event is not open for public RSVPs.');
         const existing = data.guests || [];
         tx.set(eventRef, { guests: [...existing, newGuest] }, { merge: true });
       });
