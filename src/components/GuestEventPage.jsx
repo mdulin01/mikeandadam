@@ -527,7 +527,9 @@ export default function GuestEventPage() {
     );
   }
 
-  if (!event || !currentGuest) {
+  // Note: currentGuest may be null for a public visitor who hasn't joined yet —
+  // the main view shows them the self-signup card, so only require the event.
+  if (!event) {
     return null;
   }
 
