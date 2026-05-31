@@ -27,6 +27,7 @@ import {
   getDoc,
   setDoc,
   onSnapshot,
+  runTransaction,
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -43,16 +44,37 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
+// Generate a unique guest token (mirrors the host app's generator)
+const generateGuestToken = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let token = '';
+  for (let i = 0; i < 12; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+};
+
 export default function GuestEventPage() {
   const { eventId } = useParams();
-  const [searchParams] = useSearchParams();
-  const guestToken = searchParams.get('t');
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Effective token: from the URL (?t=) or, for public events, a token this
+  // device saved when the guest added themselves via the shared link.
+  const savedToken =
+    typeof window !== 'undefined'
+      ? window.localStorage.getItem(`event_token_${eventId}`)
+      : null;
+  const guestToken = searchParams.get('t') || savedToken;
 
   // State
   const [event, setEvent] = useState(null);
   const [currentGuest, setCurrentGuest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Public self-signup
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPhone, setSignupPhone] = useState('');
+  const [signingUp, setSigningUp] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(null);
@@ -66,7 +88,7 @@ export default function GuestEventPage() {
 
   // Fetch event data
   useEffect(() => {
-    if (!eventId || !guestToken) {
+    if (!eventId) {
       setError('Invalid invitation link');
       setLoading(false);
       return;
@@ -84,10 +106,20 @@ export default function GuestEventPage() {
         const eventData = snapshot.data();
         setEvent(eventData);
 
-        // Find current guest
-        const guest = eventData.guests?.find((g) => g.token === guestToken);
+        // Find current guest by token (from URL or saved on this device)
+        const guest = guestToken
+          ? eventData.guests?.find((g) => g.token === guestToken)
+          : null;
+
         if (!guest) {
-          setError('This invitation link is invalid. Ask the host for a new one.');
+          // No matching guest. If the event is open to the public, let them
+          // add themselves; otherwise it's an invite-only link they can't use.
+          if (eventData.isPublic) {
+            setCurrentGuest(null);
+            setError(null);
+          } else {
+            setError('This invitation link is invalid. Ask the host for a new one.');
+          }
           setLoading(false);
           return;
         }
@@ -109,6 +141,52 @@ export default function GuestEventPage() {
 
     return () => unsubscribe();
   }, [eventId, guestToken]);
+
+  // Public self-signup: anyone with the shared link can add themselves.
+  const handleSelfSignup = async () => {
+    const name = signupName.trim();
+    if (!eventId || !name) return;
+    setSigningUp(true);
+    try {
+      const eventRef = doc(db, 'events', eventId);
+      const newToken = generateGuestToken();
+      const newGuest = {
+        id: `guest-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        email: signupEmail.trim() || null,
+        phone: signupPhone.trim() || null,
+        token: newToken,
+        rsvp: 'going',
+        rsvpAt: new Date().toISOString(),
+        plusOne: 0,
+        note: '',
+        permission: 'view',
+        addedBy: 'self',
+        addedAt: new Date().toISOString(),
+      };
+      // Transaction so concurrent signups don't overwrite each other.
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(eventRef);
+        if (!snap.exists()) throw new Error('Event not found');
+        const data = snap.data();
+        if (!data.isPublic) throw new Error('This event is not open for public RSVPs.');
+        const existing = data.guests || [];
+        tx.set(eventRef, { guests: [...existing, newGuest] }, { merge: true });
+      });
+      // Remember this guest on the device and put the token in the URL.
+      window.localStorage.setItem(`event_token_${eventId}`, newToken);
+      setSearchParams({ t: newToken }, { replace: true });
+      setCurrentGuest(newGuest);
+      setPendingRsvp('going');
+      setPendingPlusOne(0);
+      setPendingNote('');
+    } catch (err) {
+      console.error('Self-signup failed:', err);
+      setError(err.message || 'Could not add you to this event. Please try again.');
+    } finally {
+      setSigningUp(false);
+    }
+  };
 
   // Update guest RSVP
   const handleRSVP = async (rsvpStatus, plusOne = currentGuest?.plusOne || 0) => {
@@ -519,7 +597,58 @@ export default function GuestEventPage() {
 
       {/* Main content */}
       <div className="px-4 md:px-0 md:max-w-2xl md:mx-auto pb-12">
+        {/* Public self-signup (shown when the visitor hasn't joined yet) */}
+        {!currentGuest && (
+          <div className="mt-8 mb-8 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-6 md:p-8">
+            <h2 className="text-2xl md:text-3xl font-bold mb-2">You're invited! 🎉</h2>
+            <p className="text-white/70 mb-6">
+              Add your name to RSVP, see who else is coming, and offer to bring something.
+            </p>
+            <div className="space-y-3 mb-4">
+              <input
+                type="text"
+                value={signupName}
+                onChange={(e) => setSignupName(e.target.value)}
+                placeholder="Your name *"
+                className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <input
+                type="email"
+                value={signupEmail}
+                onChange={(e) => setSignupEmail(e.target.value)}
+                placeholder="Email (optional)"
+                className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <input
+                type="tel"
+                value={signupPhone}
+                onChange={(e) => setSignupPhone(e.target.value)}
+                placeholder="Phone (optional)"
+                className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+            <button
+              onClick={handleSelfSignup}
+              disabled={!signupName.trim() || signingUp}
+              className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 ${
+                !signupName.trim() || signingUp
+                  ? 'bg-white/10 text-white/40 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white shadow-lg hover:shadow-xl hover:scale-[1.02]'
+              }`}
+            >
+              {signingUp ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader className="w-5 h-5 animate-spin" /> Joining...
+                </span>
+              ) : (
+                "Count me in! ✨"
+              )}
+            </button>
+          </div>
+        )}
+
         {/* RSVP Section */}
+        {currentGuest && (
         <div className="mt-8 mb-8 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-6 md:p-8">
           <h2 className="text-2xl md:text-3xl font-bold mb-2">
             Hey {currentGuest.name}! 👋
@@ -628,6 +757,7 @@ export default function GuestEventPage() {
             )}
           </button>
         </div>
+        )}
 
         {/* Event Details */}
         <div className="space-y-4 mb-8">
@@ -807,7 +937,7 @@ export default function GuestEventPage() {
         </div>
 
         {/* Collaborative Lists */}
-        {event.lists && event.lists.length > 0 && (
+        {currentGuest && event.lists && event.lists.length > 0 && (
           <div className="mb-8 space-y-6">
             {event.lists.map((list) => (
               <div
@@ -903,6 +1033,7 @@ export default function GuestEventPage() {
         )}
 
         {/* Photo Gallery */}
+        {currentGuest && (
         <div className="mb-8 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-6 md:p-8">
           <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
             <Camera className="w-6 h-6 text-orange-400" />
@@ -961,6 +1092,7 @@ export default function GuestEventPage() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Photo Lightbox */}

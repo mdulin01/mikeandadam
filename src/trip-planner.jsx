@@ -2444,6 +2444,35 @@ export default function TripPlanner() {
     };
   }, [user]);
 
+  // Live guest sync: subscribe to each event's own /events/{id} doc so the host
+  // sees RSVPs and public self-signups in real time. Guests can only write to
+  // these per-event docs (not tripData), so this is the source of truth for the
+  // guest list. We merge the fresh guest array back into local state for display.
+  const partyEventIdsKey = partyEvents.map((e) => e.id).join(',');
+  useEffect(() => {
+    if (!user) return;
+    const ids = partyEventIdsKey ? partyEventIdsKey.split(',') : [];
+    if (ids.length === 0) return;
+
+    const unsubs = ids.map((id) =>
+      onSnapshot(doc(db, 'events', String(id)), (snap) => {
+        if (!snap.exists()) return;
+        const remote = snap.data();
+        const remoteGuests = remote.guests || [];
+        const mergeGuests = (ev) => {
+          if (ev.id !== id) return ev;
+          // Skip if unchanged to avoid needless re-renders.
+          if (JSON.stringify(ev.guests || []) === JSON.stringify(remoteGuests)) return ev;
+          return { ...ev, guests: remoteGuests };
+        };
+        setPartyEvents((prev) => prev.map(mergeGuests));
+        setSelectedPartyEvent((prev) => (prev && prev.id === id ? mergeGuests(prev) : prev));
+      }, (err) => console.error('Event guest sync error:', err))
+    );
+
+    return () => unsubs.forEach((u) => u());
+  }, [user, partyEventIdsKey]);
+
   // Deep link handler — auto-open a Hub item when ?hub=type&id=itemId is in URL
   useEffect(() => {
     if (!pendingDeepLink || !hubDataLoadedRef.current) return;
@@ -2735,6 +2764,7 @@ export default function TripPlanner() {
         tasks: [],
         photos: [],
         coverImage: '',
+        isPublic: true,
       };
       setPartyEvents(prev => [...prev, newEvent]);
       savePartyEventsToFirestore([...partyEvents, newEvent]);
@@ -10758,6 +10788,72 @@ export default function TripPlanner() {
             </div>
 
             <div className="p-6 space-y-4">
+              {/* Open RSVP / Public Share Link */}
+              {(() => {
+                const isPublic = showInviteModal.isPublic !== false;
+                const publicLink = `${window.location.origin}/event/${showInviteModal.id}`;
+                const formattedDate = showInviteModal.date ? new Date(showInviteModal.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'TBD';
+                const formattedTime = showInviteModal.time ? (() => { const [h,m] = showInviteModal.time.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; })() : '';
+                const publicMessage = `🏳️‍🌈✨ You're Invited! ✨🏳️‍🌈\n\n🎉 ${showInviteModal.name}\n📅 ${formattedDate}${formattedTime ? ` at ${formattedTime}` : ''}\n📍 ${showInviteModal.location || 'TBD'}\n\n${showInviteModal.description || ''}\n\nTap to RSVP & see who's coming:\n${publicLink}\n\nHosted with love by Mike & Adam 💕`;
+                const togglePublic = () => {
+                  const next = !isPublic;
+                  const newEvents = partyEvents.map(ev =>
+                    ev.id === showInviteModal.id ? { ...ev, isPublic: next } : ev
+                  );
+                  setPartyEvents(newEvents);
+                  const updated = newEvents.find(e => e.id === showInviteModal.id);
+                  setShowInviteModal(updated);
+                  if (selectedPartyEvent?.id === showInviteModal.id) setSelectedPartyEvent(updated);
+                  savePartyEventsToFirestore(newEvents);
+                  showToast(next ? 'Open RSVP on — anyone with the link can join' : 'Open RSVP off — invite-only', 'success');
+                };
+                return (
+                  <div className="bg-gradient-to-br from-purple-500/15 to-pink-500/15 border border-purple-400/30 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-white font-semibold text-sm flex items-center gap-1.5">🔗 Shareable Link</h3>
+                        <p className="text-slate-400 text-xs mt-0.5">Anyone with the link can add themselves & RSVP</p>
+                      </div>
+                      <button
+                        onClick={togglePublic}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${isPublic ? 'bg-green-500' : 'bg-slate-600'}`}
+                        aria-label="Toggle open RSVP"
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isPublic ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                    {isPublic && (
+                      <>
+                        <div className="flex items-center gap-2 bg-black/30 rounded-lg px-3 py-2">
+                          <span className="text-slate-300 text-xs truncate flex-1">{publicLink}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (navigator.share) {
+                                try { await navigator.share({ title: showInviteModal.name, text: publicMessage, url: publicLink }); } catch {}
+                              } else {
+                                await navigator.clipboard.writeText(publicMessage);
+                                showToast('Invite copied!', 'success');
+                              }
+                            }}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition"
+                          >
+                            <Share2 className="w-3.5 h-3.5" /> Share invite
+                          </button>
+                          <button
+                            onClick={async () => { await navigator.clipboard.writeText(publicLink); showToast('Link copied!', 'success'); }}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white/10 text-white rounded-lg text-xs font-semibold hover:bg-white/20 transition"
+                          >
+                            📋 Copy link
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Add New Guest Form */}
               <div className="space-y-3">
                 <h3 className="text-white font-semibold text-sm">Add a Guest</h3>
@@ -12246,6 +12342,7 @@ export default function TripPlanner() {
                           id: `event-${Date.now()}`,
                           guests: [],
                           tasks: [],
+                          isPublic: true,
                           createdBy: currentUser,
                           createdAt: new Date().toISOString()
                         };
