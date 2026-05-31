@@ -643,7 +643,7 @@ export default function GuestEventPage() {
         {/* Floating rainbow emoji */}
         {!event.coverImage && (
           <div className="absolute inset-x-0 top-4 flex justify-center gap-4 md:gap-7 text-2xl md:text-4xl pointer-events-none">
-            {['🏳️‍🌈', '✨', '🌈', '💖', '🎉'].map((e, i) => (
+            {['🏳️‍🌈', '✨', '🌈', '💖', '🦄'].map((e, i) => (
               <span key={i} className="ggp-float drop-shadow-lg" style={{ animationDelay: `${i * 0.35}s` }}>{e}</span>
             ))}
           </div>
@@ -669,7 +669,7 @@ export default function GuestEventPage() {
             <h2 className="ggp-display text-2xl md:text-3xl mb-2">You're invited! 🎉</h2>
             <p className="text-white/70 mb-6">
               Add your name to RSVP and see who else is coming. Bring something along if you like,
-              and add a plus-one if you're bringing a date.
+              and add a plus-one (or two) if you're bringing a date (or two).
             </p>
             <div className="space-y-3 mb-4">
               <input
@@ -695,7 +695,7 @@ export default function GuestEventPage() {
               />
               {/* Plus-one (bringing a date) */}
               <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3">
-                <span className="text-sm text-white/80">Bringing a date? Add a plus-one</span>
+                <span className="text-sm text-white/80">Bringing a date (or two)? Add a plus-one (or two)</span>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -779,7 +779,7 @@ export default function GuestEventPage() {
           {/* Plus one counter */}
           {pendingRsvp === 'going' && (
             <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
-              <p className="text-sm text-white/70 mb-3">Bringing a date? Add a plus-one</p>
+              <p className="text-sm text-white/70 mb-3">Bringing a date (or two)? Add a plus-one (or two)</p>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setPendingPlusOne(Math.max(0, pendingPlusOne - 1))}
