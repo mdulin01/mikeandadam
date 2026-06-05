@@ -53,31 +53,25 @@ const SharedListModal = React.memo(({
     }
   };
 
-  const handleBackgroundClick = (e) => {
-    if (e.target === e.currentTarget) {
-      if (mode === 'form') {
-        const hasData = formData.name.trim();
-        if (hasData) {
-          setShowConfirmClose(true);
-        } else {
-          onClose();
-        }
-      } else if (!isEditing && items.length > 0) {
-        setShowConfirmClose(true);
-      } else {
-        onClose();
-      }
+  const handleClose = () => {
+    // If a new list already has items, closing (X or backdrop) should PERSIST it,
+    // not discard the work. Items mode is only reachable once the name is validated,
+    // so a non-empty items list always has a usable name to save with.
+    if (!isEditing && items.length > 0 && formData.name.trim()) {
+      handleSaveList();
+      return;
     }
+    // New list with a name typed but no items yet → warn before throwing the name away.
+    if (mode === 'form' && !isEditing && formData.name.trim()) {
+      setShowConfirmClose(true);
+      return;
+    }
+    // Editing (items already persist live) or nothing entered → just close.
+    onClose();
   };
 
-  const handleClose = () => {
-    if (mode === 'form' && formData.name.trim()) {
-      setShowConfirmClose(true);
-    } else if (mode === 'items' && !isEditing && items.length > 0) {
-      setShowConfirmClose(true);
-    } else {
-      onClose();
-    }
+  const handleBackgroundClick = (e) => {
+    if (e.target === e.currentTarget) handleClose();
   };
 
   // Advance from form to items mode (for new lists)
