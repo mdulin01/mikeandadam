@@ -222,6 +222,95 @@ exports.weeklySummary = onSchedule(
 );
 
 // ═══════════════════════════════════════════════
+// Helper: days since the most recent memory
+// ═══════════════════════════════════════════════
+function daysSinceLastMemory(memories) {
+  if (!Array.isArray(memories) || memories.length === 0) return null;
+  let latest = null;
+  for (const m of memories) {
+    if (!m || !m.date) continue;
+    const raw = String(m.date);
+    const d = new Date(raw.length <= 10 ? raw + "T00:00:00" : raw);
+    if (isNaN(d.getTime())) continue;
+    if (latest === null || d > latest) latest = d;
+  }
+  if (latest === null) return null;
+  return Math.max(0, Math.floor((Date.now() - latest.getTime()) / (24 * 3600 * 1000)));
+}
+
+// Stable biweekly parity: whole weeks since the Unix epoch. Consecutive
+// Saturdays land in consecutive epoch-week buckets, so parity alternates
+// weekly → the reminder fires every OTHER Saturday.
+function isMemoryOnWeek() {
+  const weeks = Math.floor(Date.now() / (7 * 24 * 3600 * 1000));
+  return weeks % 2 === 0;
+}
+
+function buildMemoryReminder(memories) {
+  const days = daysSinceLastMemory(memories);
+  const title = "📸 Time to make a memory";
+  let body;
+  if (days === null) {
+    body = "You haven't logged any memories yet — capture a moment from the last couple weeks together. 💛";
+  } else if (days >= 14) {
+    body = `It's been ${days} days since your last memory. Add one from the past couple weeks before it fades. 💛`;
+  } else {
+    body = "Add a memory from the past couple weeks — a date, a trip, or a small moment worth keeping. 💛";
+  }
+  return { title, body, days };
+}
+
+// ═══════════════════════════════════════════════
+// Scheduled Function: Biweekly "make a memory" nudge
+// Runs Saturdays 10:00 ET, but only every OTHER Saturday.
+// ═══════════════════════════════════════════════
+exports.memoryReminder = onSchedule(
+  {
+    schedule: "every saturday 10:00",
+    timeZone: "America/New_York",
+    retryCount: 1,
+  },
+  async (event) => {
+    if (!isMemoryOnWeek()) {
+      logger.info("memoryReminder: off-week, skipping.");
+      return;
+    }
+    logger.info("Running biweekly memory reminder...");
+    try {
+      const sharedDoc = await db.collection("tripData").doc("shared").get();
+      const memories = sharedDoc.exists ? (sharedDoc.data().memories || []) : [];
+      const { title, body, days } = buildMemoryReminder(memories);
+      const result = await sendPushNotifications(title, body);
+      logger.info(`Memory reminder complete: ${result.sent} sent, ${result.failed} failed (daysSinceLast=${days}).`);
+    } catch (error) {
+      logger.error("Error sending memory reminder:", error);
+      throw error;
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════
+// HTTP Function: Test the memory reminder (does NOT send)
+// GET /testMemoryReminder — returns the text + cadence state
+// ═══════════════════════════════════════════════
+exports.testMemoryReminder = onRequest(async (req, res) => {
+  try {
+    const sharedDoc = await db.collection("tripData").doc("shared").get();
+    const memories = sharedDoc.exists ? (sharedDoc.data().memories || []) : [];
+    const { title, body, days } = buildMemoryReminder(memories);
+    res.json({
+      wouldFireThisSaturday: isMemoryOnWeek(),
+      daysSinceLastMemory: days,
+      memoryCount: memories.length,
+      title,
+      body,
+    });
+  } catch (error) {
+    res.status(500).send(String(error));
+  }
+});
+
+// ═══════════════════════════════════════════════
 // HTTP Function: Test the summary (for debugging)
 // GET /testSummary — returns the notification text without sending
 // ═══════════════════════════════════════════════
