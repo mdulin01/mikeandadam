@@ -2061,6 +2061,13 @@ export default function TripPlanner() {
   const eventCoverFileRef = useRef(null);
   const eventCoverCameraRef = useRef(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  // ----- Message Guests (send an update / logistics note to RSVPs) -----
+  const [showMessageModal, setShowMessageModal] = useState(false); // holds the event being messaged
+  const [messageText, setMessageText] = useState('');
+  const [messageFilter, setMessageFilter] = useState('today'); // 'today' | 'going' | 'all'
+  const [messageSaving, setMessageSaving] = useState(false);
+  const [messageCopied, setMessageCopied] = useState(false);
+  const DEFAULT_LOGISTICS_NOTE = `Park in the lot outside of the building — the entry to the lot is on Church Street. The front door entry code is #2987. Take the elevator to the First floor — we're in Unit #110. See you soon! 💕`;
   const [newGuestName, setNewGuestName] = useState('');
   const [newGuestEmail, setNewGuestEmail] = useState('');
   const [newGuestPhone, setNewGuestPhone] = useState('');
@@ -10921,7 +10928,21 @@ export default function TripPlanner() {
               {/* Current Guests with Share Links */}
               {(showInviteModal.guests || []).length > 0 && (
                 <div>
-                  <h3 className="text-white font-semibold text-sm mb-3">Guest List ({(showInviteModal.guests || []).length})</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-white font-semibold text-sm">Guest List ({(showInviteModal.guests || []).length})</h3>
+                    <button
+                      onClick={() => {
+                        setShowMessageModal(showInviteModal);
+                        setMessageText(showInviteModal.announcement?.text || DEFAULT_LOGISTICS_NOTE);
+                        setMessageFilter('today');
+                        setMessageCopied(false);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-500/30 to-purple-500/30 text-blue-200 rounded-lg text-xs font-medium hover:from-blue-500/40 hover:to-purple-500/40 transition"
+                    >
+                      <Bell className="w-3.5 h-3.5" />
+                      Message guests
+                    </button>
+                  </div>
                   <div className="space-y-2">
                     {(showInviteModal.guests || []).map(guest => {
                       const inviteLink = `${window.location.origin}/event/${showInviteModal.id}?t=${guest.token}`;
@@ -11018,6 +11039,156 @@ export default function TripPlanner() {
           </div>
         </div>
       )}
+
+      {/* ===== Message Guests modal (send an update / logistics note) ===== */}
+      {showMessageModal && (() => {
+        const msgEvent = showMessageModal;
+        const isToday = (iso) => {
+          if (!iso) return false;
+          const d = new Date(iso); const n = new Date();
+          return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+        };
+        const allGuests = msgEvent.guests || [];
+        const recipients = allGuests.filter(g =>
+          messageFilter === 'today' ? isToday(g.rsvpAt)
+          : messageFilter === 'going' ? g.rsvp === 'going'
+          : true
+        );
+        const recipientEmails = recipients.map(g => g.email).filter(Boolean);
+        const noEmail = recipients.filter(g => !g.email);
+        const subject = `Update: ${msgEvent.name}`;
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&bcc=${encodeURIComponent(recipientEmails.join(','))}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(messageText)}`;
+        const filters = [
+          { key: 'today', label: "RSVP'd today", count: allGuests.filter(g => isToday(g.rsvpAt)).length },
+          { key: 'going', label: 'Everyone going', count: allGuests.filter(g => g.rsvp === 'going').length },
+          { key: 'all', label: 'Everyone', count: allGuests.length },
+        ];
+        const closeMsg = () => { setShowMessageModal(null); setMessageCopied(false); };
+        const saveAnnouncement = async () => {
+          setMessageSaving(true);
+          try {
+            const announcement = { text: messageText, updatedAt: new Date().toISOString(), updatedBy: currentUser || 'host' };
+            const newEvents = partyEvents.map(ev => ev.id === msgEvent.id ? { ...ev, announcement } : ev);
+            setPartyEvents(newEvents);
+            const updated = newEvents.find(e => e.id === msgEvent.id);
+            if (selectedPartyEvent?.id === msgEvent.id) setSelectedPartyEvent(updated);
+            setShowInviteModal(prev => (prev && prev.id === msgEvent.id) ? updated : prev);
+            setShowMessageModal(updated);
+            await savePartyEventsToFirestore(newEvents);
+            showToast('Posted to the event page — guests will see it.', 'success');
+          } catch { /* save fn shows its own error toast */ }
+          finally { setMessageSaving(false); }
+        };
+        const removeAnnouncement = async () => {
+          setMessageSaving(true);
+          try {
+            const newEvents = partyEvents.map(ev => ev.id === msgEvent.id ? { ...ev, announcement: null } : ev);
+            setPartyEvents(newEvents);
+            const updated = newEvents.find(e => e.id === msgEvent.id);
+            if (selectedPartyEvent?.id === msgEvent.id) setSelectedPartyEvent(updated);
+            setShowInviteModal(prev => (prev && prev.id === msgEvent.id) ? updated : prev);
+            setShowMessageModal(updated);
+            await savePartyEventsToFirestore(newEvents);
+            showToast('Removed from the event page.', 'success');
+          } catch { /* save fn shows its own error toast */ }
+          finally { setMessageSaving(false); }
+        };
+        return (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-800 rounded-2xl w-full max-w-lg max-h-[85dvh] overflow-y-auto">
+              <div className="p-6 border-b border-white/10 flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2"><Bell className="w-5 h-5" /> Message guests</h2>
+                  <p className="text-slate-400 text-sm mt-1">{msgEvent.emoji} {msgEvent.name}</p>
+                </div>
+                <button onClick={closeMsg} className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition"><X className="w-5 h-5" /></button>
+              </div>
+
+              <div className="p-6 space-y-5">
+                {/* Recipient filter */}
+                <div>
+                  <label className="text-white font-semibold text-sm mb-2 block">Who gets this?</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {filters.map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setMessageFilter(f.key)}
+                        className={`px-2 py-2 rounded-lg text-xs font-medium transition border ${
+                          messageFilter === f.key
+                            ? 'bg-blue-500/30 border-blue-400/50 text-blue-100'
+                            : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                        }`}
+                      >
+                        {f.label}
+                        <span className="block text-[11px] opacity-70 mt-0.5">{f.count} guest{f.count === 1 ? '' : 's'}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Message body */}
+                <div>
+                  <label className="text-white font-semibold text-sm mb-2 block">Your note</label>
+                  <textarea
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    rows={6}
+                    className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                    placeholder="Parking, entry instructions, what to bring…"
+                  />
+                </div>
+
+                {/* Recipient summary */}
+                <div className="text-xs text-slate-400 bg-white/5 rounded-lg p-3">
+                  <span className="text-white/80 font-medium">{recipientEmails.length}</span> of {recipients.length} selected guest{recipients.length === 1 ? '' : 's'} have an email on file.
+                  {noEmail.length > 0 && (
+                    <span className="block mt-1">No email for: {noEmail.map(g => g.name).join(', ')}. Post it to the event page so they still see it.</span>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="space-y-2">
+                  <a
+                    href={recipientEmails.length ? gmailUrl : undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => { if (!recipientEmails.length) e.preventDefault(); }}
+                    className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition ${
+                      recipientEmails.length
+                        ? 'bg-blue-500/20 text-blue-200 hover:bg-blue-500/30'
+                        : 'bg-white/5 text-white/30 cursor-not-allowed'
+                    }`}
+                  >
+                    ✉️ Email {recipientEmails.length || 'these'} guest{recipientEmails.length === 1 ? '' : 's'} via Gmail
+                  </a>
+                  <button
+                    onClick={saveAnnouncement}
+                    disabled={messageSaving || !messageText.trim()}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {messageSaving ? <><Loader className="w-4 h-4 animate-spin" /> Saving…</> : '📣 Post to the event page'}
+                  </button>
+                  <button
+                    onClick={async () => { try { await navigator.clipboard.writeText(messageText); setMessageCopied(true); setTimeout(() => setMessageCopied(false), 2000); } catch {} }}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm bg-white/5 text-white/70 hover:bg-white/10 transition"
+                  >
+                    {messageCopied ? <><Check className="w-4 h-4" /> Copied</> : 'Copy note text'}
+                  </button>
+                  {msgEvent.announcement?.text && (
+                    <button
+                      onClick={removeAnnouncement}
+                      disabled={messageSaving}
+                      className="w-full text-center py-1.5 text-xs text-red-300/70 hover:text-red-300 transition disabled:opacity-50"
+                    >
+                      Remove note from event page
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {editingMemory && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">

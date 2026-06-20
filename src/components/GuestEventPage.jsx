@@ -663,6 +663,19 @@ export default function GuestEventPage() {
 
       {/* Main content */}
       <div className="px-4 md:px-0 md:max-w-2xl md:mx-auto pb-12">
+        {/* Host announcement / logistics note */}
+        {event.announcement?.text && (
+          <div className="mt-8 rounded-2xl bg-gradient-to-br from-amber-500/15 to-pink-500/15 border border-amber-400/30 backdrop-blur-sm p-5 md:p-6">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">📣</span>
+              <h2 className="ggp-display text-xl md:text-2xl">A note from your hosts</h2>
+            </div>
+            <p className="text-white/90 text-sm md:text-base whitespace-pre-line leading-relaxed">
+              {event.announcement.text}
+            </p>
+          </div>
+        )}
+
         {/* Public self-signup (shown when the visitor hasn't joined yet) */}
         {!currentGuest && (
           <div className="mt-8 mb-8 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-sm p-6 md:p-8">
