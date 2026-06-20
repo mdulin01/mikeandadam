@@ -11055,9 +11055,12 @@ export default function TripPlanner() {
           : true
         );
         const recipientEmails = recipients.map(g => g.email).filter(Boolean);
+        const recipientPhones = recipients.map(g => g.phone).filter(Boolean);
         const noEmail = recipients.filter(g => !g.email);
+        const noContact = recipients.filter(g => !g.email && !g.phone);
         const subject = `Update: ${msgEvent.name}`;
         const gmailUrl = `https://mail.google.com/mail/?view=cm&bcc=${encodeURIComponent(recipientEmails.join(','))}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(messageText)}`;
+        const smsUrl = `sms:${recipientPhones.join(',')}?&body=${encodeURIComponent(messageText)}`;
         const filters = [
           { key: 'today', label: "RSVP'd today", count: allGuests.filter(g => isToday(g.rsvpAt)).length },
           { key: 'going', label: 'Everyone going', count: allGuests.filter(g => g.rsvp === 'going').length },
@@ -11140,9 +11143,9 @@ export default function TripPlanner() {
 
                 {/* Recipient summary */}
                 <div className="text-xs text-slate-400 bg-white/5 rounded-lg p-3">
-                  <span className="text-white/80 font-medium">{recipientEmails.length}</span> of {recipients.length} selected guest{recipients.length === 1 ? '' : 's'} have an email on file.
-                  {noEmail.length > 0 && (
-                    <span className="block mt-1">No email for: {noEmail.map(g => g.name).join(', ')}. Post it to the event page so they still see it.</span>
+                  Of {recipients.length} selected guest{recipients.length === 1 ? '' : 's'}: <span className="text-white/80 font-medium">{recipientEmails.length}</span> with email, <span className="text-white/80 font-medium">{recipientPhones.length}</span> with phone.
+                  {noContact.length > 0 && (
+                    <span className="block mt-1">No email or phone for: {noContact.map(g => g.name).join(', ')}. Post it to the event page so they still see it.</span>
                   )}
                 </div>
 
@@ -11160,6 +11163,17 @@ export default function TripPlanner() {
                     }`}
                   >
                     ✉️ Email {recipientEmails.length || 'these'} guest{recipientEmails.length === 1 ? '' : 's'} via Gmail
+                  </a>
+                  <a
+                    href={recipientPhones.length ? smsUrl : undefined}
+                    onClick={(e) => { if (!recipientPhones.length) e.preventDefault(); }}
+                    className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition ${
+                      recipientPhones.length
+                        ? 'bg-green-500/20 text-green-200 hover:bg-green-500/30'
+                        : 'bg-white/5 text-white/30 cursor-not-allowed'
+                    }`}
+                  >
+                    💬 Text {recipientPhones.length || 'these'} guest{recipientPhones.length === 1 ? '' : 's'} via SMS
                   </a>
                   <button
                     onClick={saveAnnouncement}
