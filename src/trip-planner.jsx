@@ -7400,6 +7400,19 @@ export default function TripPlanner() {
                           Invite Guests
                         </button>
 
+                        <button
+                          onClick={() => {
+                            setShowMessageModal(selectedPartyEvent);
+                            setMessageText(selectedPartyEvent.announcement?.text || DEFAULT_LOGISTICS_NOTE);
+                            setMessageFilter('going');
+                            setMessageCopied(false);
+                          }}
+                          className="w-full py-3 bg-gradient-to-r from-blue-500/80 to-indigo-500/80 text-white font-semibold rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2"
+                        >
+                          <Bell className="w-5 h-5" />
+                          Message Guests
+                        </button>
+
                         {/* Quick share link for the event */}
                         {(selectedPartyEvent.guests || []).length > 0 && (
                           <div className="flex flex-wrap gap-2">
