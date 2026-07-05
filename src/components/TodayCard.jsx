@@ -34,7 +34,7 @@ const Chip = ({ emoji, children, onClick, tone = 'slate' }) => (
   </button>
 );
 
-const TodayCard = ({ snapshot, onGo }) => {
+const TodayCard = ({ snapshot, onGo, onOpenTask }) => {
   const { today, runsToday, tasksDueToday, nextEvent, nextTrip, latestMemory } = snapshot || {};
   const hasAnything = (runsToday?.length || tasksDueToday?.length || nextEvent || nextTrip);
   if (!hasAnything && !latestMemory) return null;
@@ -60,7 +60,7 @@ const TodayCard = ({ snapshot, onGo }) => {
           </Chip>
         ))}
         {(tasksDueToday || []).slice(0, 3).map((t) => (
-          <Chip key={`task-${t.id}`} emoji="✅" tone="blue" onClick={() => onGo('home')}>
+          <Chip key={`task-${t.id}`} emoji="✅" tone="blue" onClick={() => (onOpenTask ? onOpenTask(t) : onGo('home'))}>
             <span className="font-medium">{t.title}</span>
             {t.dueDate && t.dueDate < today && <span className="text-red-400"> · overdue</span>}
           </Chip>
