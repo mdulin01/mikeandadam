@@ -7,34 +7,22 @@ service cloud.firestore {
         request.auth.token.email in ['mdulin@gmail.com', 'adamjosephbritten@gmail.com'];
     }
 
-    // Main app data + all subcollections (Phase 2 2026-07-05:
-    // tripData/shared/memories/{id}, tripData/sharedHub/tasks/{id})
-    // — only Mike and Adam.
-    match /tripData/{document=**} {
+    // ⚠️ trip-planner-5cc84 is SHARED by mikeandadam AND mikesfitness — these
+    // rules govern both. Catch-all locks the whole project (tripData + its
+    // subcollections, fitness collections, rupert, portal_*, dailyMetrics…)
+    // to Mike + Adam. Before 2026-07-05 this was `request.auth != null`,
+    // i.e. ANY signed-in Google account had full read/write.
+    match /{document=**} {
       allow read, write: if isOwner();
     }
 
-    // Rupert banner note (written server-side by the mikeslife cron via
-    // service account, which bypasses rules; owners read it).
-    match /rupert/{docId} {
-      allow read: if isOwner();
-      allow write: if false; // admin SDK only
-    }
-
-    // Individual event docs — guests can view the event page and RSVP,
-    // but 2026-07-05 tightening: guests may only touch the collaboration
-    // fields; they can no longer rewrite or delete the whole event.
+    // Guest event pages: public read + collaboration-field-only writes.
+    // Owners keep full access via the catch-all (rules are OR'd).
+    // Guests can no longer rewrite or delete whole event docs.
     match /events/{eventId} {
       allow read: if true;
-      allow create, delete: if isOwner();
-      allow update: if isOwner() ||
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['guests', 'lists', 'images', 'photos', 'lastUpdated', 'updatedBy']);
-    }
-
-    // FCM push notification tokens — owners only
-    match /fcmTokens/{tokenId} {
-      allow read, write: if isOwner();
+      allow update: if request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['guests', 'lists', 'images', 'photos', 'lastUpdated', 'updatedBy']);
     }
   }
 }
