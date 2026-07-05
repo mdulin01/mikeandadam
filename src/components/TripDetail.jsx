@@ -213,7 +213,20 @@ const TripDetail = ({
                 placeholder="Trip destination"
               />
             ) : (
-              <h2 className="text-4xl md:text-5xl font-bold mb-2">{trip.destination}</h2>
+              <>
+                <h2 className="text-4xl md:text-5xl font-bold mb-2">{trip.destination}</h2>
+                {trip.source === 'mikestravel' && (
+                  <a
+                    href="https://www.mikestravel.app"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 mb-2 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-200 text-xs font-medium hover:bg-sky-500/30 transition"
+                    title="This trip syncs one-way from mikestravel — edits made here can be overwritten"
+                  >
+                    ✈️ Synced from mikestravel — edit there
+                  </a>
+                )}
+              </>
             )}
 
             {/* Guest Avatars */}

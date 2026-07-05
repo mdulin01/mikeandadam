@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback , useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Plane, Hotel, Music, MapPin, Plus, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Heart, Anchor, Sun, Star, Clock, Users, ExternalLink, Sparkles, Pencil, Check, MoreVertical, Trash2, Palette, Image, ImagePlus, Link, Globe, Loader, LogIn, LogOut, User, UserPlus, Share2, Upload, Folder, Edit3, CheckSquare, RefreshCw, Camera, Search, Bell, BellOff } from 'lucide-react';
 
@@ -91,6 +91,8 @@ import { firebaseConfig } from './firebase-config';
 import RupertBanner from './components/RupertBanner';
 import { memoriesSeed } from './data/memoriesSeed';
 import { defaultFitnessEvents, indyHalfTrainingPlan, gsoHalfTrainingPlan } from './data/fitnessData';
+import TodayCard from './components/TodayCard';
+import MemoriesFeed from './components/MemoriesFeed';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -605,7 +607,7 @@ export default function TripPlanner() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFilters, setSearchFilters] = useState({ tasks: true, lists: true, ideas: true, social: true, goals: true, travel: true, events: true, fitness: true, memories: true });
   const [searchHighlightId, setSearchHighlightId] = useState(null); // { type, id } - scroll-to target after search nav
-  const [memoriesView, setMemoriesView] = useState('timeline'); // 'timeline' | 'events' | 'media'
+  const [memoriesView, setMemoriesView] = useState('feed'); // 'feed' | 'timeline' | 'events' | 'media'
   const [collapsedMemorySections, setCollapsedMemorySections] = useState({}); // { sectionId: true/false }
   const [timelineSortOrder, setTimelineSortOrder] = useState('newest'); // 'newest' | 'oldest'
   const [timelineYearFilter, setTimelineYearFilter] = useState('all'); // 'all' | specific year
@@ -2430,6 +2432,59 @@ export default function TripPlanner() {
     }
   }, [user, currentUser, showToast, diffSyncCollection]);
 
+  // ── Memory reactions + comments (Phase 3 feed) ──
+  const reactToMemory = useCallback((memoryId, emoji) => {
+    const me = String(currentUser || 'mike').toLowerCase();
+    setMemories(prev => {
+      const next = prev.map(m => {
+        if (m.id !== memoryId) return m;
+        const reactions = { ...(m.reactions || {}) };
+        if (reactions[me] === emoji) delete reactions[me]; else reactions[me] = emoji;
+        return { ...m, reactions };
+      });
+      saveMemoriesToFirestore(next);
+      return next;
+    });
+  }, [currentUser, saveMemoriesToFirestore]);
+
+  const commentOnMemory = useCallback((memoryId, text) => {
+    const trimmed = String(text || '').trim();
+    if (!trimmed) return;
+    const me = String(currentUser || 'mike').toLowerCase();
+    setMemories(prev => {
+      const next = prev.map(m => m.id === memoryId
+        ? { ...m, comments: [...(m.comments || []), { by: me, at: new Date().toISOString(), text: trimmed }] }
+        : m);
+      saveMemoriesToFirestore(next);
+      return next;
+    });
+  }, [currentUser, saveMemoriesToFirestore]);
+
+  // ── Hub "Today together" snapshot (Phase 3) ──
+  const todaySnapshot = useMemo(() => {
+    const today = toLocalDateStr();
+    const runsToday = [];
+    for (const ev of fitnessEvents) {
+      if (ev.status === 'completed') continue;
+      const plan = fitnessTrainingPlans[ev.id] ||
+        (ev.id === 'indy-half-2026' ? indyHalfTrainingPlan : ev.id === 'gso-half-2026' ? gsoHalfTrainingPlan : null);
+      const week = (plan || []).find(w => w.startDate <= today && today <= w.endDate);
+      if (!week) continue;
+      for (const r of week.runs || []) {
+        if (!(r.mike && ('adam' in r ? r.adam : true))) {
+          runsToday.push({ event: ev.name, weekNumber: week.weekNumber, label: r.label, distance: r.distance, mike: !!r.mike, adam: !!r.adam });
+        }
+      }
+    }
+    const tasksDueToday = sharedTasks.filter(t => t.status !== 'done' &&
+      ((t.dueDate && t.dueDate <= today) || t.timeHorizon === 'today'));
+    const nextEvent = [...partyEvents].filter(e => e.date && e.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0] || null;
+    const nextTrip = [...trips].filter(t => (t.dates?.start || t.start) && (t.dates?.start || t.start) >= today)
+      .sort((a, b) => (a.dates?.start || a.start).localeCompare(b.dates?.start || b.start))[0] || null;
+    const latestMemory = [...memories].filter(m => m.date).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+    return { today, runsToday, tasksDueToday, nextEvent, nextTrip, latestMemory };
+  }, [fitnessEvents, fitnessTrainingPlans, sharedTasks, partyEvents, trips, memories]);
+
   // Save fitness data to Firestore
   const saveFitnessToFirestore = useCallback(async (newEvents, newTrainingPlans) => {
     if (!user) return;
@@ -3808,6 +3863,9 @@ export default function TripPlanner() {
               {/* ===== HUB DASHBOARD VIEW ===== */}
               {hubSubView === 'home' && (
                 <>
+                  {/* TODAY TOGETHER (Phase 3) */}
+                  <TodayCard snapshot={todaySnapshot} onGo={(s) => { setActiveSection(s); if (s === 'home') setHubSubView('home'); }} />
+
                   {/* GOAL PROGRESS STATS */}
                   {(() => {
                     const activeGoals = sharedGoals.filter(g => g.status === 'active');
@@ -7969,6 +8027,7 @@ export default function TripPlanner() {
               <div className="flex gap-1.5 md:gap-2 mb-4 items-center justify-start sticky top-0 z-20 bg-slate-800/95 backdrop-blur-md py-3 -mx-6 px-6">
                 {/* View Switcher */}
                 {[
+                  { id: 'feed', emoji: '💞' },
                   { id: 'timeline', emoji: '📅' },
                   { id: 'events', emoji: '🎭' },
                   { id: 'media', emoji: '📸' },
@@ -7990,7 +8049,19 @@ export default function TripPlanner() {
                 <div className="flex-1" />
 
                 {/* Timeline Controls - Right justified (only show for timeline view) */}
-                {memoriesView === 'timeline' && (
+                {/* ===== FEED VIEW (Phase 3 — our own social feed) ===== */}
+              {memoriesView === 'feed' && (
+                <MemoriesFeed
+                  memories={memories}
+                  currentUser={currentUser}
+                  todayStr={toLocalDateStr()}
+                  onReact={reactToMemory}
+                  onAddComment={commentOnMemory}
+                  onOpen={(m) => setEditingMemory({ ...m })}
+                />
+              )}
+
+              {memoriesView === 'timeline' && (
                   <>
                     {/* Sort Order Toggle - Just arrow icon */}
                     <button

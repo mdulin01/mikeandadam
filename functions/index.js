@@ -167,7 +167,8 @@ function tasksDue(tasks, todayStr) {
 }
 function upcoming(shared, partyEvents, todayStr, horizonDays) {
   const until = addDays(todayStr, horizonDays);
-  const trips = (shared.trips || []).filter((t) => t.start && t.start >= todayStr && t.start <= until);
+  const tripStart = (t) => t.dates?.start || t.start; // native trips use dates.{start,end}
+  const trips = (shared.trips || []).filter((t) => tripStart(t) && tripStart(t) >= todayStr && tripStart(t) <= until);
   const events = partyEvents.filter((e) => e.date && e.date >= todayStr && e.date <= until);
   return { trips, events };
 }
@@ -214,7 +215,7 @@ exports.coupleDigest = onSchedule(
 
     const near = upcoming(shared, partyEvents, todayStr, isSunday ? 7 : 3);
     for (const trip of near.trips) {
-      lines.push(`✈️ ${trip.emoji || ""} ${trip.name || trip.destination} — ${fmtDate(trip.start)}`);
+      lines.push(`✈️ ${trip.emoji || ""} ${trip.name || trip.destination} — ${fmtDate(trip.dates?.start || trip.start)}`);
     }
     for (const ev of near.events) {
       lines.push(`🎉 ${ev.title || ev.name} — ${fmtDate(ev.date)}`);
@@ -257,7 +258,8 @@ exports.memoryPrompt = onSchedule(
     ]);
     const prompts = [];
     for (const trip of shared.trips || []) {
-      if (trip.end === yesterday) prompts.push(`your ${trip.name || trip.destination} trip`);
+      const end = trip.dates?.end || trip.end;
+      if (end === yesterday) prompts.push(`your ${trip.name || trip.destination} trip`);
     }
     for (const ev of fitness.events || []) {
       if (ev.date === yesterday) prompts.push(`the ${ev.name}`);

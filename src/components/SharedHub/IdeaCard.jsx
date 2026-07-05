@@ -5,7 +5,7 @@ import PortalMenu from './PortalMenu';
 import { useSharedHub } from '../../contexts/SharedHubContext';
 
 const IdeaCard = React.memo(({ idea, onPromoteToTask }) => {
-  const { deleteIdea, highlightIdea, setShowAddIdeaModal, showToast } = useSharedHub();
+  const { deleteIdea, highlightIdea, setShowAddIdeaModal, showToast, currentUser } = useSharedHub();
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
 
@@ -89,6 +89,18 @@ const IdeaCard = React.memo(({ idea, onPromoteToTask }) => {
                   <Star className={`w-3.5 h-3.5 ${idea.highlighted ? 'text-amber-400 fill-amber-400' : ''}`} />
                   {idea.highlighted ? 'Unhighlight' : 'Highlight'}
                 </button>
+                {String(currentUser || '').toLowerCase() === 'mike' && (
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      const ask = `Help us plan this idea from mikeandadam: ${idea.title}${idea.description ? ` — ${idea.description}` : ''}`;
+                      window.open(`https://mikeslife.app/?rupert=1&ask=${encodeURIComponent(ask)}`, '_blank');
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-white hover:bg-slate-600 transition text-left"
+                  >
+                    <span className="w-3.5 h-3.5 flex items-center justify-center text-xs">🦚</span> Ask Rupert to plan
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setShowMenu(false);

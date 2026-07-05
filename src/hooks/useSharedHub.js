@@ -322,6 +322,7 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast, isLoadedRef)
 
   // ========== RETURN CONTEXT VALUE ==========
   return {
+    currentUser,
     // Data
     sharedTasks,
     sharedLists,
