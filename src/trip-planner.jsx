@@ -4372,7 +4372,13 @@ export default function TripPlanner() {
 
                   {/* ACTIVE LISTS WIDGET */}
                   {(() => {
-                    const activeLists = sharedLists.filter(l => l.status === 'active').slice(0, 3);
+                    // Newest lists first — previously this sliced the array in insertion
+                    // order, so a freshly created list (appended at the end) never showed
+                    // on the dashboard and looked like it hadn't saved at all.
+                    const allActiveLists = sharedLists.filter(l => l.status === 'active');
+                    const activeLists = [...allActiveLists]
+                      .sort((a, b) => String(b.createdAt || b.id || '').localeCompare(String(a.createdAt || a.id || '')))
+                      .slice(0, 3);
                     const isCollapsed = collapsedSections.lists;
                     return (
                       <div className="mb-6 rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(16,185,129,0.06)]">
@@ -4382,7 +4388,7 @@ export default function TripPlanner() {
                         >
                           <h3 className="text-base font-bold text-white flex items-center gap-2">
                             <span>🛒</span> Lists
-                            {activeLists.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">{activeLists.length}</span>}
+                            {allActiveLists.length > 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">{allActiveLists.length}</span>}
                           </h3>
                           <div className="flex items-center gap-1">
                             <button
