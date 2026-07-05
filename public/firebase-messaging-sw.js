@@ -1,5 +1,10 @@
 // Firebase Cloud Messaging Service Worker
 // This file MUST be at the root of the public directory
+//
+// DATA-ONLY push pattern (2026-07-05): the server never sends a
+// `notification` payload — only `data`. This SW is the single place
+// a notification is displayed, which prevents the double-notification
+// bug (SDK auto-display + SW display).
 
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
@@ -15,36 +20,40 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Handle background push notifications
+// Display background pushes from the data payload only.
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Background message:', payload);
+  const d = payload.data || {};
+  // Legacy senders may still include payload.notification — if so the
+  // browser already displayed it; don't show a second one.
+  if (payload.notification) return;
 
-  const title = payload.notification?.title || 'Mike & Adam';
-  const options = {
-    body: payload.notification?.body || 'You have a new update!',
+  self.registration.showNotification(d.title || 'Mike & Adam', {
+    body: d.body || '',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    data: { url: payload.data?.url || '/' },
+    tag: d.tag || 'mikeandadam', // same tag replaces instead of stacking
+    data: { url: d.url || '/' },
     vibrate: [200, 100, 200],
-  };
-
-  self.registration.showNotification(title, options);
+  });
 });
 
-// Handle notification click — open the app
+// Click → focus an existing tab and navigate it, else open a new one.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = event.notification.data?.url || '/';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Focus existing tab if open
       for (const client of clientList) {
-        if (client.url.includes('trip-planner') && 'focus' in client) {
-          return client.focus();
+        const sameOrigin = client.url.startsWith(self.location.origin);
+        if (sameOrigin && 'focus' in client) {
+          client.focus();
+          if ('navigate' in client && url.startsWith(self.location.origin)) {
+            client.navigate(url).catch(() => {});
+          }
+          return;
         }
       }
-      // Otherwise open new tab
       return clients.openWindow(url);
     })
   );

@@ -87,7 +87,6 @@ import heic2any from 'heic2any';
 
 // Import your Firebase config
 import { firebaseConfig } from './firebase-config';
-import RupertBanner from './components/RupertBanner';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -496,12 +495,12 @@ export default function TripPlanner() {
   })();
 
   // URL ↔ section slug mapping (pretty URLs like /hub, /fitness)
-  const URL_SECTIONS = { fitness: 'fitness', hub: 'home', events: 'events', memories: 'memories', calendar: 'calendar', apps: 'apps' };
+  const URL_SECTIONS = { fitness: 'fitness', hub: 'home', events: 'events', memories: 'memories', nutrition: 'nutrition', lifeplanning: 'lifePlanning', business: 'business', calendar: 'calendar', apps: 'apps' };
   const SECTION_URLS = Object.fromEntries(Object.entries(URL_SECTIONS).map(([u, s]) => [s, u]));
   const routeParams = useParams();
   const navigateRoute = useNavigate();
   const urlSection = routeParams?.section ? URL_SECTIONS[routeParams.section.toLowerCase()] : null;
-  const [activeSection, setActiveSection] = useState(initialAppMode || urlSection || 'home'); // 'home' (hub, default) | 'fitness' | 'events' | 'memories' | 'calendar' | 'apps'
+  const [activeSection, setActiveSection] = useState(initialAppMode || urlSection || 'fitness'); // 'fitness' | 'home' (hub) | 'events' | 'memories' | 'nutrition' | 'lifePlanning' | 'business'
 
   // Sync URL when activeSection changes (from tab clicks) — skip if in app mode (PWA standalone override)
   useEffect(() => {
@@ -509,9 +508,9 @@ export default function TripPlanner() {
     const slug = SECTION_URLS[activeSection];
     if (!slug) return;
     const currentSlug = (routeParams?.section || '').toLowerCase();
-    const desiredPath = slug === 'home' && !routeParams?.section ? '/' : '/' + slug;
+    const desiredPath = slug === 'fitness' && !routeParams?.section ? '/' : '/' + slug;
     // Only navigate if URL is out of sync (prevents loop)
-    if (currentSlug !== slug && !(currentSlug === '' && activeSection === 'home')) {
+    if (currentSlug !== slug && !(currentSlug === '' && activeSection === 'fitness')) {
       navigateRoute(desiredPath, { replace: false });
     }
   }, [activeSection]);
@@ -1878,7 +1877,7 @@ export default function TripPlanner() {
     if (!messaging || !notificationsEnabled) return;
     const unsub = onMessage(messaging, (payload) => {
       console.log('Foreground push:', payload);
-      showToast(payload.data?.body || payload.notification?.body || 'New notification!', 'info');
+      showToast(payload.notification?.body || 'New notification!', 'info');
     });
     return () => unsub();
   }, [notificationsEnabled]);
@@ -3766,6 +3765,24 @@ export default function TripPlanner() {
                   <p className="text-xs text-slate-400">The story of us, one moment at a time</p>
                 </div>
               )}
+              {activeSection === 'nutrition' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">🥗 Nutrition</h2>
+                  <p className="text-xs text-slate-400">Recipes, meal planning & grocery lists</p>
+                </div>
+              )}
+              {activeSection === 'lifePlanning' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">🎯 Life Planning</h2>
+                  <p className="text-xs text-slate-400">Dream big, plan together</p>
+                </div>
+              )}
+              {activeSection === 'business' && (
+                <div>
+                  <h2 className="text-xl font-bold text-white">💼 Business</h2>
+                  <p className="text-xs text-slate-400">Build and grow together</p>
+                </div>
+              )}
               {activeSection === 'calendar' && (
                 <div>
                   <h2 className="text-xl font-bold text-white">📅 Calendar</h2>
@@ -3959,9 +3976,6 @@ export default function TripPlanner() {
       {/* Main Content - scrollable area on mobile */}
       <main className="relative z-10 px-6 md:pb-12 flex-1 overflow-y-auto main-mobile-pb" id="main-scroll">
         <div className="max-w-6xl mx-auto">
-
-          {/* Rupert banner — written by mikeslife cron-couple-context (rupert/note doc) */}
-          <RupertBanner db={db} />
 
           {/* ========== HUB SECTION (formerly Home) ========== */}
           {activeSection === 'home' && (
@@ -6662,6 +6676,28 @@ export default function TripPlanner() {
           )}
           {/* ========== END APPS SECTION ========== */}
 
+          {/* ========== NUTRITION SECTION ========== */}
+          {activeSection === 'nutrition' && (
+            <div className="mt-8">
+              {/* Coming Soon Placeholder */}
+              <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-3xl p-8 text-center border border-green-500/30">
+                <div className="text-6xl mb-4">👨‍🍳</div>
+                <h3 className="text-2xl font-bold text-white mb-2">Nutrition Section Coming Soon!</h3>
+                <p className="text-slate-300 mb-4">Plan meals together with:</p>
+                <div className="flex justify-center gap-4 flex-wrap">
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-green-300">
+                    📖 Recipe Collection
+                  </div>
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-emerald-300">
+                    📅 Meal Planning
+                  </div>
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-lime-300">
+                    🛒 Grocery Lists
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {/* ========== END NUTRITION SECTION ========== */}
 
           {/* ========== EVENTS SECTION ========== */}
@@ -8123,7 +8159,55 @@ export default function TripPlanner() {
           )}
           {/* ========== END EVENTS SECTION ========== */}
 
+          {/* ========== LIFE PLANNING SECTION ========== */}
+          {activeSection === 'lifePlanning' && (
+            <div className="mt-8">
+              {/* Coming Soon Placeholder */}
+              <div className="bg-gradient-to-r from-purple-500/20 to-indigo-500/20 rounded-3xl p-8 text-center border border-purple-500/30">
+                <div className="text-6xl mb-4">🌟</div>
+                <h3 className="text-2xl font-bold text-white mb-2">Life Planning Section Coming Soon!</h3>
+                <p className="text-slate-300 mb-4">Plan your future together:</p>
+                <div className="flex justify-center gap-4 flex-wrap">
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-purple-300">
+                    🏡 Where to Live
+                  </div>
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-indigo-300">
+                    🌴 Retirement Plans
+                  </div>
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-violet-300">
+                    📝 Life Goals
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* ========== END LIFE PLANNING SECTION ========== */}
 
+          {/* ========== BUSINESS SECTION ========== */}
+          {activeSection === 'business' && (
+            <div className="mt-8">
+              {/* Coming Soon Placeholder */}
+              <div className="bg-gradient-to-r from-slate-500/20 to-zinc-500/20 rounded-3xl p-8 text-center border border-slate-500/30">
+                <div className="text-6xl mb-4">🚀</div>
+                <h3 className="text-2xl font-bold text-white mb-2">Business Section Coming Soon!</h3>
+                <p className="text-slate-300 mb-4">Track your business ventures:</p>
+                <div className="flex justify-center gap-4 flex-wrap">
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-slate-300">
+                    📊 Projects
+                  </div>
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-slate-300">
+                    💰 Finances
+                  </div>
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-slate-300">
+                    📈 Goals
+                  </div>
+                  <div className="bg-white/10 px-4 py-2 rounded-full text-slate-300">
+                    🤝 Partnerships
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {/* ========== END BUSINESS SECTION ========== */}
 
           {/* ========== MEMORIES SECTION ========== */}
