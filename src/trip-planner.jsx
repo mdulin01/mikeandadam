@@ -3870,6 +3870,383 @@ export default function TripPlanner() {
                     onOpenTask={(t) => setShowAddTaskModal(t)}
                   />
 
+                  {/* WEEK AHEAD PLANNER */}
+                  {(() => {
+                    const today = new Date();
+                    const todayStr = toLocalDateStr(today);
+                    // Compute Monday of current week + offset
+                    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon...
+                    const monday = new Date(today);
+                    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1) + (weekOffset * 7));
+                    monday.setHours(0,0,0,0);
+
+                    const weekDays = Array.from({ length: 7 }, (_, i) => {
+                      const d = new Date(monday);
+                      d.setDate(monday.getDate() + i);
+                      const dateStr = toLocalDateStr(d);
+                      const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                      return { date: dateStr, dayName: dayNames[d.getDay()], dayNum: d.getDate(), month: d.getMonth() + 1, isToday: dateStr === todayStr };
+                    });
+
+                    const weekStart = weekDays[0].date;
+                    const weekEnd = weekDays[6].date;
+
+                    // Collect items for each day
+                    const dayItems = {};
+                    weekDays.forEach(d => { dayItems[d.date] = []; });
+
+                    // Tasks with dueDate
+                    sharedTasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate >= weekStart && t.dueDate <= weekEnd).forEach(t => {
+                      if (dayItems[t.dueDate]) dayItems[t.dueDate].push({ type: 'task', emoji: '✅', label: t.title, assignedTo: t.assignedTo, id: t.id });
+                    });
+
+                    // Party events
+                    partyEvents.filter(e => e.date && e.date >= weekStart && e.date <= weekEnd).forEach(e => {
+                      if (dayItems[e.date]) dayItems[e.date].push({ type: 'event', emoji: e.emoji || '🎉', label: e.name || e.title || 'Event', id: e.id, time: e.time });
+                    });
+
+                    // Social plans
+                    sharedSocial.filter(s => s.status !== 'done' && s.date && s.date >= weekStart && s.date <= weekEnd).forEach(s => {
+                      const typeEmojis = { text: '💬', call: '📞', meetup: '🤝', gather: '🎊' };
+                      if (dayItems[s.date]) dayItems[s.date].push({ type: 'social', emoji: typeEmojis[s.type] || '👥', label: s.person || s.title, id: s.id });
+                    });
+
+                    // Trips spanning into this week
+                    trips.filter(t => t.dates?.start && t.dates?.end).forEach(t => {
+                      const tripStart = t.dates.start;
+                      const tripEnd = t.dates.end;
+                      if (tripEnd < weekStart || tripStart > weekEnd) return;
+                      weekDays.forEach(d => {
+                        if (d.date >= tripStart && d.date <= tripEnd) {
+                          dayItems[d.date].push({ type: 'trip', emoji: t.emoji || '✈️', label: t.destination, id: t.id });
+                        }
+                      });
+                    });
+
+                    // Fitness workouts from training plans
+                    Object.values(fitnessTrainingPlans || {}).forEach(plan => {
+                      if (!Array.isArray(plan)) return;
+                      plan.forEach(week => {
+                        [...(week.runs || []), ...(week.crossTraining || [])].forEach(w => {
+                          if (w.date && w.date >= weekStart && w.date <= weekEnd && dayItems[w.date]) {
+                            const label = w.miles ? `${w.miles}mi` : (w.type || 'Workout');
+                            dayItems[w.date].push({ type: 'fitness', emoji: '🏃', label, id: w.id });
+                          }
+                        });
+                      });
+                    });
+
+                    // Google Calendar events
+                    (googleCalendarEvents || []).forEach(e => {
+                      const start = e.start?.split('T')[0];
+                      const end = e.end?.split('T')[0] || start;
+                      if (!start || end < weekStart || start > weekEnd) return;
+                      weekDays.forEach(d => {
+                        if (d.date >= start && d.date <= end) {
+                          dayItems[d.date].push({ type: 'gcal', emoji: '📅', label: e.title, id: e.id });
+                        }
+                      });
+                    });
+
+                    // Event of the week — first upcoming event or trip this week
+                    const eventOfWeek = partyEvents.find(e => e.date && e.date >= todayStr && e.date <= weekEnd) ||
+                      trips.find(t => t.dates?.start && t.dates.start >= todayStr && t.dates.start <= weekEnd);
+
+                    const isCollapsed = collapsedSections.weekAhead;
+
+                    return (
+                      <div className="mb-6 rounded-3xl border border-purple-500/20 bg-gradient-to-br from-purple-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(147,51,234,0.06)]">
+                        <button
+                          onClick={() => toggleDashSection('weekAhead')}
+                          className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">📅</span>
+                            <span className="text-white font-bold text-lg">{showFullMonthCalendar ? 'Calendar' : 'Week Ahead'}</span>
+                            {!showFullMonthCalendar && (
+                              <div className="flex items-center gap-1 ml-1" onClick={e => e.stopPropagation()}>
+                                <button
+                                  onClick={() => setWeekOffset(prev => prev - 1)}
+                                  className="p-1 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition"
+                                >
+                                  <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setWeekOffset(0)}
+                                  className={`text-sm px-1.5 py-0.5 rounded transition ${weekOffset === 0 ? 'text-purple-300 font-semibold' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                  {weekDays[0].month}/{weekDays[0].dayNum} – {weekDays[6].month}/{weekDays[6].dayNum}
+                                </button>
+                                <button
+                                  onClick={() => setWeekOffset(prev => prev + 1)}
+                                  className="p-1 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition"
+                                >
+                                  <ChevronRight className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <svg className={`w-5 h-5 text-slate-400 transition-transform ${isCollapsed ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        </button>
+
+                        {!isCollapsed && (
+                          <div className="px-4 pb-4">
+                            {/* 7-Day Grid (hidden when month is shown) */}
+                            {!showFullMonthCalendar && (
+                            <div className={`grid grid-cols-7 gap-1 ${weekQuickAddDay ? 'overflow-visible pb-28' : 'overflow-x-auto'}`}>
+                              {weekDays.map(day => (
+                                <div
+                                  key={day.date}
+                                  onClick={() => setSelectedCalendarDay(day.date)}
+                                  className={`rounded-xl p-1.5 min-h-[100px] flex flex-col cursor-pointer hover:bg-white/10 transition ${
+                                    day.isToday
+                                      ? 'bg-purple-500/15 border border-purple-400/30 ring-1 ring-purple-400/20'
+                                      : 'bg-white/5 border border-white/5'
+                                  }`}
+                                >
+                                  {/* Day Header */}
+                                  <div className="text-center mb-1">
+                                    <div className={`text-[10px] font-bold uppercase tracking-wider ${day.isToday ? 'text-purple-300' : 'text-slate-500'}`}>
+                                      {day.dayName}
+                                    </div>
+                                    <div className={`text-sm font-bold ${day.isToday ? 'text-purple-200' : 'text-slate-300'}`}>
+                                      {day.dayNum}
+                                    </div>
+                                  </div>
+
+                                  {/* Items */}
+                                  <div className="flex-1 space-y-0.5 min-h-0">
+                                    {(dayItems[day.date] || []).slice(0, 4).map((item, idx) => {
+                                      const colors = {
+                                        task: 'bg-teal-500/20 text-teal-300',
+                                        event: 'bg-amber-500/20 text-amber-300',
+                                        social: 'bg-pink-500/20 text-pink-300',
+                                        trip: 'bg-green-500/20 text-green-300',
+                                        fitness: 'bg-blue-500/20 text-blue-300',
+                                        gcal: 'bg-indigo-500/20 text-indigo-300',
+                                      };
+                                      return (
+                                        <div key={`${item.type}-${item.id}-${idx}`} className={`px-1 py-0.5 rounded text-[9px] truncate ${colors[item.type] || 'bg-white/10 text-slate-300'}`}>
+                                          <span className="mr-0.5">{item.emoji}</span>
+                                          <span className="truncate">{item.label}</span>
+                                        </div>
+                                      );
+                                    })}
+                                    {(dayItems[day.date] || []).length > 4 && (
+                                      <div className="text-[9px] text-slate-500 text-center">+{dayItems[day.date].length - 4}</div>
+                                    )}
+                                  </div>
+
+                                  {/* Quick Add Button */}
+                                  <div className="relative mt-1">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setWeekQuickAddDay(weekQuickAddDay === day.date ? null : day.date); }}
+                                      className="w-full py-0.5 rounded-lg text-slate-500 hover:text-purple-300 hover:bg-purple-500/10 transition text-xs"
+                                    >
+                                      +
+                                    </button>
+                                    {weekQuickAddDay === day.date && (
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-slate-800 border border-white/20 rounded-xl shadow-2xl z-50 py-1 min-w-[120px]">
+                                        <button onClick={() => { setShowAddTaskModal({ _prefill: true, dueDate: day.date }); setWeekQuickAddDay(null); }} className="w-full px-3 py-1.5 text-left text-xs text-white hover:bg-white/10 flex items-center gap-2">
+                                          <span>✅</span> Task
+                                        </button>
+                                        <button onClick={() => { setNewEventData(prev => ({ ...prev, date: day.date })); setShowAddEventModal(true); setWeekQuickAddDay(null); }} className="w-full px-3 py-1.5 text-left text-xs text-white hover:bg-white/10 flex items-center gap-2">
+                                          <span>🎉</span> Event
+                                        </button>
+                                        <button onClick={() => { setShowAddSocialModal({ _prefill: true, date: day.date }); setWeekQuickAddDay(null); }} className="w-full px-3 py-1.5 text-left text-xs text-white hover:bg-white/10 flex items-center gap-2">
+                                          <span>👥</span> Social
+                                        </button>
+                                        <button onClick={() => { setActiveSection('fitness'); setWeekQuickAddDay(null); }} className="w-full px-3 py-1.5 text-left text-xs text-white hover:bg-white/10 flex items-center gap-2">
+                                          <span>🏋️</span> Fitness
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            )}
+
+                            {/* Toggle & Google Calendar controls */}
+                            <div className="flex items-center justify-between mt-3 gap-2">
+                              <button
+                                onClick={() => setShowFullMonthCalendar(!showFullMonthCalendar)}
+                                className="text-xs text-purple-300 hover:text-purple-200 font-medium transition flex items-center gap-1"
+                              >
+                                <Calendar className="w-3.5 h-3.5" />
+                                {showFullMonthCalendar ? 'Show Week' : 'Show Full Month'}
+                              </button>
+                              {!calendarConnected ? (
+                                <button
+                                  onClick={connectGoogleCalendar}
+                                  disabled={calendarLoading}
+                                  className="text-xs text-blue-300 hover:text-blue-200 font-medium transition flex items-center gap-1"
+                                >
+                                  {calendarLoading ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Calendar className="w-3.5 h-3.5" />}
+                                  {calendarLoading ? 'Connecting...' : 'Link Google Calendar'}
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => fetchGoogleCalendarEvents()}
+                                    disabled={calendarLoading}
+                                    className="text-xs text-blue-300 hover:text-blue-200 transition flex items-center gap-1"
+                                  >
+                                    {calendarLoading ? <Loader className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                                    Refresh
+                                  </button>
+                                  <button
+                                    onClick={() => window.open('https://calendar.google.com', '_blank')}
+                                    className="text-xs text-slate-400 hover:text-white transition flex items-center gap-1"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    Open
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Full Month Calendar (expandable) */}
+                            {showFullMonthCalendar && (
+                              <div className="mt-4 border-t border-white/10 pt-4">
+                                <div className="flex items-center justify-between mb-4">
+                                  <button
+                                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
+                                    className="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition"
+                                  >
+                                    <ChevronLeft className="w-4 h-4" />
+                                  </button>
+                                  <span className="text-white font-semibold text-sm">
+                                    {months[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                                  </span>
+                                  <button
+                                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
+                                    className="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition"
+                                  >
+                                    <ChevronRight className="w-4 h-4" />
+                                  </button>
+                                </div>
+                                {/* Month grid */}
+                                <div className="grid grid-cols-7 gap-1">
+                                  {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
+                                    <div key={d} className="text-center text-[10px] text-white/40 font-medium pb-1">{d}</div>
+                                  ))}
+                                  {(() => {
+                                    const year = currentMonth.getFullYear();
+                                    const month = currentMonth.getMonth();
+                                    const firstDay = new Date(year, month, 1);
+                                    const lastDay = new Date(year, month + 1, 0);
+                                    let startIdx = firstDay.getDay() - 1;
+                                    if (startIdx < 0) startIdx = 6; // Sunday
+                                    const cells = [];
+                                    for (let i = 0; i < startIdx; i++) cells.push(<div key={`e${i}`} />);
+                                    for (let d = 1; d <= lastDay.getDate(); d++) {
+                                      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                                      const todayStr2 = toLocalDateStr();
+                                      const isToday2 = dateStr === todayStr2;
+                                      const dayTrips = trips.filter(t => t.dates?.start && t.dates?.end && dateStr >= t.dates.start && dateStr <= t.dates.end);
+                                      const dayEvents = partyEvents.filter(e => e.date === dateStr);
+                                      const dayGcal = (googleCalendarEvents || []).filter(e => {
+                                        const s = e.start?.split('T')[0];
+                                        const en = e.end?.split('T')[0] || s;
+                                        return s && dateStr >= s && dateStr <= en;
+                                      });
+                                      const dayTasks = sharedTasks.filter(t => t.status !== 'done' && t.dueDate === dateStr);
+                                      const daySocial = sharedSocial.filter(s => s.status !== 'done' && s.date === dateStr);
+                                      const hasTrip = dayTrips.length > 0;
+                                      const hasEvent = dayEvents.length > 0;
+                                      const hasGcal = dayGcal.length > 0;
+                                      const hasTask = dayTasks.length > 0;
+                                      const hasSocial = daySocial.length > 0;
+                                      const hasFitness = Object.values(fitnessTrainingPlans || {}).some(weeks => {
+                                        if (!Array.isArray(weeks)) return false;
+                                        return weeks.some(week => {
+                                          const runs = week.runs || [];
+                                          const cross = week.crossTraining || [];
+                                          return [...runs, ...cross].some(w => w.date === dateStr);
+                                        });
+                                      });
+                                      const totalItems = dayTrips.length + dayEvents.length + dayGcal.length + dayTasks.length + daySocial.length;
+                                      const anyDot = hasTrip || hasEvent || hasGcal || hasTask || hasSocial || hasFitness;
+                                      cells.push(
+                                        <button
+                                          key={d}
+                                          onClick={() => setSelectedCalendarDay(dateStr)}
+                                          className={`text-center py-1.5 rounded-lg text-xs relative transition cursor-pointer hover:bg-white/10 active:scale-95 min-h-[36px] ${
+                                            isToday2 ? 'bg-purple-500/30 text-white font-bold ring-1 ring-purple-400/50' : 'text-white/60 bg-white/[0.03]'
+                                          } ${hasTrip ? 'ring-1 ring-teal-400/40' : ''} ${selectedCalendarDay === dateStr ? 'ring-2 ring-white/50 bg-white/15' : ''}`}
+                                        >
+                                          <div className="text-[11px]">{d}</div>
+                                          {anyDot && (
+                                            <div className="flex justify-center gap-0.5 mt-0.5">
+                                              {hasTrip && <div className="w-1 h-1 rounded-full bg-teal-400" />}
+                                              {hasEvent && <div className="w-1 h-1 rounded-full bg-amber-400" />}
+                                              {hasGcal && <div className="w-1 h-1 rounded-full bg-blue-400" />}
+                                              {hasTask && <div className="w-1 h-1 rounded-full bg-green-400" />}
+                                              {hasSocial && <div className="w-1 h-1 rounded-full bg-pink-400" />}
+                                              {hasFitness && <div className="w-1 h-1 rounded-full bg-orange-400" />}
+                                            </div>
+                                          )}
+                                          {totalItems > 0 && !anyDot && (
+                                            <div className="w-1 h-1 rounded-full bg-white/30 mx-auto mt-0.5" />
+                                          )}
+                                        </button>
+                                      );
+                                    }
+                                    return cells;
+                                  })()}
+                                </div>
+                                {/* Legend */}
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-[10px] text-white/40">
+                                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400" /> Trips</span>
+                                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Events</span>
+                                  {calendarConnected && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400" /> Google</span>}
+                                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400" /> Tasks</span>
+                                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-pink-400" /> Social</span>
+                                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400" /> Fitness</span>
+                                </div>
+
+                                {/* Google Calendar Events — import list */}
+                                {calendarConnected && googleCalendarEvents.length > 0 && (
+                                  <div className="mt-4 border-t border-white/10 pt-3">
+                                    <h4 className="text-xs font-semibold text-blue-300 mb-2 flex items-center gap-1">
+                                      <Calendar className="w-3.5 h-3.5" /> Google Calendar Events
+                                    </h4>
+                                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                      {googleCalendarEvents.map(event => {
+                                        const startDate = new Date(event.start);
+                                        const dateLabel = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                        const timeLabel = !event.allDay && event.start.includes('T')
+                                          ? startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                                          : 'All day';
+                                        return (
+                                          <div
+                                            key={event.id}
+                                            className="flex items-center justify-between gap-2 bg-white/5 hover:bg-white/10 rounded-lg px-3 py-2 transition cursor-pointer group"
+                                            onClick={() => {
+                                              setImportSettings(prev => ({ ...prev, customName: '' }));
+                                              setShowImportModal(event);
+                                            }}
+                                          >
+                                            <div className="min-w-0 flex-1">
+                                              <div className="text-xs text-white truncate">{event.title}</div>
+                                              <div className="text-[10px] text-white/40">{dateLabel} · {timeLabel}{event.location ? ` · ${event.location}` : ''}</div>
+                                            </div>
+                                            <span className="text-[10px] text-blue-400 opacity-0 group-hover:opacity-100 transition shrink-0 font-medium">Import →</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* TODAY'S TASKS WIDGET */}
                   {(() => {
                     const todayTasks = sharedTasks.filter(t => t.status !== 'done' && isTaskDueToday(t));
