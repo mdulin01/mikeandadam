@@ -4435,7 +4435,10 @@ export default function TripPlanner() {
 
                   {/* RECENT IDEAS WIDGET */}
                   {(() => {
-                    const recentIdeas = sharedIdeas.filter(i => i.status === 'inbox' || i.status === 'saved').slice(0, 4);
+                    // Newest first (same fix as Lists — insertion-order slice hid new items)
+                    const recentIdeas = [...sharedIdeas.filter(i => i.status === 'inbox' || i.status === 'saved')]
+                      .sort((a, b) => String(b.createdAt || b.id || '').localeCompare(String(a.createdAt || a.id || '')))
+                      .slice(0, 4);
                     const isCollapsed = collapsedSections.ideas;
                     return (
                       <div className="mb-6 rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(245,158,11,0.06)]">
@@ -4489,7 +4492,10 @@ export default function TripPlanner() {
 
                   {/* UPCOMING SOCIAL WIDGET */}
                   {(() => {
-                    const upcomingSocial = sharedSocial.filter(s => s.status !== 'done').slice(0, 4);
+                    // Soonest first; undated items last (was insertion-order slice)
+                    const upcomingSocial = [...sharedSocial.filter(s => s.status !== 'done')]
+                      .sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')))
+                      .slice(0, 4);
                     const isCollapsed = collapsedSections.social;
                     return (
                       <div className="mb-6 rounded-3xl border border-purple-500/20 bg-gradient-to-br from-purple-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(168,85,247,0.06)]">
