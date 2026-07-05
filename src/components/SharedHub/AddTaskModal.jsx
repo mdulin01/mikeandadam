@@ -7,6 +7,7 @@ const AddTaskModal = React.memo(({
   onClose,
   onSave,
   editTask,
+  onDelete,
   currentUser,
   trips,
   fitnessEvents,
@@ -505,11 +506,19 @@ const AddTaskModal = React.memo(({
           </div>
         </div>
 
-        {/* Footer with action button */}
-        <div className="p-6 border-t border-slate-700 bg-slate-900/50 shrink-0" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+        {/* Footer with action buttons */}
+        <div className="p-6 border-t border-slate-700 bg-slate-900/50 shrink-0 flex gap-3" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+          {isEditing && onDelete && (
+            <button
+              onClick={() => onDelete(editTask.id)}
+              className="px-5 py-3 bg-red-500/20 text-red-400 font-semibold rounded-xl hover:bg-red-500/30 transition"
+            >
+              Delete
+            </button>
+          )}
           <button
             onClick={handleSubmit}
-            className="w-full py-3 bg-gradient-to-r from-teal-400 to-cyan-500 text-white font-bold rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+            className="flex-1 py-3 bg-gradient-to-r from-teal-400 to-cyan-500 text-white font-bold rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
           >
             <Check className="w-5 h-5" />
             {isEditing ? 'Save Changes' : 'Create Task'}
