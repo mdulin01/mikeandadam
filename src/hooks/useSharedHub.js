@@ -49,18 +49,26 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast, isLoadedRef)
   // ========== TASK CRUD ==========
   const addTask = useCallback((task) => {
     if (!ensureHubLoaded('adding the task')) return;
-    const newTasks = [...sharedTasks, task];
+    // Provenance: the taskAssigned cloud trigger uses createdBy to avoid
+    // notifying you about your own tasks.
+    const stamped = {
+      createdBy: String(currentUser || '').toLowerCase(),
+      createdAt: new Date().toISOString(),
+      ...task,
+    };
+    const newTasks = [...sharedTasks, stamped];
     setSharedTasks(newTasks);
     saveRef.current(null, newTasks, null);
     showToast('Task added', 'success');
-  }, [sharedTasks, showToast]);
+  }, [sharedTasks, showToast, currentUser]);
 
   const updateTask = useCallback((taskId, updates) => {
     if (!ensureHubLoaded('editing the task')) return;
-    const newTasks = sharedTasks.map(t => t.id === taskId ? { ...t, ...updates } : t);
+    const stamped = { ...updates, updatedBy: String(currentUser || '').toLowerCase() };
+    const newTasks = sharedTasks.map(t => t.id === taskId ? { ...t, ...stamped } : t);
     setSharedTasks(newTasks);
     saveRef.current(null, newTasks, null);
-  }, [sharedTasks]);
+  }, [sharedTasks, currentUser]);
 
   const deleteTask = useCallback((taskId) => {
     if (!ensureHubLoaded('removing the task')) return;

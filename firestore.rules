@@ -2,22 +2,39 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Main app data — only Mike and Adam (authenticated owners)
-    match /tripData/{docId} {
-      allow read, write: if request.auth != null &&
+    function isOwner() {
+      return request.auth != null &&
         request.auth.token.email in ['mdulin@gmail.com', 'adamjosephbritten@gmail.com'];
     }
 
-    // Individual event docs — guests need read access (for event page)
-    // and write access (for RSVP, collaborative lists, photo uploads)
+    // Main app data + all subcollections (Phase 2 2026-07-05:
+    // tripData/shared/memories/{id}, tripData/sharedHub/tasks/{id})
+    // — only Mike and Adam.
+    match /tripData/{document=**} {
+      allow read, write: if isOwner();
+    }
+
+    // Rupert banner note (written server-side by the mikeslife cron via
+    // service account, which bypasses rules; owners read it).
+    match /rupert/{docId} {
+      allow read: if isOwner();
+      allow write: if false; // admin SDK only
+    }
+
+    // Individual event docs — guests can view the event page and RSVP,
+    // but 2026-07-05 tightening: guests may only touch the collaboration
+    // fields; they can no longer rewrite or delete the whole event.
     match /events/{eventId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, delete: if isOwner();
+      allow update: if isOwner() ||
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['guests', 'lists', 'images', 'photos', 'lastUpdated', 'updatedBy']);
     }
 
-    // FCM push notification tokens — authenticated owners only
+    // FCM push notification tokens — owners only
     match /fcmTokens/{tokenId} {
-      allow read, write: if request.auth != null &&
-        request.auth.token.email in ['mdulin@gmail.com', 'adamjosephbritten@gmail.com'];
+      allow read, write: if isOwner();
     }
   }
 }

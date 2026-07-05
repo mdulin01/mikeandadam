@@ -74,7 +74,8 @@ import {
   onSnapshot,
   collection,
   query,
-  orderBy
+  orderBy,
+  writeBatch
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -733,17 +734,21 @@ export default function TripPlanner() {
 
       // Add to memory's images array (check if still mounted)
       if (!isMountedRef.current) return;
-      setMemories(prev => prev.map(m => {
-        if (m.id === memoryId) {
-          const currentImages = m.images || [];
-          // Also migrate old 'image' field if present
-          if (m.image && !currentImages.includes(m.image)) {
-            return { ...m, images: [m.image, ...currentImages, downloadURL], image: '' };
+      setMemories(prev => {
+        const next = prev.map(m => {
+          if (m.id === memoryId) {
+            const currentImages = m.images || [];
+            // Also migrate old 'image' field if present
+            if (m.image && !currentImages.includes(m.image)) {
+              return { ...m, images: [m.image, ...currentImages, downloadURL], image: '' };
+            }
+            return { ...m, images: [...currentImages, downloadURL] };
           }
-          return { ...m, images: [...currentImages, downloadURL] };
-        }
-        return m;
-      }));
+          return m;
+        });
+        saveMemoriesToFirestore(next); // was previously never persisted — bug fix
+        return next;
+      });
     } catch (error) {
       console.error('Upload failed:', error);
       if (isMountedRef.current) showToast('Photo upload failed. Please try again.', 'error');
@@ -1729,7 +1734,29 @@ export default function TripPlanner() {
           if (data.trips) setTrips(data.trips);
           if (data.wishlist) setWishlist(data.wishlist);
           if (data.tripDetails) setTripDetails(data.tripDetails);
-          if (data.memories) setMemories(data.memories);
+          // Legacy memories array — only authoritative until migrated to the
+          // tripData/shared/memories subcollection (Phase 2).
+          if (data.memories && !data.memoriesMigratedAt) setMemories(data.memories);
+          if (data.memories?.length && !data.memoriesMigratedAt && !migratingMemoriesRef.current) {
+            migratingMemoriesRef.current = true;
+            (async () => {
+              try {
+                let batch = writeBatch(db);
+                let pending = 0;
+                for (const m of data.memories) {
+                  if (m?.id === undefined || m?.id === null) continue;
+                  batch.set(doc(db, 'tripData', 'shared', 'memories', String(m.id)), JSON.parse(JSON.stringify(m)));
+                  if (++pending >= 400) { await batch.commit(); batch = writeBatch(db); pending = 0; }
+                }
+                if (pending > 0) await batch.commit();
+                await setDoc(doc(db, 'tripData', 'shared'), { memoriesMigratedAt: new Date().toISOString() }, { merge: true });
+                console.log('[migration] memories → subcollection done:', data.memories.length);
+              } catch (e) {
+                console.error('[migration] memories failed (will retry next snapshot):', e);
+                migratingMemoriesRef.current = false;
+              }
+            })();
+          }
         }
         setDataLoading(false);
       },
@@ -1820,7 +1847,30 @@ export default function TripPlanner() {
         console.log('[hubSnapshot] fired', { exists, listsCount: data?.lists?.length, alreadyLoaded: hubDataLoadedRef.current });
         if (exists) {
           if (data.lists) setSharedLists(data.lists);
-          if (data.tasks) setSharedTasks(data.tasks);
+          // Legacy tasks array — only authoritative until migrated to the
+          // tripData/sharedHub/tasks subcollection (Phase 2).
+          if (data.tasks && !data.tasksMigratedAt) setSharedTasks(data.tasks);
+          if (data.tasks?.length && !data.tasksMigratedAt && !migratingTasksRef.current) {
+            migratingTasksRef.current = true;
+            (async () => {
+              try {
+                let batch = writeBatch(db);
+                let pending = 0;
+                for (const t of data.tasks) {
+                  if (t?.id === undefined || t?.id === null) continue;
+                  // _migrated tells the taskAssigned cloud trigger to stay quiet
+                  batch.set(doc(db, 'tripData', 'sharedHub', 'tasks', String(t.id)), JSON.parse(JSON.stringify({ ...t, _migrated: true })));
+                  if (++pending >= 400) { await batch.commit(); batch = writeBatch(db); pending = 0; }
+                }
+                if (pending > 0) await batch.commit();
+                await setDoc(doc(db, 'tripData', 'sharedHub'), { tasksMigratedAt: new Date().toISOString() }, { merge: true });
+                console.log('[migration] tasks → subcollection done:', data.tasks.length);
+              } catch (e) {
+                console.error('[migration] tasks failed (will retry next snapshot):', e);
+                migratingTasksRef.current = false;
+              }
+            })();
+          }
           if (data.ideas) setSharedIdeas(data.ideas);
           if (data.social) setSharedSocial(data.social);
           if (data.goals) setSharedGoals(data.goals);
@@ -1833,7 +1883,37 @@ export default function TripPlanner() {
       }
     );
 
+    // ── Subcollection listeners (Phase 2): once these have docs, they own state ──
+    const memoriesColUnsubscribe = onSnapshot(
+      collection(db, 'tripData', 'shared', 'memories'),
+      (snap) => {
+        if (snap.empty) return;
+        const m = new Map();
+        const sorter = (v) => Array.isArray(v) ? v.map(sorter) : (v && typeof v === 'object' ? Object.keys(v).sort().reduce((acc, k) => { acc[k] = sorter(v[k]); return acc; }, {}) : v);
+        const items = snap.docs.map((d) => { m.set(d.id, JSON.stringify(sorter(d.data()))); return d.data(); });
+        items.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.id).localeCompare(String(b.id)));
+        memoriesSyncRef.current = m;
+        setMemories(items);
+      },
+      (e) => console.error('memories subcollection listener:', e)
+    );
+    const tasksColUnsubscribe = onSnapshot(
+      collection(db, 'tripData', 'sharedHub', 'tasks'),
+      (snap) => {
+        if (snap.empty) return;
+        const m = new Map();
+        const sorter = (v) => Array.isArray(v) ? v.map(sorter) : (v && typeof v === 'object' ? Object.keys(v).sort().reduce((acc, k) => { acc[k] = sorter(v[k]); return acc; }, {}) : v);
+        const items = snap.docs.map((d) => { m.set(d.id, JSON.stringify(sorter(d.data()))); return d.data(); });
+        items.sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || String(a.id).localeCompare(String(b.id)));
+        tasksSyncRef.current = m;
+        setSharedTasks(items);
+      },
+      (e) => console.error('tasks subcollection listener:', e)
+    );
+
     return () => {
+      memoriesColUnsubscribe();
+      tasksColUnsubscribe();
       tripsUnsubscribe();
       fitnessUnsubscribe();
       partyEventsUnsubscribe();
@@ -2251,6 +2331,59 @@ export default function TripPlanner() {
   // Deep-strip undefined values to prevent Firestore errors
   const stripUndefined = useCallback((obj) => JSON.parse(JSON.stringify(obj)), []);
 
+  // ── Subcollection sync machinery (Phase 2, 2026-07-05) ──
+  // Memories live in tripData/shared/memories/{id}; tasks in
+  // tripData/sharedHub/tasks/{id}. The old whole-array saves are diff-synced
+  // into per-item docs so simultaneous edits by Mike + Adam can't clobber
+  // each other, and the parent docs stay small (1MB doc limit).
+  const memoriesSyncRef = useRef(new Map()); // id -> stable JSON of last-known doc
+  const tasksSyncRef = useRef(new Map());
+  const migratingMemoriesRef = useRef(false);
+  const migratingTasksRef = useRef(false);
+
+  // Stable stringify (sorted keys) so Firestore key reordering doesn't
+  // register as a difference.
+  const stableJson = useCallback((obj) => {
+    const sorter = (v) => {
+      if (Array.isArray(v)) return v.map(sorter);
+      if (v && typeof v === 'object') {
+        return Object.keys(v).sort().reduce((acc, k) => { acc[k] = sorter(v[k]); return acc; }, {});
+      }
+      return v;
+    };
+    return JSON.stringify(sorter(obj));
+  }, []);
+
+  // Diff-sync an array of {id, ...} items into a 3-segment subcollection.
+  // Only writes docs that changed; deletes docs that disappeared.
+  const diffSyncCollection = useCallback(async (seg1, seg2, seg3, items, syncRef) => {
+    const colRef = collection(db, seg1, seg2, seg3);
+    const prev = syncRef.current;
+    const next = new Map();
+    let batch = writeBatch(db);
+    let pending = 0;
+    const commit = async () => { if (pending > 0) { await batch.commit(); batch = writeBatch(db); pending = 0; } };
+    for (const item of items) {
+      if (item?.id === undefined || item?.id === null) continue;
+      const id = String(item.id);
+      const clean = stripUndefined({ ...item });
+      const json = stableJson(clean);
+      next.set(id, json);
+      if (prev.get(id) !== json) {
+        batch.set(doc(colRef, id), clean);
+        if (++pending >= 400) await commit();
+      }
+    }
+    for (const id of prev.keys()) {
+      if (!next.has(id)) {
+        batch.delete(doc(colRef, id));
+        if (++pending >= 400) await commit();
+      }
+    }
+    await commit();
+    syncRef.current = next;
+  }, [stripUndefined, stableJson]);
+
   // Save to Firestore whenever data changes
   const saveToFirestore = useCallback(async (newTrips, newWishlist, newTripDetails, newMemories) => {
     if (!user) return;
@@ -2273,16 +2406,29 @@ export default function TripPlanner() {
   const saveMemoriesToFirestore = useCallback(async (newMemories) => {
     if (!user) return;
     try {
+      // Per-doc diff sync into tripData/shared/memories (Phase 2 model).
+      await diffSyncCollection('tripData', 'shared', 'memories', newMemories, memoriesSyncRef);
       await setDoc(doc(db, 'tripData', 'shared'), {
-        memories: newMemories,
+        memoriesMigratedAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
         updatedBy: currentUser
       }, { merge: true });
     } catch (error) {
-      console.error('Error saving memories to Firestore:', error);
-      showToast('Failed to save memory. Please try again.', 'error');
+      // Fallback: legacy whole-array write (covers the window before the
+      // updated Firestore rules that allow subcollections are deployed).
+      console.error('Memories subcollection sync failed, falling back to array:', error);
+      try {
+        await setDoc(doc(db, 'tripData', 'shared'), {
+          memories: newMemories,
+          lastUpdated: new Date().toISOString(),
+          updatedBy: currentUser
+        }, { merge: true });
+      } catch (e2) {
+        console.error('Error saving memories to Firestore:', e2);
+        showToast('Failed to save memory. Please try again.', 'error');
+      }
     }
-  }, [user, currentUser, showToast]);
+  }, [user, currentUser, showToast, diffSyncCollection]);
 
   // Save fitness data to Firestore
   const saveFitnessToFirestore = useCallback(async (newEvents, newTrainingPlans) => {
@@ -2445,7 +2591,17 @@ export default function TripPlanner() {
       // This prevents stale closure values from overwriting other fields
       const updates = { lastUpdated: new Date().toISOString(), updatedBy: currentUser || 'unknown' };
       if (newLists !== null && newLists !== undefined) updates.lists = newLists;
-      if (newTasks !== null && newTasks !== undefined) updates.tasks = newTasks;
+      if (newTasks !== null && newTasks !== undefined) {
+        try {
+          // Per-doc diff sync into tripData/sharedHub/tasks (Phase 2 model).
+          await diffSyncCollection('tripData', 'sharedHub', 'tasks', newTasks, tasksSyncRef);
+          updates.tasksMigratedAt = new Date().toISOString();
+        } catch (e) {
+          // Rules not deployed yet? Fall back to the legacy array so nothing is lost.
+          console.error('Tasks subcollection sync failed, falling back to array:', e);
+          updates.tasks = newTasks;
+        }
+      }
       if (newIdeas !== null && newIdeas !== undefined) updates.ideas = newIdeas;
       if (newSocial !== null && newSocial !== undefined) updates.social = newSocial;
       if (newGoals !== null && newGoals !== undefined) updates.goals = newGoals;
@@ -2458,7 +2614,7 @@ export default function TripPlanner() {
       console.error('Error saving shared hub:', error);
       showToast('Failed to save. Please try again.', 'error');
     }
-  }, [user, currentUser, showToast]);
+  }, [user, currentUser, showToast, diffSyncCollection]);
 
   // Update the ref so the hook can use the actual saveSharedHub function
   useEffect(() => {
