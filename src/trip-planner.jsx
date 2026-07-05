@@ -4477,7 +4477,7 @@ export default function TripPlanner() {
                                       key={goal.id}
                                       goal={goal}
                                       currentUser={currentUser}
-                                      onToggleMilestone={(milestoneId) => toggleMilestone(goal.id, milestoneId)}
+                                      onToggleMilestone={toggleMilestone}
                                       onEdit={() => setShowAddGoalModal(goal)}
                                       onDelete={() => deleteGoal(goal.id)}
                                       onHighlight={() => highlightGoal(goal.id)}
@@ -4711,7 +4711,7 @@ export default function TripPlanner() {
                           <GoalCard
                             goal={goal}
                             currentUser={currentUser}
-                            onToggleMilestone={(milestoneId) => toggleMilestone(goal.id, milestoneId)}
+                            onToggleMilestone={toggleMilestone}
                             onEdit={() => setShowAddGoalModal(goal)}
                             onDelete={() => deleteGoal(goal.id)}
                             onHighlight={() => highlightGoal(goal.id)}
@@ -4738,7 +4738,7 @@ export default function TripPlanner() {
                             key={goal.id}
                             goal={goal}
                             currentUser={currentUser}
-                            onToggleMilestone={(milestoneId) => toggleMilestone(goal.id, milestoneId)}
+                            onToggleMilestone={toggleMilestone}
                             onEdit={() => setShowAddGoalModal(goal)}
                             onDelete={() => deleteGoal(goal.id)}
                             onHighlight={() => highlightGoal(goal.id)}
