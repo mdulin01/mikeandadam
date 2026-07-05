@@ -580,14 +580,13 @@ export default function TripPlanner() {
   const saveFitnessRef = useRef(() => {});
 
   // ========== FITNESS: All state and operations from hook =====
-  // Note: plan templates (cary10k, gsoHalf, indyHalf) are defined later in this file.
+  // Note: plan templates (gsoHalf, indyHalf) are defined later in this file.
   // Each gets a ref so useFitness can lazy-init the plan into Firestore on first edit.
   const generateTrainingWeeksRef = useRef(() => []);
   const indyHalfTrainingPlanRef = useRef([]);
-  const cary10kTrainingPlanRef = useRef([]);
   const gsoHalfTrainingPlanRef = useRef([]);
 
-  const fitness = useFitness(saveFitnessRef, showToast, generateTrainingWeeksRef, indyHalfTrainingPlanRef, cary10kTrainingPlanRef, gsoHalfTrainingPlanRef);
+  const fitness = useFitness(saveFitnessRef, showToast, generateTrainingWeeksRef, indyHalfTrainingPlanRef, gsoHalfTrainingPlanRef);
   const {
     fitnessEvents, fitnessTrainingPlans, selectedFitnessEvent, fitnessViewMode,
     updateFitnessEvent, deleteFitnessEvent, updateTrainingWeek, addWorkout, deleteWorkout,
@@ -1353,16 +1352,6 @@ export default function TripPlanner() {
       finishTime: '2:22',
     },
     {
-      id: 'cary-10k-2026',
-      name: 'Cary 10K',
-      emoji: '🏃',
-      date: '2026-07-11',
-      type: '10k',
-      location: 'Cary, NC',
-      color: 'from-emerald-400 to-green-500',
-      status: 'active',
-    },
-    {
       id: 'gso-half-2026',
       name: 'Greensboro Half Marathon',
       emoji: '🏃',
@@ -1508,203 +1497,124 @@ export default function TripPlanner() {
 
   /* eslint-disable */
   // ============================================================
-  // CARY 10K TRAINING PLAN — 9 weeks, 3 runs/week, 2-week taper
-  // Race: Saturday 2026-07-11 in Cary, NC
-  // Coming off the Indy Half so base fitness is good — focus on speed.
+  // GREENSBORO HALF MARATHON TRAINING PLAN — 16 weeks, 3 runs/week, 2-week taper
+  // Race: Saturday 2026-11-21 in Greensboro, NC
+  // Re-planned 2026-07-05 from Mike's "GSO Half Plan" sheet — 247.1 total miles.
+  // Weekly notes carry trip/race conflicts (PTown, Mike Holland, Tri, Atlanta, FMX, PS Pride).
   // ============================================================
-  const cary10kTrainingPlan = [
-    { weekNumber: 1, startDate: '2026-05-10', endDate: '2026-05-16', runs: [
-      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: 'Easy recovery from Indy Half' },
+  const gsoHalfTrainingPlan = [
+    { weekNumber: 1, startDate: '2026-08-02', endDate: '2026-08-08', runs: [
+      { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
       { id: 3, label: 'Long Run',   distance: '5 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 11, weekNotes: '🟢 Recovery + base — first week post-Indy' },
-    { weekNumber: 2, startDate: '2026-05-17', endDate: '2026-05-23', runs: [
-      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+    ], totalMiles: 10, weekNotes: 'PTown 8/1-8/8' },
+    { weekNumber: 2, startDate: '2026-08-09', endDate: '2026-08-15', runs: [
+      { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '5 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 10, weekNotes: '' },
+    { weekNumber: 3, startDate: '2026-08-16', endDate: '2026-08-22', runs: [
+      { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '6 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 11, weekNotes: '' },
+    { weekNumber: 4, startDate: '2026-08-23', endDate: '2026-08-29', runs: [
+      { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
       { id: 3, label: 'Long Run',   distance: '6 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 13, weekNotes: '' },
-    { weekNumber: 3, startDate: '2026-05-24', endDate: '2026-05-30', runs: [
+    ], totalMiles: 12, weekNotes: '' },
+    { weekNumber: 5, startDate: '2026-08-30', endDate: '2026-09-05', runs: [
+      { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 13, weekNotes: 'Mike Holland 8/30-9/6' },
+    { weekNumber: 6, startDate: '2026-09-06', endDate: '2026-09-12', runs: [
       { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '6.5 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 13.5, weekNotes: '' },
-    { weekNumber: 4, startDate: '2026-05-31', endDate: '2026-06-06', runs: [
-      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
       { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 15, weekNotes: '' },
-    { weekNumber: 5, startDate: '2026-06-07', endDate: '2026-06-13', runs: [
-      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
+    ], totalMiles: 14, weekNotes: 'Mike Holland 8/30-9/6' },
+    { weekNumber: 7, startDate: '2026-09-13', endDate: '2026-09-19', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: '' }
+      { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
     ], totalMiles: 16, weekNotes: '' },
-    { weekNumber: 6, startDate: '2026-06-14', endDate: '2026-06-20', runs: [
-      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 17, weekNotes: '' },
-    { weekNumber: 7, startDate: '2026-06-21', endDate: '2026-06-27', runs: [
-      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 17, weekNotes: '🔝 Peak week' },
-    { weekNumber: 8, startDate: '2026-06-28', endDate: '2026-07-04', runs: [
-      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '5 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 12, weekNotes: '📉 Taper Week 1' },
-    { weekNumber: 9, startDate: '2026-07-05', endDate: '2026-07-11', runs: [
-      { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: 'Easy shakeout' },
-      { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '6.2 mi', mike: false, adam: false, notes: '🏁 RACE!' }
-    ], crossTraining: [
-      { id: 1, label: 'Race Day Prep', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Rest', mike: false, adam: false, notes: '' }
-    ], totalMiles: 11.2, weekNotes: '🏁 RACE WEEK! Cary 10K — go get it! 🎉', isRaceWeek: true }
-  ].map(week => ({ ...week, id: `cary-10k-2026-week-${week.weekNumber}` }));
-
-  // ============================================================
-  // GREENSBORO HALF MARATHON TRAINING PLAN — 16 weeks, 3 runs/week, 2-week taper
-  // Race: Saturday 2026-11-21 in Greensboro, NC
-  // Plan starts Aug 2 (3 weeks of base after 10K). Wrightsville Tri Sep 27 falls in week 9.
-  // ============================================================
-  const gsoHalfTrainingPlan = [
-    { weekNumber: 1, startDate: '2026-08-02', endDate: '2026-08-08', runs: [
-      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '5 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 12, weekNotes: 'Plan begins — easy build from 10K base' },
-    { weekNumber: 2, startDate: '2026-08-09', endDate: '2026-08-15', runs: [
-      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '6 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 13, weekNotes: '' },
-    { weekNumber: 3, startDate: '2026-08-16', endDate: '2026-08-22', runs: [
-      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 14, weekNotes: '' },
-    { weekNumber: 4, startDate: '2026-08-23', endDate: '2026-08-29', runs: [
-      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 14, weekNotes: '' },
-    { weekNumber: 5, startDate: '2026-08-30', endDate: '2026-09-05', runs: [
-      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 15, weekNotes: '' },
-    { weekNumber: 6, startDate: '2026-09-06', endDate: '2026-09-12', runs: [
-      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 17, weekNotes: '' },
-    { weekNumber: 7, startDate: '2026-09-13', endDate: '2026-09-19', runs: [
-      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '9 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 18, weekNotes: '' },
     { weekNumber: 8, startDate: '2026-09-20', endDate: '2026-09-26', runs: [
-      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: 'Easy — Mike has tri Sat' }
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 15, weekNotes: '⚠️ Mike racing Wrightsville Tri this Sun (9/27) — light week' },
+    ], totalMiles: 16, weekNotes: 'Triathlon 9/24-9/27' },
     { weekNumber: 9, startDate: '2026-09-27', endDate: '2026-10-03', runs: [
-      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: 'Recovery' },
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
       { id: 3, label: 'Long Run',   distance: '9 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 17, weekNotes: 'Post-tri recovery + back to half build' },
+    ], totalMiles: 17, weekNotes: 'Triathlon 9/24-9/27' },
     { weekNumber: 10, startDate: '2026-10-04', endDate: '2026-10-10', runs: [
+      { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '6 mi', mike: false, adam: false, notes: '' },
+      { id: 3, label: 'Long Run',   distance: '9 mi', mike: false, adam: false, notes: '' }
+    ], crossTraining: [
+      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    ], totalMiles: 18, weekNotes: 'Atlanta 10/8-10/12' },
+    { weekNumber: 11, startDate: '2026-10-11', endDate: '2026-10-17', runs: [
       { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '6 mi', mike: false, adam: false, notes: '' },
       { id: 3, label: 'Long Run',   distance: '10 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 19, weekNotes: '' },
-    { weekNumber: 11, startDate: '2026-10-11', endDate: '2026-10-17', runs: [
+    ], totalMiles: 20, weekNotes: 'Atlanta 10/8-10/12' },
+    { weekNumber: 12, startDate: '2026-10-18', endDate: '2026-10-24', runs: [
       { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '6 mi', mike: false, adam: false, notes: '' },
       { id: 3, label: 'Long Run',   distance: '11 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 20, weekNotes: '' },
-    { weekNumber: 12, startDate: '2026-10-18', endDate: '2026-10-24', runs: [
-      { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
-      { id: 3, label: 'Long Run',   distance: '12 mi', mike: false, adam: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 21, weekNotes: '' },
+    ], totalMiles: 21, weekNotes: 'FMX 10/20-10/25?' },
     { weekNumber: 13, startDate: '2026-10-25', endDate: '2026-10-31', runs: [
       { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '6 mi', mike: false, adam: false, notes: '' },
       { id: 3, label: 'Long Run',   distance: '12 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 21, weekNotes: '🔝 Peak week' },
+    ], totalMiles: 22, weekNotes: 'FMX 10/20-10/25? · 🔝 Peak week' },
     { weekNumber: 14, startDate: '2026-11-01', endDate: '2026-11-07', runs: [
       { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
-      { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
+      { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
       { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 15, weekNotes: '📉 Taper Week 1' },
+    ], totalMiles: 16, weekNotes: 'PS Pride 11/4-11/9 · 📉 Taper Week 1' },
     { weekNumber: 15, startDate: '2026-11-08', endDate: '2026-11-14', runs: [
       { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
@@ -1712,9 +1622,9 @@ export default function TripPlanner() {
     ], crossTraining: [
       { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
-    ], totalMiles: 13, weekNotes: '📉 Taper Week 2' },
+    ], totalMiles: 13, weekNotes: 'PS Pride 11/4-11/9 · 📉 Taper Week 2' },
     { weekNumber: 16, startDate: '2026-11-15', endDate: '2026-11-21', runs: [
-      { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: 'Easy shakeout' },
+      { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
       { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
       { id: 3, label: 'Long Run',   distance: '13.1 mi', mike: false, adam: false, notes: '🏁 RACE!' }
     ], crossTraining: [
@@ -1724,223 +1634,13 @@ export default function TripPlanner() {
   ].map(week => ({ ...week, id: `gso-half-2026-week-${week.weekNumber}` }));
   /* eslint-enable */
 
-  // The Triathlon plan was REMOVED from mikeandadam — Mike's tri lives in mikesfitness.app now.
-  const _removedTriathlonPlan = [
-    // === PRE-SEASON: Swimming Cross-Training (Feb 2 - May 9) ===
-    // During this phase, runs are tracked in Half Marathon plan
-    { weekNumber: 1, startDate: '2026-02-02', endDate: '2026-02-08', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '450 yds', mike: false, notes: 'Easy pace, focus on form' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '🏊 Pre-Season Week 1 - Getting in the water!' },
-    { weekNumber: 2, startDate: '2026-02-09', endDate: '2026-02-15', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '500 yds', mike: false, notes: 'Freestyle drills' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 3, startDate: '2026-02-16', endDate: '2026-02-22', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '550 yds', mike: false, notes: '' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 4, startDate: '2026-02-23', endDate: '2026-03-01', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '600 yds', mike: false, notes: '' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 5, startDate: '2026-03-02', endDate: '2026-03-08', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '650 yds', mike: false, notes: '' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '🏊 Building endurance!' },
-    { weekNumber: 6, startDate: '2026-03-09', endDate: '2026-03-15', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '700 yds', mike: false, notes: '' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 7, startDate: '2026-03-16', endDate: '2026-03-22', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '750 yds', mike: false, notes: '' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 8, startDate: '2026-03-23', endDate: '2026-03-29', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '825 yds', mike: false, notes: '' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 9, startDate: '2026-03-30', endDate: '2026-04-05', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '875 yds', mike: false, notes: '' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '🏊 Halfway to race swim distance!' },
-    { weekNumber: 10, startDate: '2026-04-06', endDate: '2026-04-12', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '925 yds', mike: false, notes: '' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 11, startDate: '2026-04-13', endDate: '2026-04-19', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '1000 yds', mike: false, notes: '' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 12, startDate: '2026-04-20', endDate: '2026-04-26', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '1050 yds', mike: false, notes: '' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 13, startDate: '2026-04-27', endDate: '2026-05-03', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '1100 yds', mike: false, notes: 'Race distance achieved!' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '🏃 Half Marathon Week! Focus on race.' },
-    { weekNumber: 14, startDate: '2026-05-04', endDate: '2026-05-09', phase: 'pre-season', runs: [
-      { id: 1, label: '🏊 Swim', distance: '650 yds', mike: false, notes: 'Recovery swim' }
-    ], crossTraining: [], totalMiles: 0, weekNotes: '🔄 Transition week - recover from Half!' },
-
-    // === MAIN TRAINING: Full Triathlon (May 10 onwards) ===
-    { weekNumber: 15, startDate: '2026-05-10', endDate: '2026-05-16', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '550 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '10 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '2 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '🚴 Full tri training begins!' },
-    { weekNumber: 16, startDate: '2026-05-17', endDate: '2026-05-23', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '650 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '12 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '2.5 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 17, startDate: '2026-05-24', endDate: '2026-05-30', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '750 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '14 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '3 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 18, startDate: '2026-05-31', endDate: '2026-06-06', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '875 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '15 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '3 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 19, startDate: '2026-06-07', endDate: '2026-06-13', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1000 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '16 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '3.5 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 20, startDate: '2026-06-14', endDate: '2026-06-20', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1100 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '18 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '4 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 21, startDate: '2026-06-21', endDate: '2026-06-27', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1100 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '20 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '4 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 22, startDate: '2026-06-28', endDate: '2026-07-04', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1200 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '22 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '4.5 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '🎆 4th of July Week!' },
-    { weekNumber: 23, startDate: '2026-07-05', endDate: '2026-07-11', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1300 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '24 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 24, startDate: '2026-07-12', endDate: '2026-07-18', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1425 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '26 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 25, startDate: '2026-07-19', endDate: '2026-07-25', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1530 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '28 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5.5 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 26, startDate: '2026-07-26', endDate: '2026-08-01', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1640 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '30 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '6 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '🏊 Peak Swim Week!' },
-    { weekNumber: 27, startDate: '2026-08-02', endDate: '2026-08-08', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1640 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '30 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '6 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 28, startDate: '2026-08-09', endDate: '2026-08-15', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1640 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '28 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5.5 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 29, startDate: '2026-08-16', endDate: '2026-08-22', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1530 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '26 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 30, startDate: '2026-08-23', endDate: '2026-08-29', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1425 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '24 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '5 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '' },
-    { weekNumber: 31, startDate: '2026-08-30', endDate: '2026-09-05', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1300 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '22 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '4 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '📉 Taper begins!' },
-    { weekNumber: 32, startDate: '2026-09-06', endDate: '2026-09-12', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '1100 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '18 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '3 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '📉 Taper Week 2' },
-    { weekNumber: 33, startDate: '2026-09-13', endDate: '2026-09-19', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '875 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '14 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '2.5 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Brick (Bike+Run)', mike: false, notes: '' },
-      { id: 2, label: 'Strength', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '📉 Taper Week 3 - Rest up!' },
-    { weekNumber: 34, startDate: '2026-09-20', endDate: '2026-09-26', phase: 'main', runs: [
-      { id: 1, label: 'Swim', distance: '550 yds', mike: false, notes: '' },
-      { id: 2, label: 'Bike', distance: '10 mi', mike: false, notes: '' },
-      { id: 3, label: 'Run', distance: '6.2 mi', mike: false, notes: '' }
-    ], crossTraining: [
-      { id: 1, label: 'Race Day Prep', mike: false, notes: '' },
-      { id: 2, label: 'Rest', mike: false, notes: '' }
-    ], totalMiles: 0, weekNotes: '🏁 RACE WEEK! Sprint Tri - You got this! 🎉', isRaceWeek: true }
-  ];
-  void _removedTriathlonPlan; // suppress unused warning; data kept for reference until next cleanup pass
+  // The triathlon plan lives in mikesfitness.app — removed from this app entirely.
 
   // Update refs for training plans (used by fitness hook)
   useEffect(() => {
     indyHalfTrainingPlanRef.current = indyHalfTrainingPlan;
-    cary10kTrainingPlanRef.current = cary10kTrainingPlan;
     gsoHalfTrainingPlanRef.current = gsoHalfTrainingPlan;
-  }, [indyHalfTrainingPlan, cary10kTrainingPlan, gsoHalfTrainingPlan]);
+  }, [indyHalfTrainingPlan, gsoHalfTrainingPlan]);
 
   // Generate generic training weeks for other events
   const generateTrainingWeeks = (startDate, eventDate, eventId) => {
@@ -2362,7 +2062,8 @@ export default function TripPlanner() {
     // Triathlon was removed from this app (lives in mikesfitness now). Defensive
     // filter strips it from persisted state so old Firestore data doesn't resurrect it.
     // Also merges hardcoded defaultFitnessEvents with persisted ones so newly-added
-    // events (Cary 10K, GSO Half) appear immediately even if Firestore has only Indy.
+    // events appear immediately even if Firestore has only Indy. Cary 10K was
+    // removed 2026-07-05 (skipping the race) — the filter strips it like the tri.
     // Persisted events that EXIST get fields from defaults patched in (status, location)
     // — defaults win for these "structural" fields since they're how we mark archived state.
     const fitnessUnsubscribe = onSnapshot(
@@ -2373,7 +2074,7 @@ export default function TripPlanner() {
           if (data.events) {
             // Strip the legacy triathlon-2026 AND any Mike-only events seeded by
             // mikesfitness (owner: 'mike') — those don't belong in the couples app.
-            const filtered = data.events.filter(e => e.id !== 'triathlon-2026' && e.owner !== 'mike');
+            const filtered = data.events.filter(e => e.id !== 'triathlon-2026' && e.id !== 'cary-10k-2026' && e.owner !== 'mike');
             const defaultsById = new Map(defaultFitnessEvents.map(e => [e.id, e]));
             // Patch persisted events with current defaults for status/location (defaults win).
             const patched = filtered.map(e => {
@@ -2393,9 +2094,17 @@ export default function TripPlanner() {
             setFitnessEvents([...patched, ...missingDefaults]);
           }
           if (data.trainingPlans) {
-            // Drop the orphan triathlon plan from persisted state too.
+            // Drop orphan plans from persisted state too (tri → mikesfitness; Cary 10K removed).
             const cleanedPlans = { ...data.trainingPlans };
             delete cleanedPlans['triathlon-2026'];
+            delete cleanedPlans['cary-10k-2026'];
+            // GSO Half re-planned 2026-07-05: purge a stale persisted copy (old plan's
+            // week-1 short run was '3 mi'; the new plan's is '2 mi') so the updated
+            // template takes effect. Safe — plan doesn't start until 8/2/26.
+            const gsoW1 = (cleanedPlans['gso-half-2026'] || []).find(w => w.weekNumber === 1);
+            if (gsoW1 && (gsoW1.runs || []).some(r => r.label === 'Short Run' && r.distance === '3 mi')) {
+              delete cleanedPlans['gso-half-2026'];
+            }
             setFitnessTrainingPlans(cleanedPlans);
           }
         }
@@ -3259,7 +2968,6 @@ export default function TripPlanner() {
     if (!newPlans[eventId]) {
       const template = (
         eventId === 'indy-half-2026' ? indyHalfTrainingPlan :
-        eventId === 'cary-10k-2026' ? cary10kTrainingPlan :
         eventId === 'gso-half-2026' ? gsoHalfTrainingPlan :
         null
       );
@@ -3333,8 +3041,6 @@ export default function TripPlanner() {
     let weeks;
     if (eventId === 'indy-half-2026') {
       weeks = JSON.parse(JSON.stringify(indyHalfTrainingPlan));
-    } else if (eventId === 'cary-10k-2026') {
-      weeks = JSON.parse(JSON.stringify(cary10kTrainingPlan));
     } else if (eventId === 'gso-half-2026') {
       weeks = JSON.parse(JSON.stringify(gsoHalfTrainingPlan));
     } else {
@@ -3442,9 +3148,6 @@ export default function TripPlanner() {
 
     if (eventId === 'indy-half-2026') {
       return mergeWithFirebase(indyHalfTrainingPlan);
-    }
-    if (eventId === 'cary-10k-2026') {
-      return mergeWithFirebase(cary10kTrainingPlan);
     }
     if (eventId === 'gso-half-2026') {
       return mergeWithFirebase(gsoHalfTrainingPlan);
@@ -5595,7 +5298,7 @@ export default function TripPlanner() {
                           {event.name}
                         </button>
                         {/* Edit button - only show for non-hardcoded events */}
-                        {!['indy-half-2026', 'cary-10k-2026', 'gso-half-2026'].includes(event.id) && (
+                        {!['indy-half-2026', 'gso-half-2026'].includes(event.id) && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -8677,7 +8380,6 @@ export default function TripPlanner() {
                       // Add completed fitness events to timeline
                       const fitnessEvents = [
                         { id: 'indy-half-2026', name: 'Indy Half Marathon', date: '2026-05-02', emoji: '🏃' },
-                        { id: 'cary-10k-2026', name: 'Cary 10K', date: '2026-07-11', emoji: '🏃' },
                         { id: 'gso-half-2026', name: 'Greensboro Half Marathon', date: '2026-11-21', emoji: '🏃' },
                       ];
                       fitnessEvents.forEach(event => {
@@ -8898,7 +8600,6 @@ export default function TripPlanner() {
                     const completedFitnessEvents = [];
                     const fitnessEventsData = [
                       { id: 'indy-half-2026', name: 'Indy Half Marathon', date: '2026-05-02', location: 'Indianapolis, IN', emoji: '🏃' },
-                      { id: 'cary-10k-2026', name: 'Cary 10K', date: '2026-07-11', location: 'Cary, NC', emoji: '🏃' },
                       { id: 'gso-half-2026', name: 'Greensboro Half Marathon', date: '2026-11-21', location: 'Greensboro, NC', emoji: '🏃' },
                     ];
                     fitnessEventsData.forEach(event => {

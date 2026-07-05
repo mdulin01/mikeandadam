@@ -5,7 +5,7 @@ import { useState, useCallback } from 'react';
  * Manages all fitness-related state and operations
  * Handles events, training plans, and workouts
  *
- * NOTE: saveRef, genRef, indyPlanRef, cary10kPlanRef, gsoHalfPlanRef are React refs
+ * NOTE: saveRef, genRef, indyPlanRef, gsoHalfPlanRef are React refs
  * passed from the parent. We read .current at CALL TIME (not render time) to always
  * get the latest function/data, avoiding stale closure issues.
  *
@@ -13,7 +13,7 @@ import { useState, useCallback } from 'react';
  * mikesfitness.app. Don't add a triPlanRef back here — keep this app couples-only.
  */
 
-export const useFitness = (saveRef, showToast, genRef, indyPlanRef, cary10kPlanRef, gsoHalfPlanRef) => {
+export const useFitness = (saveRef, showToast, genRef, indyPlanRef, gsoHalfPlanRef) => {
   // ========== INITIAL DATA ==========
   // Empty by default — defaults come from trip-planner.jsx defaultFitnessEvents and
   // are merged via setFitnessEvents on first load. Keeping this empty avoids two
@@ -53,7 +53,6 @@ export const useFitness = (saveRef, showToast, genRef, indyPlanRef, cary10kPlanR
   // Add the entry here and pass the ref through trip-planner.jsx → useFitness().
   const planRefByEventId = {
     'indy-half-2026': indyPlanRef,
-    'cary-10k-2026': cary10kPlanRef,
     'gso-half-2026': gsoHalfPlanRef,
   };
 
@@ -99,7 +98,7 @@ export const useFitness = (saveRef, showToast, genRef, indyPlanRef, cary10kPlanR
 
     setFitnessTrainingPlans(newPlans);
     await saveRef.current(null, newPlans);
-  }, [fitnessEvents, fitnessTrainingPlans, saveRef, indyPlanRef, cary10kPlanRef, gsoHalfPlanRef, genRef]);
+  }, [fitnessEvents, fitnessTrainingPlans, saveRef, indyPlanRef, gsoHalfPlanRef, genRef]);
 
   const updateWorkout = useCallback(async (eventId, weekId, workoutType, workoutId, updates) => {
     if (!eventId || !weekId) return;
@@ -127,7 +126,7 @@ export const useFitness = (saveRef, showToast, genRef, indyPlanRef, cary10kPlanR
 
     setFitnessTrainingPlans(newPlans);
     await saveRef.current(null, newPlans);
-  }, [fitnessTrainingPlans, saveRef, indyPlanRef, cary10kPlanRef, gsoHalfPlanRef]);
+  }, [fitnessTrainingPlans, saveRef, indyPlanRef, gsoHalfPlanRef]);
 
   const addWorkout = useCallback(async (eventId, weekId, workoutType, workoutData) => {
     if (!eventId || !weekId) return;
@@ -155,7 +154,7 @@ export const useFitness = (saveRef, showToast, genRef, indyPlanRef, cary10kPlanR
 
     setFitnessTrainingPlans(newPlans);
     await saveRef.current(null, newPlans);
-  }, [fitnessEvents, fitnessTrainingPlans, saveRef, indyPlanRef, cary10kPlanRef, gsoHalfPlanRef, genRef]);
+  }, [fitnessEvents, fitnessTrainingPlans, saveRef, indyPlanRef, gsoHalfPlanRef, genRef]);
 
   const deleteWorkout = useCallback(async (eventId, weekId, workoutType, workoutId) => {
     if (!eventId || !weekId) return;
