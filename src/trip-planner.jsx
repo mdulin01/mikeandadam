@@ -7497,19 +7497,7 @@ export default function TripPlanner() {
                 <div className="flex-1" />
 
                 {/* Timeline Controls - Right justified (only show for timeline view) */}
-                {/* ===== FEED VIEW (Phase 3 — our own social feed) ===== */}
-              {memoriesView === 'feed' && (
-                <MemoriesFeed
-                  memories={memories}
-                  currentUser={currentUser}
-                  todayStr={toLocalDateStr()}
-                  onReact={reactToMemory}
-                  onAddComment={commentOnMemory}
-                  onOpen={(m) => setEditingMemory({ ...m })}
-                />
-              )}
-
-              {memoriesView === 'timeline' && (
+                {memoriesView === 'timeline' && (
                   <>
                     {/* Sort Order Toggle - Just arrow icon */}
                     <button
@@ -7569,6 +7557,18 @@ export default function TripPlanner() {
                   </>
                 )}
               </div>
+
+              {/* ===== FEED VIEW (Phase 3 — our own social feed) ===== */}
+              {memoriesView === 'feed' && (
+                <MemoriesFeed
+                  memories={memories}
+                  currentUser={currentUser}
+                  todayStr={toLocalDateStr()}
+                  onReact={reactToMemory}
+                  onAddComment={commentOnMemory}
+                  onOpen={(m) => setEditingMemory({ ...m })}
+                />
+              )}
 
               {/* Timeline View */}
               {memoriesView === 'timeline' && (
