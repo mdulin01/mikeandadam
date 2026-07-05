@@ -3,7 +3,8 @@ import { doc, onSnapshot } from 'firebase/firestore';
 
 /**
  * RupertBanner — same pattern as mikes-money / mikesfitness / rainbow-rentals.
- * Reads the single doc rupert/note in THIS app's Firestore (trip-planner-5cc84),
+ * Reads the single doc rupert/coupleNote in THIS app's Firestore (trip-planner-5cc84)
+ * — coupleNote (not note) because mikesfitness shares this project and owns rupert/note —
  * written by the mikeslife cron-couple-context job. Shape:
  *   { text, signals: [{label, href}], priorities: [], updatedAt }
  * Dismissable per-update (remembers the dismissed updatedAt in localStorage).
@@ -17,7 +18,7 @@ const RupertBanner = ({ db }) => {
   useEffect(() => {
     if (!db) return;
     const unsub = onSnapshot(
-      doc(db, 'rupert', 'note'),
+      doc(db, 'rupert', 'coupleNote'),
       (snap) => setNote(snap.exists() ? snap.data() : null),
       () => setNote(null)
     );

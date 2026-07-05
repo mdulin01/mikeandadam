@@ -3851,7 +3851,7 @@ export default function TripPlanner() {
       <main className="relative z-10 px-6 md:pb-12 flex-1 overflow-y-auto main-mobile-pb" id="main-scroll">
         <div className="max-w-6xl mx-auto">
 
-          {/* Rupert banner — written by mikeslife cron-couple-context (rupert/note doc) */}
+          {/* Rupert banner — written by mikeslife cron-couple-context (rupert/coupleNote doc) */}
           <RupertBanner db={db} />
 
           {/* ========== HUB SECTION (formerly Home) ========== */}
