@@ -130,6 +130,10 @@ async function readFitness() {
   const snap = await db.collection("tripData").doc("fitness").get();
   return snap.exists ? snap.data() : {};
 }
+async function readCheckins() {
+  const col = await db.collection("tripData").doc("checkins").collection("entries").get();
+  return col.docs.map((d) => d.data());
+}
 async function readPartyEvents() {
   const snap = await db.collection("tripData").doc("partyEvents").get();
   return snap.exists ? (snap.data().events || []) : [];
@@ -221,11 +225,21 @@ exports.coupleDigest = onSchedule(
       lines.push(`🎉 ${ev.title || ev.name} — ${fmtDate(ev.date)}`);
     }
 
+    // On this day (any year back) — daily, people love this.
+    const mmdd = todayStr.slice(5);
+    const onThisDay = memories.filter((m) => m.date && m.date.slice(5) === mmdd && m.date < todayStr)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (onThisDay.length > 0) {
+      const m = onThisDay[0];
+      const years = parseInt(todayStr.slice(0, 4), 10) - parseInt(m.date.slice(0, 4), 10);
+      lines.push(`💝 On this day ${years} year${years > 1 ? "s" : ""} ago: ${m.title}${m.location ? ` (${m.location})` : ""}`);
+    }
+
     if (isSunday) {
-      const lb = lookbackMemories(memories, todayStr);
+      const lb = lookbackMemories(memories, todayStr).filter((m) => m.date.slice(5) !== mmdd);
       if (lb.length > 0) {
         const m = lb[0];
-        lines.push(`💝 One year ago: ${m.title}${m.location ? ` (${m.location})` : ""}`);
+        lines.push(`💝 One year ago this week: ${m.title}${m.location ? ` (${m.location})` : ""}`);
       }
       const hub = await readHubDoc();
       const openLists = (hub.lists || []).filter((l) => l.status === "active" && (l.items || []).some((i) => !i.checked)).length;
@@ -304,6 +318,35 @@ exports.memoryReminder = onSchedule(
       { title: "📸 Time to make a memory", body, url: APP_URL + "/memories", tag: "memory-nudge" },
       { kind: "memory" }
     );
+  }
+);
+
+// ═══════════════════════════════════════════════
+// Weekly couple check-in reminder — Sundays 5 PM ET.
+// Nudges only the person (or people) who haven't checked in this week.
+// ═══════════════════════════════════════════════
+exports.checkinReminder = onSchedule(
+  { schedule: "0 17 * * 0", timeZone: ET, retryCount: 1 },
+  async () => {
+    const now = etNow();
+    const sunday = new Date(now);
+    sunday.setDate(sunday.getDate() - sunday.getDay());
+    const week = toYMD(sunday);
+    const checkins = await readCheckins();
+    const done = new Set(checkins.filter((c) => c.week === week).map((c) => c.by));
+    const missing = ["mike", "adam"].filter((p) => !done.has(p));
+    if (missing.length === 0) { logger.info("checkinReminder: both done."); return; }
+    for (const person of missing) {
+      await sendPush({
+        title: "💌 Weekly check-in",
+        body: done.size > 0
+          ? `${[...done][0] === "mike" ? "Mike" : "Adam"} already checked in — two minutes to add yours?`
+          : "Two minutes, five questions — future you will treasure these.",
+        url: APP_URL + "/home",
+        tag: "checkin",
+      }, { only: person, kind: "digest" });
+    }
+    logger.info("checkinReminder sent", { missing });
   }
 );
 

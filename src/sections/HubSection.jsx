@@ -7,6 +7,7 @@ import OdysseyPlanCard from '../components/SharedHub/OdysseyPlanCard';
 import SocialCard from '../components/SharedHub/SocialCard';
 import TaskCard from '../components/SharedHub/TaskCard';
 import TodayCard from '../components/TodayCard';
+import CheckinCard from '../components/CheckinCard';
 import { ideaCategories, listCategories, socialTypes, timeHorizons } from '../constants';
 
 /**
@@ -15,6 +16,8 @@ import { ideaCategories, listCategories, socialTypes, timeHorizons } from '../co
  */
 const HubSection = (props) => {
   const {
+    checkins,
+    submitCheckin,
     calendarAgenda,
     collapsedSections,
     completeSocial,
@@ -80,6 +83,13 @@ const HubSection = (props) => {
                     snapshot={todaySnapshot}
                     onGo={(s) => { setActiveSection(s); if (s === 'home') setHubSubView('home'); }}
                     onOpenTask={(t) => setShowAddTaskModal(t)}
+                  />
+
+                  {/* WEEKLY COUPLE CHECK-IN */}
+                  <CheckinCard
+                    me={String(currentUser || 'mike').toLowerCase()}
+                    checkins={checkins}
+                    onSubmit={submitCheckin}
                   />
 
                   {/* UPCOMING (shared Google calendar via Rupert/mikeslife) */}

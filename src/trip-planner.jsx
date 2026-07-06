@@ -612,6 +612,7 @@ export default function TripPlanner() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [showNotifyPrefs, setShowNotifyPrefs] = useState(false);
   const [notifyPrefs, setNotifyPrefs] = useState(null); // tripData/notifyPrefs
+  const [checkins, setCheckins] = useState([]); // tripData/checkins/entries (weekly couple check-in)
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFilters, setSearchFilters] = useState({ tasks: true, lists: true, ideas: true, social: true, goals: true, travel: true, events: true, fitness: true, memories: true });
@@ -1606,6 +1607,19 @@ export default function TripPlanner() {
     }
   };
 
+  const submitCheckin = async (entry) => {
+    try {
+      await setDoc(doc(db, 'tripData', 'checkins', 'entries', `${entry.week}-${entry.by}`), {
+        ...entry,
+        createdAt: new Date().toISOString(),
+      });
+      showToast('Check-in saved 💌', 'success');
+    } catch (e) {
+      console.error('checkin save failed:', e);
+      showToast('Could not save check-in', 'error');
+    }
+  };
+
   const enableNotifications = async () => {
     if (!user) return;
     setNotificationsLoading(true);
@@ -1958,6 +1972,13 @@ export default function TripPlanner() {
       }
     );
 
+    // Weekly couple check-ins (kept forever).
+    const checkinsUnsubscribe = onSnapshot(
+      collection(db, 'tripData', 'checkins', 'entries'),
+      (snap) => setCheckins(snap.docs.map((d) => d.data())),
+      (e) => console.error('checkins listener:', e)
+    );
+
     // Per-person notification preferences (read by the Cloud Functions).
     const notifyPrefsUnsubscribe = onSnapshot(
       doc(db, 'tripData', 'notifyPrefs'),
@@ -2001,6 +2022,7 @@ export default function TripPlanner() {
     );
 
     return () => {
+      checkinsUnsubscribe();
       notifyPrefsUnsubscribe();
       calendarUnsubscribe();
       memoriesColUnsubscribe();
@@ -3947,7 +3969,7 @@ export default function TripPlanner() {
           {/* ========== HUB SECTION (formerly Home) ========== */}
           {activeSection === 'home' && (
             <SharedHubProvider value={sharedHub}>
-              <HubSection {...{ calendarAgenda, collapsedSections, completeSocial, completeTask, currentUser, deleteGoal, deleteIdea, deleteOdysseyPlan, deleteSocial, deleteTask, getEventLabel, getLinkedLabel, highlightGoal, highlightIdea, highlightSocial, highlightTask, hubGoalFilter, hubIdeaFilter, hubListFilter, hubSocialFilter, hubSubView, hubTaskFilter, hubTaskSort, navigateToEvent, navigateToLinked, promoteIdeaToTask, setActiveSection, setHubGoalFilter, setHubIdeaFilter, setHubListFilter, setHubSocialFilter, setHubSubView, setHubTaskFilter, setHubTaskSort, setShowAddGoalModal, setShowAddIdeaModal, setShowAddSocialModal, setShowAddTaskModal, setShowOdysseyPlanModal, setShowSharedListModal, sharedGoals, sharedIdeas, sharedLists, sharedOdysseyPlans, sharedSocial, sharedTasks, taskMatchesHorizon, todaySnapshot, toggleDashSection, toggleMilestone, updateTask }} />
+              <HubSection {...{ checkins, submitCheckin, calendarAgenda, collapsedSections, completeSocial, completeTask, currentUser, deleteGoal, deleteIdea, deleteOdysseyPlan, deleteSocial, deleteTask, getEventLabel, getLinkedLabel, highlightGoal, highlightIdea, highlightSocial, highlightTask, hubGoalFilter, hubIdeaFilter, hubListFilter, hubSocialFilter, hubSubView, hubTaskFilter, hubTaskSort, navigateToEvent, navigateToLinked, promoteIdeaToTask, setActiveSection, setHubGoalFilter, setHubIdeaFilter, setHubListFilter, setHubSocialFilter, setHubSubView, setHubTaskFilter, setHubTaskSort, setShowAddGoalModal, setShowAddIdeaModal, setShowAddSocialModal, setShowAddTaskModal, setShowOdysseyPlanModal, setShowSharedListModal, sharedGoals, sharedIdeas, sharedLists, sharedOdysseyPlans, sharedSocial, sharedTasks, taskMatchesHorizon, todaySnapshot, toggleDashSection, toggleMilestone, updateTask }} />
             </SharedHubProvider>
           )}
           {/* ========== END HUB SECTION ========== */}
