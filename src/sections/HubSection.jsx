@@ -18,6 +18,8 @@ const HubSection = (props) => {
   const {
     checkins,
     submitCheckin,
+    weeklyQuestion,
+    rerollQuestion,
     updateGoal,
     calendarAgenda,
     collapsedSections,
@@ -91,6 +93,8 @@ const HubSection = (props) => {
                     me={String(currentUser || 'mike').toLowerCase()}
                     checkins={checkins}
                     onSubmit={submitCheckin}
+                    question={weeklyQuestion}
+                    onRerollQuestion={rerollQuestion}
                   />
 
                   {/* UPCOMING (shared Google calendar via Rupert/mikeslife) */}
@@ -204,63 +208,6 @@ const HubSection = (props) => {
                     );
                   })()}
 
-                  {/* RECENT IDEAS WIDGET */}
-                  {(() => {
-                    // Newest first (same fix as Lists — insertion-order slice hid new items)
-                    const recentIdeas = [...sharedIdeas.filter(i => i.status === 'inbox' || i.status === 'saved')]
-                      .sort((a, b) => String(b.createdAt || b.id || '').localeCompare(String(a.createdAt || a.id || '')))
-                      .slice(0, 4);
-                    const isCollapsed = collapsedSections.ideas;
-                    return (
-                      <div className="mb-6 rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(245,158,11,0.06)]">
-                        <button
-                          onClick={() => toggleDashSection('ideas')}
-                          className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition"
-                        >
-                          <h3 className="text-base font-bold text-white flex items-center gap-2">
-                            <span>💡</span> Ideas
-                          </h3>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setShowAddIdeaModal('create'); }}
-                              className="w-7 h-7 rounded-full bg-amber-500/20 hover:bg-amber-500/40 flex items-center justify-center transition text-amber-400"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
-                            <div className="text-white/40">
-                              {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-                            </div>
-                          </div>
-                        </button>
-                        {!isCollapsed && (
-                          <>
-                            <div className="px-4 pb-1">
-                              <button onClick={() => setHubSubView('ideas')} className="text-xs text-teal-400 hover:text-teal-300 transition">See All →</button>
-                            </div>
-                            <div className="p-4 pt-2 grid grid-cols-2 gap-3">
-                              {recentIdeas.length === 0 ? (
-                                <div className="col-span-2 text-center py-6">
-                                  <span className="text-3xl mb-2 block">💡</span>
-                                  <p className="text-white/40 text-sm">No ideas yet</p>
-                                  <button onClick={() => setShowAddIdeaModal('create')} className="mt-3 text-xs text-teal-400 hover:text-teal-300 transition">+ Add an idea</button>
-                                </div>
-                              ) : (
-                                recentIdeas.map(idea => (
-                                  <IdeaCard
-                                    key={idea.id}
-                                    idea={idea}
-
-                                    onPromoteToTask={promoteIdeaToTask}
-                                  />
-                                ))
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })()}
-
                   {/* GOALS WIDGET */}
                   {(() => {
                     const activeGoals = sharedGoals.filter(g => g.status === 'active');
@@ -350,6 +297,63 @@ const HubSection = (props) => {
                                   </div>
                                 );
                               })()}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* RECENT IDEAS WIDGET */}
+                  {(() => {
+                    // Newest first (same fix as Lists — insertion-order slice hid new items)
+                    const recentIdeas = [...sharedIdeas.filter(i => i.status === 'inbox' || i.status === 'saved')]
+                      .sort((a, b) => String(b.createdAt || b.id || '').localeCompare(String(a.createdAt || a.id || '')))
+                      .slice(0, 4);
+                    const isCollapsed = collapsedSections.ideas;
+                    return (
+                      <div className="mb-6 rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-950/30 via-slate-900/50 to-slate-950/40 backdrop-blur-xl shadow-[0_0_30px_rgba(245,158,11,0.06)]">
+                        <button
+                          onClick={() => toggleDashSection('ideas')}
+                          className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition"
+                        >
+                          <h3 className="text-base font-bold text-white flex items-center gap-2">
+                            <span>💡</span> Ideas
+                          </h3>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setShowAddIdeaModal('create'); }}
+                              className="w-7 h-7 rounded-full bg-amber-500/20 hover:bg-amber-500/40 flex items-center justify-center transition text-amber-400"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                            <div className="text-white/40">
+                              {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                            </div>
+                          </div>
+                        </button>
+                        {!isCollapsed && (
+                          <>
+                            <div className="px-4 pb-1">
+                              <button onClick={() => setHubSubView('ideas')} className="text-xs text-teal-400 hover:text-teal-300 transition">See All →</button>
+                            </div>
+                            <div className="p-4 pt-2 grid grid-cols-2 gap-3">
+                              {recentIdeas.length === 0 ? (
+                                <div className="col-span-2 text-center py-6">
+                                  <span className="text-3xl mb-2 block">💡</span>
+                                  <p className="text-white/40 text-sm">No ideas yet</p>
+                                  <button onClick={() => setShowAddIdeaModal('create')} className="mt-3 text-xs text-teal-400 hover:text-teal-300 transition">+ Add an idea</button>
+                                </div>
+                              ) : (
+                                recentIdeas.map(idea => (
+                                  <IdeaCard
+                                    key={idea.id}
+                                    idea={idea}
+
+                                    onPromoteToTask={promoteIdeaToTask}
+                                  />
+                                ))
+                              )}
                             </div>
                           </>
                         )}

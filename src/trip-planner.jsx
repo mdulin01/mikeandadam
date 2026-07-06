@@ -92,6 +92,7 @@ import heic2any from 'heic2any';
 import { firebaseConfig } from './firebase-config';
 import RupertBanner from './components/RupertBanner';
 import { memoriesSeed } from './data/memoriesSeed';
+import { RELATIONSHIP_QUESTIONS, questionIndexForWeek } from './data/relationshipQuestions';
 import { defaultFitnessEvents, indyHalfTrainingPlan, gsoHalfTrainingPlan } from './data/fitnessData';
 import TodayCard from './components/TodayCard';
 import NotificationPrefsModal from './components/NotificationPrefsModal';
@@ -613,6 +614,7 @@ export default function TripPlanner() {
   const [showNotifyPrefs, setShowNotifyPrefs] = useState(false);
   const [notifyPrefs, setNotifyPrefs] = useState(null); // tripData/notifyPrefs
   const [checkins, setCheckins] = useState([]); // tripData/checkins/entries (weekly couple check-in)
+  const [checkinMeta, setCheckinMeta] = useState(null); // tripData/checkins doc: {week, questionIndex} reroll override
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFilters, setSearchFilters] = useState({ tasks: true, lists: true, ideas: true, social: true, goals: true, travel: true, events: true, fitness: true, memories: true });
@@ -1607,6 +1609,29 @@ export default function TripPlanner() {
     }
   };
 
+  // Question of the week: deterministic per week, unless a 🎲 reroll wrote an
+  // override to the tripData/checkins doc (kept in sync for both partners).
+  const currentWeekKey = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - d.getDay());
+    return toLocalDateStr(d);
+  })();
+  const weeklyQuestion = RELATIONSHIP_QUESTIONS[
+    (checkinMeta?.week === currentWeekKey && Number.isInteger(checkinMeta?.questionIndex))
+      ? checkinMeta.questionIndex % RELATIONSHIP_QUESTIONS.length
+      : questionIndexForWeek(currentWeekKey)
+  ];
+  const rerollQuestion = async () => {
+    try {
+      const current = RELATIONSHIP_QUESTIONS.indexOf(weeklyQuestion);
+      let next = Math.floor(Math.random() * RELATIONSHIP_QUESTIONS.length);
+      if (next === current) next = (next + 1) % RELATIONSHIP_QUESTIONS.length;
+      await setDoc(doc(db, 'tripData', 'checkins'), { week: currentWeekKey, questionIndex: next }, { merge: true });
+    } catch (e) {
+      console.error('question reroll failed:', e);
+    }
+  };
+
   const submitCheckin = async (entry) => {
     try {
       await setDoc(doc(db, 'tripData', 'checkins', 'entries', `${entry.week}-${entry.by}`), {
@@ -1972,6 +1997,13 @@ export default function TripPlanner() {
       }
     );
 
+    // Check-in meta (question-of-the-week reroll override).
+    const checkinMetaUnsubscribe = onSnapshot(
+      doc(db, 'tripData', 'checkins'),
+      (snap) => setCheckinMeta(snap.exists() ? snap.data() : null),
+      (e) => console.error('checkin meta listener:', e)
+    );
+
     // Weekly couple check-ins (kept forever).
     const checkinsUnsubscribe = onSnapshot(
       collection(db, 'tripData', 'checkins', 'entries'),
@@ -2022,6 +2054,7 @@ export default function TripPlanner() {
     );
 
     return () => {
+      checkinMetaUnsubscribe();
       checkinsUnsubscribe();
       notifyPrefsUnsubscribe();
       calendarUnsubscribe();
@@ -3712,8 +3745,8 @@ export default function TripPlanner() {
                   <div className="fixed inset-0 z-[60]" onClick={() => setShowSectionDropdown(false)} />
                   <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-[61] bg-slate-800/95 backdrop-blur-md border border-white/15 rounded-xl py-1 shadow-2xl min-w-[140px]">
                     {[
-                      { id: 'fitness', emoji: '🏃', label: 'Fitness' },
                       { id: 'home', emoji: '⚛️', label: 'Hub' },
+                      { id: 'fitness', emoji: '🏃', label: 'Fitness' },
                       { id: 'events', emoji: '📅', label: 'Events' },
                       { id: 'memories', emoji: '💝', label: 'Memories' },
                     ].map(section => (
@@ -3901,8 +3934,8 @@ export default function TripPlanner() {
             <div className="mt-6 hidden md:flex gap-2 flex-wrap items-center justify-center">
               {/* Main navigation buttons */}
               {[
-                { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
                 { id: 'home', label: 'Hub', emoji: '⚛️', gradient: 'from-pink-500 to-purple-500' },
+                { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
                 { id: 'events', label: 'Events', emoji: '📅', gradient: 'from-amber-400 to-orange-500' },
                 { id: 'memories', label: 'Memories', emoji: '💝', gradient: 'from-rose-400 to-pink-500' },
               ].map(section => (
@@ -3969,7 +4002,7 @@ export default function TripPlanner() {
           {/* ========== HUB SECTION (formerly Home) ========== */}
           {activeSection === 'home' && (
             <SharedHubProvider value={sharedHub}>
-              <HubSection {...{ checkins, submitCheckin, updateGoal, calendarAgenda, collapsedSections, completeSocial, completeTask, currentUser, deleteGoal, deleteIdea, deleteOdysseyPlan, deleteSocial, deleteTask, getEventLabel, getLinkedLabel, highlightGoal, highlightIdea, highlightSocial, highlightTask, hubGoalFilter, hubIdeaFilter, hubListFilter, hubSocialFilter, hubSubView, hubTaskFilter, hubTaskSort, navigateToEvent, navigateToLinked, promoteIdeaToTask, setActiveSection, setHubGoalFilter, setHubIdeaFilter, setHubListFilter, setHubSocialFilter, setHubSubView, setHubTaskFilter, setHubTaskSort, setShowAddGoalModal, setShowAddIdeaModal, setShowAddSocialModal, setShowAddTaskModal, setShowOdysseyPlanModal, setShowSharedListModal, sharedGoals, sharedIdeas, sharedLists, sharedOdysseyPlans, sharedSocial, sharedTasks, taskMatchesHorizon, todaySnapshot, toggleDashSection, toggleMilestone, updateTask }} />
+              <HubSection {...{ checkins, submitCheckin, weeklyQuestion, rerollQuestion, updateGoal, calendarAgenda, collapsedSections, completeSocial, completeTask, currentUser, deleteGoal, deleteIdea, deleteOdysseyPlan, deleteSocial, deleteTask, getEventLabel, getLinkedLabel, highlightGoal, highlightIdea, highlightSocial, highlightTask, hubGoalFilter, hubIdeaFilter, hubListFilter, hubSocialFilter, hubSubView, hubTaskFilter, hubTaskSort, navigateToEvent, navigateToLinked, promoteIdeaToTask, setActiveSection, setHubGoalFilter, setHubIdeaFilter, setHubListFilter, setHubSocialFilter, setHubSubView, setHubTaskFilter, setHubTaskSort, setShowAddGoalModal, setShowAddIdeaModal, setShowAddSocialModal, setShowAddTaskModal, setShowOdysseyPlanModal, setShowSharedListModal, sharedGoals, sharedIdeas, sharedLists, sharedOdysseyPlans, sharedSocial, sharedTasks, taskMatchesHorizon, todaySnapshot, toggleDashSection, toggleMilestone, updateTask }} />
             </SharedHubProvider>
           )}
           {/* ========== END HUB SECTION ========== */}
@@ -8117,8 +8150,8 @@ export default function TripPlanner() {
             {/* Tab buttons — 4 items: Fitness, Hub, [FAB gap], Events, Memories */}
             <div className="flex items-end justify-around px-1 pt-1 pb-1">
               {[
-                { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
                 { id: 'home', label: 'Hub', emoji: '⚛️', gradient: 'from-pink-500 to-purple-500' },
+                { id: 'fitness', label: 'Fitness', emoji: '🏃', gradient: 'from-orange-400 to-red-500' },
                 { id: 'events', label: 'Events', emoji: '📅', gradient: 'from-amber-400 to-orange-500' },
                 { id: 'memories', label: 'Memories', emoji: '💝', gradient: 'from-rose-400 to-pink-500' },
               ].map((section, idx) => (

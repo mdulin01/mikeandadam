@@ -35,14 +35,14 @@ const Answer = ({ label, text }) => text ? (
   <p className="text-sm text-white/80 mt-1"><span className="text-white/40">{label}:</span> {text}</p>
 ) : null;
 
-const CheckinCard = ({ me, checkins, onSubmit }) => {
+const CheckinCard = ({ me, checkins, onSubmit, question, onRerollQuestion }) => {
   const week = weekKeyFor();
   const partner = me === 'mike' ? 'adam' : 'mike';
   const mine = checkins.find((c) => c.week === week && c.by === me);
   const theirs = checkins.find((c) => c.week === week && c.by === partner);
 
   const [mood, setMood] = useState('😊');
-  const [answers, setAnswers] = useState({ wentWell: '', stressed: '', appreciated: '', nextWeek: '' });
+  const [answers, setAnswers] = useState({ wentWell: '', stressed: '', appreciated: '', nextWeek: '', questionAnswer: '' });
   const [showArchive, setShowArchive] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -60,7 +60,7 @@ const CheckinCard = ({ me, checkins, onSubmit }) => {
     if (saving) return;
     setSaving(true);
     try {
-      await onSubmit({ week, by: me, mood, ...answers });
+      await onSubmit({ week, by: me, mood, question: question || '', ...answers });
     } finally {
       setSaving(false);
     }
@@ -109,6 +109,29 @@ const CheckinCard = ({ me, checkins, onSubmit }) => {
                 />
               </div>
             ))}
+            {question && (
+              <div className="bg-violet-500/10 border border-violet-400/25 rounded-xl p-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-lg leading-none mt-0.5">💭</span>
+                  <p className="flex-1 text-sm text-violet-100">{question}</p>
+                  {onRerollQuestion && (
+                    <button
+                      onClick={onRerollQuestion}
+                      className="shrink-0 text-lg opacity-60 hover:opacity-100 transition"
+                      title="Pull a different question (changes it for both of you)"
+                    >
+                      🎲
+                    </button>
+                  )}
+                </div>
+                <input
+                  value={answers.questionAnswer}
+                  onChange={(e) => setAnswers((a) => ({ ...a, questionAnswer: e.target.value }))}
+                  className="mt-2 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-violet-400/50"
+                  placeholder="Your answer…"
+                />
+              </div>
+            )}
             <button
               onClick={submit}
               disabled={saving}
@@ -126,6 +149,12 @@ const CheckinCard = ({ me, checkins, onSubmit }) => {
                 <p className="text-sm text-rose-200">“{theirs.appreciated || '…'}”</p>
                 <Answer label="Went well" text={theirs.wentWell} />
                 <Answer label="Next week" text={theirs.nextWeek} />
+                {theirs.questionAnswer && (
+                  <div className="mt-2 pt-2 border-t border-white/10">
+                    <p className="text-xs text-violet-300/70">💭 {theirs.question || question}</p>
+                    <p className="text-sm text-violet-100 mt-0.5">“{theirs.questionAnswer}”</p>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-xs text-white/40 mt-1">
@@ -156,6 +185,7 @@ const CheckinCard = ({ me, checkins, onSubmit }) => {
                     <Answer label="Stressed" text={c.stressed} />
                     <Answer label="Appreciated" text={c.appreciated} />
                     <Answer label="Next week" text={c.nextWeek} />
+                    {c.questionAnswer && <Answer label={`💭 ${c.question || 'Question'}`} text={c.questionAnswer} />}
                   </div>
                 ))}
               </div>
