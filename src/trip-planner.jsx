@@ -720,18 +720,9 @@ export default function TripPlanner() {
       let fileToUpload = file;
       let fileName = file.name;
 
-      // Convert HEIC/HEIF to JPEG
-      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
-                     file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
-      if (isHeic) {
-        const convertedBlob = await heic2any({
-          blob: file,
-          toType: 'image/jpeg',
-          quality: 0.9
-        });
-        fileToUpload = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
-        fileName = fileToUpload.name;
-      }
+      // Downscale + JPEG-normalize (memory-safe HEIC handling — see prepareImageForUpload)
+      fileToUpload = await prepareImageForUpload(file);
+      fileName = fileToUpload.name;
 
       const timestamp = Date.now();
       const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -780,18 +771,9 @@ export default function TripPlanner() {
       let fileToUpload = file;
       let fileName = file.name;
 
-      // Convert HEIC/HEIF to JPEG
-      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
-                     file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
-      if (isHeic) {
-        const convertedBlob = await heic2any({
-          blob: file,
-          toType: 'image/jpeg',
-          quality: 0.9
-        });
-        fileToUpload = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
-        fileName = fileToUpload.name;
-      }
+      // Downscale + JPEG-normalize (memory-safe HEIC handling — see prepareImageForUpload)
+      fileToUpload = await prepareImageForUpload(file);
+      fileName = fileToUpload.name;
 
       const timestamp = Date.now();
       const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -854,14 +836,9 @@ export default function TripPlanner() {
       let fileToUpload = file;
       let fileName = file.name;
 
-      // Convert HEIC/HEIF to JPEG
-      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
-                     file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
-      if (isHeic) {
-        const convertedBlob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
-        fileToUpload = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
-        fileName = fileToUpload.name;
-      }
+      // Downscale + JPEG-normalize (memory-safe HEIC handling — see prepareImageForUpload)
+      fileToUpload = await prepareImageForUpload(file);
+      fileName = fileToUpload.name;
 
       const timestamp = Date.now();
       const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -976,14 +953,9 @@ export default function TripPlanner() {
       let fileToUpload = file;
       let fileName = file.name || 'photo.jpg';
 
-      // Convert HEIC/HEIF to JPEG (same as memories)
-      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
-                     fileName.toLowerCase().endsWith('.heic') || fileName.toLowerCase().endsWith('.heif');
-      if (isHeic) {
-        const convertedBlob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
-        fileToUpload = new File([convertedBlob], fileName.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
-        fileName = fileToUpload.name;
-      }
+      // Downscale + JPEG-normalize (memory-safe HEIC handling — see prepareImageForUpload)
+      fileToUpload = await prepareImageForUpload(file);
+      fileName = fileToUpload.name;
 
       // Upload to Firebase Storage using memories/ prefix (allowed by storage rules)
       const timestamp = Date.now();
@@ -1053,13 +1025,9 @@ export default function TripPlanner() {
     try {
       let fileToUpload = file;
       let fileName = file.name || 'photo.jpg';
-      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
-                     fileName.toLowerCase().endsWith('.heic') || fileName.toLowerCase().endsWith('.heif');
-      if (isHeic) {
-        const convertedBlob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
-        fileToUpload = new File([convertedBlob], fileName.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
-        fileName = fileToUpload.name;
-      }
+      // Downscale + JPEG-normalize (memory-safe HEIC handling — see prepareImageForUpload)
+      fileToUpload = await prepareImageForUpload(file);
+      fileName = fileToUpload.name;
       const timestamp = Date.now();
       const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
       const storageRef = ref(storage, `memories/race-${eventId}-${timestamp}_${safeName}`);
@@ -1109,6 +1077,61 @@ export default function TripPlanner() {
     }, 800);
   }, [updateTrainingWeek]);
 
+  // ── Memory-safe image preparation (2026-07-05) ──
+  // heic2any decodes the FULL-resolution HEIC in JS memory (a 48MP iPhone
+  // photo ≈ hundreds of MB decompressed), which crashes mobile Safari PWAs.
+  // iOS Safari can decode HEIC natively in an <img>, so: native decode →
+  // scaled canvas (max 2048px) → JPEG. heic2any is only the fallback for
+  // browsers that can't decode HEIC (desktop Chrome/Firefox).
+  const prepareImageForUpload = async (file, maxDim = 2048, quality = 0.85) => {
+    const decodeAndScale = async (blob) => {
+      const url = URL.createObjectURL(blob);
+      try {
+        const img = await new Promise((resolve, reject) => {
+          const i = new window.Image();
+          i.onload = () => resolve(i);
+          i.onerror = () => reject(new Error('decode failed'));
+          i.src = url;
+        });
+        const w0 = img.naturalWidth, h0 = img.naturalHeight;
+        if (!w0 || !h0) throw new Error('decode produced empty image');
+        const scale = Math.min(1, maxDim / Math.max(w0, h0));
+        const w = Math.max(1, Math.round(w0 * scale));
+        const h = Math.max(1, Math.round(h0 * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const out = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+        if (!out) throw new Error('canvas toBlob failed');
+        return out;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    };
+
+    const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
+                   /\.(heic|heif)$/i.test(file.name);
+    const jpegName = file.name.replace(/\.(heic|heif)$/i, '.jpg').replace(/\.(png|webp|gif)$/i, '.jpg');
+    try {
+      // Native decode works for JPG/PNG everywhere and HEIC on iOS Safari.
+      const blob = await decodeAndScale(file);
+      return new File([blob], jpegName, { type: 'image/jpeg' });
+    } catch (err) {
+      if (isHeic) {
+        // Browser can't decode HEIC natively — convert (desktop), then scale.
+        const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+        try {
+          const blob = await decodeAndScale(converted);
+          return new File([blob], jpegName, { type: 'image/jpeg' });
+        } catch {
+          return new File([converted], jpegName, { type: 'image/jpeg' });
+        }
+      }
+      console.warn('Image downscale failed, uploading original:', err);
+      return file;
+    }
+  };
+
   // Upload photo/video to Firebase Storage (with HEIC conversion for images) - for modals
   const uploadMemoryMedia = async (file, isEdit = false) => {
     if (!file) return;
@@ -1129,19 +1152,10 @@ export default function TripPlanner() {
       let fileToUpload = file;
       let fileName = file.name;
 
-      // Convert HEIC/HEIF to JPEG (only for images)
+      // Downscale + JPEG-normalize images (memory-safe HEIC handling).
       if (!isVideo) {
-        const isHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
-                       file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
-        if (isHeic) {
-          const convertedBlob = await heic2any({
-            blob: file,
-            toType: 'image/jpeg',
-            quality: 0.9
-          });
-          fileToUpload = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), { type: 'image/jpeg' });
-          fileName = fileToUpload.name;
-        }
+        fileToUpload = await prepareImageForUpload(file);
+        fileName = fileToUpload.name;
       }
 
       const timestamp = Date.now();
