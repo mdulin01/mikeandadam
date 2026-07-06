@@ -1819,6 +1819,27 @@ export default function TripPlanner() {
               delete cleanedPlans['gso-half-2026'];
             }
             setFitnessTrainingPlans(cleanedPlans);
+
+            // One-time WRITE-BACK (2026-07-05): the filters above only cleaned
+            // local state, so Firestore still carried the removed triathlon +
+            // Cary 10K plans/events — and the coupleDigest cloud function reads
+            // Firestore raw (it announced "Cary 10K race week"). Persist the
+            // cleaned events/plans and seed the current GSO plan so the digest
+            // and training triggers see the real schedule.
+            const hadOrphans = !!(data.trainingPlans?.['triathlon-2026'] || data.trainingPlans?.['cary-10k-2026'] ||
+              (data.events || []).some(e => e.id === 'triathlon-2026' || e.id === 'cary-10k-2026'));
+            const needsGso = !cleanedPlans['gso-half-2026'];
+            if ((hadOrphans || needsGso) && !fitnessCleanupRef.current) {
+              fitnessCleanupRef.current = true;
+              const seededPlans = { ...cleanedPlans };
+              if (needsGso) seededPlans['gso-half-2026'] = JSON.parse(JSON.stringify(gsoHalfTrainingPlan));
+              const cleanEvents = (data.events || [])
+                .filter(e => e.id !== 'triathlon-2026' && e.id !== 'cary-10k-2026' && e.owner !== 'mike');
+              const evIds = new Set(cleanEvents.map(e => e.id));
+              const fullEvents = [...cleanEvents, ...defaultFitnessEvents.filter(e => !evIds.has(e.id))];
+              saveFitnessRef.current(fullEvents, seededPlans);
+              console.log('[cleanup] fitness doc: orphan plans removed, GSO plan seeded', { hadOrphans, needsGso });
+            }
           }
         }
       },
@@ -2353,6 +2374,7 @@ export default function TripPlanner() {
   const tasksSyncRef = useRef(new Map());
   const migratingMemoriesRef = useRef(false);
   const migratingTasksRef = useRef(false);
+  const fitnessCleanupRef = useRef(false);
 
   // Stable stringify (sorted keys) so Firestore key reordering doesn't
   // register as a difference.
