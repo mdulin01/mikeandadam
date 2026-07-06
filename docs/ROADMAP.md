@@ -28,13 +28,21 @@ firebase deploy --only functions        # then confirm deletion of weeklySummary
 Until rules deploy: subcollection writes fail silently and the app falls
 back to legacy array writes (no data loss, no new features active).
 
-## Backlog (deliberate deferrals)
-1. **Finish the component split** (docs/REFACTORING_GUIDE.md): extract
-   Fitness/Events/Memories/Hub section JSX out of trip-planner.jsx
-   (~12.4k lines). Do interactively with browser verification, one
-   section per session.
-2. Notification prefs UI (functions already respect tripData/notifyPrefs).
-3. Fitness week photo upload bug (docs/ENHANCEMENTS.md) — needs runtime debugging.
-4. Legacy cleanup after migration verified: remove memories/tasks arrays
-   from tripData docs + the fallback code paths.
-5. Shared albums per trip/event; Adam-facing Rupert (couple chat) — future.
+## Backlog — CLEARED 2026-07-06
+1. ✅ Component split: Hub/Fitness/Events/Memories extracted to
+   src/sections/ (trip-planner.jsx 12.8k → 8.1k lines). Recipe: eslint
+   no-undef probe (eslint.probe.config.mjs) computes each section's free
+   variables → props. Calendar/Apps sections remain (small) — same recipe.
+2. ✅ Notification prefs UI: bell (when enabled) opens per-person toggles
+   (digest/instant/memory) → tripData/notifyPrefs.
+3. ✅ Fitness week photo bug: verified FIXED live (upload + reload
+   persistence) — resolved by the overhaul's Storage path + week-id
+   matching + seeded Firestore plan. ENHANCEMENTS.md entry closed.
+4. ✅ Legacy arrays: DECISION — keep the pre-migration memories/tasks
+   arrays frozen in tripData docs as a backup (they no longer grow, are
+   read by nothing once *MigratedAt is set, and deleting them buys ~0).
+   Client fallback write paths also stay (harmless resilience).
+
+## Future ideas
+- Shared albums per trip/event; Adam-facing Rupert (couple chat).
+- Extract remaining Calendar/Apps sections + the modal zoo.
