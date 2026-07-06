@@ -75,7 +75,9 @@ import {
   collection,
   query,
   orderBy,
-  writeBatch
+  writeBatch,
+  updateDoc,
+  deleteField
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -1831,14 +1833,30 @@ export default function TripPlanner() {
             const needsGso = !cleanedPlans['gso-half-2026'];
             if ((hadOrphans || needsGso) && !fitnessCleanupRef.current) {
               fitnessCleanupRef.current = true;
-              const seededPlans = { ...cleanedPlans };
-              if (needsGso) seededPlans['gso-half-2026'] = JSON.parse(JSON.stringify(gsoHalfTrainingPlan));
               const cleanEvents = (data.events || [])
                 .filter(e => e.id !== 'triathlon-2026' && e.id !== 'cary-10k-2026' && e.owner !== 'mike');
               const evIds = new Set(cleanEvents.map(e => e.id));
               const fullEvents = [...cleanEvents, ...defaultFitnessEvents.filter(e => !evIds.has(e.id))];
-              saveFitnessRef.current(fullEvents, seededPlans);
-              console.log('[cleanup] fitness doc: orphan plans removed, GSO plan seeded', { hadOrphans, needsGso });
+              // Direct updateDoc with deleteField(): setDoc merge DEEP-MERGES map
+              // fields, so writing a plans object without the orphan keys never
+              // actually removes them from Firestore.
+              (async () => {
+                try {
+                  const updates = {
+                    events: JSON.parse(JSON.stringify(fullEvents)),
+                    lastUpdated: new Date().toISOString(),
+                    updatedBy: 'cleanup', // not mike/adam → trainingActivity trigger stays quiet
+                    'trainingPlans.triathlon-2026': deleteField(),
+                    'trainingPlans.cary-10k-2026': deleteField(),
+                  };
+                  if (needsGso) updates['trainingPlans.gso-half-2026'] = JSON.parse(JSON.stringify(gsoHalfTrainingPlan));
+                  await updateDoc(doc(db, 'tripData', 'fitness'), updates);
+                  console.log('[cleanup] fitness doc cleaned (orphan plans deleted, GSO seeded)', { hadOrphans, needsGso });
+                } catch (e) {
+                  console.error('[cleanup] fitness write failed (will retry next load):', e);
+                  fitnessCleanupRef.current = false;
+                }
+              })();
             }
           }
         }
