@@ -3950,9 +3950,17 @@ export default function TripPlanner() {
                         </div>
                         <div className="px-4 pb-4">
                           {days.length === 0 ? (
-                            <p className="text-sm text-white/40 py-3">
-                              {calendarAgenda ? 'Nothing on the calendar for the next two weeks.' : 'Calendar syncs each morning from the shared Google calendar (via Rupert).'}
-                            </p>
+                            <div className="py-3">
+                              <p className="text-sm text-white/40">
+                                {calendarAgenda ? 'Nothing on the calendar for the next two weeks.' : 'Calendar syncs each morning from the shared Google calendar (via Rupert).'}
+                              </p>
+                              {calendarAgenda?.nextUp && (
+                                <p className="text-sm text-sky-200 mt-2">
+                                  ⏭️ Next up: <span className="font-semibold">{calendarAgenda.nextUp.title}</span>
+                                  <span className="text-sky-300/60"> · {calendarAgenda.nextUp.label}{calendarAgenda.nextUp.time ? ` ${calendarAgenda.nextUp.time}` : ''}</span>
+                                </p>
+                              )}
+                            </div>
                           ) : (
                             <div className="space-y-3">
                               {days.map(day => (
