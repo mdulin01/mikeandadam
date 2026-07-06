@@ -1,4 +1,5 @@
 import React from 'react';
+import ItineraryCard from './ItineraryCard';
 import {
   Calendar, Plane, Hotel, Music, MapPin, Plus, X, Users, ExternalLink, Pencil, Check, Link
 } from 'lucide-react';
@@ -360,8 +361,16 @@ const TripDetail = ({
             </div>
           )}
 
-          {/* Sections */}
-          {['flights', 'hotels', 'events'].map(type => (
+          {/* mikestravel itinerary (verbatim segments mirrored by cron-travel) */}
+          {Array.isArray(details.segments) && details.segments.length > 0 && (
+            <div className="mb-6">
+              <ItineraryCard segments={details.segments} />
+            </div>
+          )}
+
+          {/* Sections — hidden for mirrored trips with a full itinerary (the
+              legacy flights/hotels/events squeeze would just repeat it) */}
+          {!(trip.source === 'mikestravel' && details.segments?.length > 0) && ['flights', 'hotels', 'events'].map(type => (
             <div key={type} className="bg-white/10 rounded-3xl p-6 mb-6 border border-white/20">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
