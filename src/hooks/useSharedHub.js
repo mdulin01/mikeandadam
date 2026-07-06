@@ -237,7 +237,7 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast, isLoadedRef)
 
   // ========== GOAL CRUD ==========
   const addGoal = useCallback(async (goal) => {
-    await waitForHubLoad();
+    if (!ensureHubLoaded('saving')) return;
     setSharedGoals(prev => {
       const newGoals = [...prev, goal];
       saveRef.current(null, null, null, null, newGoals);
@@ -288,7 +288,7 @@ export const useSharedHub = (currentUser, saveSharedHub, showToast, isLoadedRef)
 
   // ========== ODYSSEY PLAN CRUD ==========
   const addOdysseyPlan = useCallback(async (plan) => {
-    await waitForHubLoad();
+    if (!ensureHubLoaded('saving')) return;
     setSharedOdysseyPlans(prev => {
       const newPlans = [...prev, plan];
       saveRef.current(null, null, null, null, null, newPlans);
