@@ -51,10 +51,19 @@ const ItineraryCard = ({ segments }) => {
                     <p className="text-sm font-semibold text-white">{seg.title}</p>
                     {seg.location && <p className="text-xs text-white/50 mt-0.5">{seg.location}</p>}
                     {seg.notes && <p className="text-xs text-white/40 mt-0.5">{seg.notes}</p>}
-                    {seg.conf && (
-                      <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/60">
-                        conf {seg.conf}
-                      </span>
+                    {(seg.conf || seg.link) && (
+                      <div className="flex items-center gap-2 mt-1">
+                        {seg.conf && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/60">
+                            conf {seg.conf}
+                          </span>
+                        )}
+                        {seg.link && (
+                          <a href={seg.link} target="_blank" rel="noreferrer" className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-200 hover:bg-sky-500/30 transition">
+                            🔗 link
+                          </a>
+                        )}
+                      </div>
                     )}
                   </div>
                   {seg.time && <span className="text-xs text-white/50 shrink-0 font-mono mt-1">{seg.time}</span>}

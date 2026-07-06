@@ -18,6 +18,7 @@ const HubSection = (props) => {
   const {
     checkins,
     submitCheckin,
+    updateGoal,
     calendarAgenda,
     collapsedSections,
     completeSocial,
@@ -311,11 +312,44 @@ const HubSection = (props) => {
                                       onEdit={() => setShowAddGoalModal(goal)}
                                       onDelete={() => deleteGoal(goal.id)}
                                       onHighlight={() => highlightGoal(goal.id)}
+                                      onToggleAchieved={(g) => updateGoal(g.id, g.status === 'achieved'
+                                        ? { status: 'active', achievedAt: null }
+                                        : { status: 'achieved', achievedAt: new Date().toISOString() })}
                                     />
                                   ))}
                                   {activeGoals.length > 5 && <div className="text-xs text-white/30 text-center pt-1">+{activeGoals.length - 5} more</div>}
                                 </>
                               )}
+
+                              {/* 🏆 ACHIEVED SHELF — completed goals live here forever */}
+                              {(() => {
+                                const achieved = sharedGoals.filter(g => g.status === 'achieved')
+                                  .sort((a, b) => String(b.achievedAt || '').localeCompare(String(a.achievedAt || '')));
+                                if (achieved.length === 0) return null;
+                                return (
+                                  <div className="mt-4 pt-3 border-t border-white/10">
+                                    <p className="text-[11px] uppercase tracking-wider text-amber-300/60 mb-2">🏆 Achieved ({achieved.length})</p>
+                                    <div className="space-y-1.5">
+                                      {achieved.map(g => (
+                                        <div key={g.id} className="flex items-center gap-2 bg-amber-500/5 border border-amber-500/15 rounded-xl px-3 py-2">
+                                          <span>{g.emoji || '🏆'}</span>
+                                          <span className="text-sm text-white/80 flex-1 min-w-0 truncate">{g.title}</span>
+                                          {g.achievedAt && (
+                                            <span className="text-[10px] text-amber-300/50 shrink-0">
+                                              {new Date(g.achievedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                            </span>
+                                          )}
+                                          <button
+                                            onClick={() => updateGoal(g.id, { status: 'active', achievedAt: null })}
+                                            className="text-[10px] text-white/30 hover:text-white/70 shrink-0"
+                                            title="Reopen"
+                                          >↩️</button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </>
                         )}

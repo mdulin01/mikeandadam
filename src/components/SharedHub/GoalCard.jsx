@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { ChevronDown, ChevronUp, MoreVertical, Star, Edit3, Trash2, Check } from 'lucide-react';
 import PortalMenu from './PortalMenu';
 
-const GoalCard = React.memo(({ goal, currentUser, onToggleMilestone, onEdit, onDelete, onHighlight }) => {
+const GoalCard = React.memo(({ goal, currentUser, onToggleMilestone, onEdit, onDelete, onHighlight, onToggleAchieved }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const menuRef = useRef(null);
@@ -161,6 +161,15 @@ const GoalCard = React.memo(({ goal, currentUser, onToggleMilestone, onEdit, onD
               >
                 <Edit3 className="w-3.5 h-3.5" /> Edit
               </button>
+              {onToggleAchieved && (
+                <button
+                  onClick={() => { setShowMenu(false); onToggleAchieved(goal); }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-white hover:bg-slate-600 transition text-left"
+                >
+                  <span className="w-3.5 h-3.5 flex items-center justify-center text-xs">{goal.status === 'achieved' ? '↩️' : '🏆'}</span>
+                  {goal.status === 'achieved' ? 'Reopen goal' : 'Mark achieved'}
+                </button>
+              )}
               <button
                 onClick={() => { setShowMenu(false); onHighlight(goal.id); }}
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-white hover:bg-slate-600 transition text-left"
