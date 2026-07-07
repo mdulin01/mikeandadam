@@ -623,6 +623,11 @@ export default function TripPlanner() {
   // the mikeslife cron-couple-context job from the "Mike & Adam" calendar.
   const [calendarAgenda, setCalendarAgenda] = useState(null);
   const [memoriesView, setMemoriesView] = useState('feed'); // 'feed' | 'timeline' | 'events' | 'media'
+  // Deep link from the on-this-day push: /memories?memory=<id> scrolls the
+  // feed to that memory and highlights it.
+  const [focusMemoryId, setFocusMemoryId] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('memory'); } catch { return null; }
+  });
   const [collapsedMemorySections, setCollapsedMemorySections] = useState({}); // { sectionId: true/false }
   const [timelineSortOrder, setTimelineSortOrder] = useState('newest'); // 'newest' | 'oldest'
   const [timelineYearFilter, setTimelineYearFilter] = useState('all'); // 'all' | specific year
@@ -4403,7 +4408,7 @@ export default function TripPlanner() {
 
           {/* ========== MEMORIES SECTION ========== */}
           {activeSection === 'memories' && (
-            <MemoriesSection {...{ collapsedMemorySections, commentOnMemory, currentUser, dragOverEventId, dragOverMemoryId, fitnessEvents, fitnessTrainingPlans, getMemoryImages, getRandomMemoryImage, handleCardDrop, handleEventCardDrop, memories, memoriesView, openLightbox, partyEvents, reactToMemory, setActiveSection, setCollapsedMemorySections, setDragOverEventId, setDragOverMemoryId, setEditingMemory, setEditingTrainingWeek, setFitnessViewMode, setMemoriesView, setSelectedFitnessEvent, setSelectedPartyEvent, setSelectedTrip, setShowAddMemoryModal, setTimelineSortOrder, setTimelineYearFilter, timelineSortOrder, timelineYearFilter, trips, uploadingToEventId, uploadingToMemoryId }} />
+            <MemoriesSection {...{ focusMemoryId, setFocusMemoryId, collapsedMemorySections, commentOnMemory, currentUser, dragOverEventId, dragOverMemoryId, fitnessEvents, fitnessTrainingPlans, getMemoryImages, getRandomMemoryImage, handleCardDrop, handleEventCardDrop, memories, memoriesView, openLightbox, partyEvents, reactToMemory, setActiveSection, setCollapsedMemorySections, setDragOverEventId, setDragOverMemoryId, setEditingMemory, setEditingTrainingWeek, setFitnessViewMode, setMemoriesView, setSelectedFitnessEvent, setSelectedPartyEvent, setSelectedTrip, setShowAddMemoryModal, setTimelineSortOrder, setTimelineYearFilter, timelineSortOrder, timelineYearFilter, trips, uploadingToEventId, uploadingToMemoryId }} />
           )}
           {/* ========== END MEMORIES SECTION ========== */}
 

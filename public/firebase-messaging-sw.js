@@ -38,23 +38,32 @@ messaging.onBackgroundMessage((payload) => {
 });
 
 // Click → focus an existing tab and navigate it, else open a new one.
+// Hardened 2026-07-06: normalize to an absolute same-origin URL and fall
+// back to opening the app root — iOS standalone PWAs sometimes land on a
+// blank page when navigate/openWindow gets a URL they don't like.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  const raw = event.notification.data?.url || '/';
+  let target;
+  try {
+    const u = new URL(raw, self.location.origin);
+    target = u.origin === self.location.origin ? u.href : self.location.origin + '/';
+  } catch {
+    target = self.location.origin + '/';
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        const sameOrigin = client.url.startsWith(self.location.origin);
-        if (sameOrigin && 'focus' in client) {
-          client.focus();
-          if ('navigate' in client && url.startsWith(self.location.origin)) {
-            client.navigate(url).catch(() => {});
-          }
-          return;
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          return Promise.resolve(client.focus()).then(() => {
+            if ('navigate' in client) {
+              return client.navigate(target).catch(() => {});
+            }
+          });
         }
       }
-      return clients.openWindow(url);
+      return clients.openWindow(target).catch(() => clients.openWindow('/'));
     })
   );
 });

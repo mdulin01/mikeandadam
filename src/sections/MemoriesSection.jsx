@@ -10,6 +10,8 @@ import { formatDate, parseLocalDate, toLocalDateStr } from '../utils';
  */
 const MemoriesSection = (props) => {
   const {
+    focusMemoryId,
+    setFocusMemoryId,
     collapsedMemorySections,
     commentOnMemory,
     currentUser,
@@ -145,6 +147,8 @@ const MemoriesSection = (props) => {
                   onReact={reactToMemory}
                   onAddComment={commentOnMemory}
                   onOpen={(m) => setEditingMemory({ ...m })}
+                  focusMemoryId={focusMemoryId}
+                  onFocused={() => setFocusMemoryId(null)}
                 />
               )}
 

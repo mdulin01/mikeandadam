@@ -225,15 +225,8 @@ exports.coupleDigest = onSchedule(
       lines.push(`🎉 ${ev.title || ev.name} — ${fmtDate(ev.date)}`);
     }
 
-    // On this day (any year back) — daily, people love this.
-    const mmdd = todayStr.slice(5);
-    const onThisDay = memories.filter((m) => m.date && m.date.slice(5) === mmdd && m.date < todayStr)
-      .sort((a, b) => a.date.localeCompare(b.date));
-    if (onThisDay.length > 0) {
-      const m = onThisDay[0];
-      const years = parseInt(todayStr.slice(0, 4), 10) - parseInt(m.date.slice(0, 4), 10);
-      lines.push(`💝 On this day ${years} year${years > 1 ? "s" : ""} ago: ${m.title}${m.location ? ` (${m.location})` : ""}`);
-    }
+    // (On-this-day memories moved to the dedicated onThisDay push at 9 AM —
+    // it deep-links straight to the memory, same one for both.)
 
     if (isSunday) {
       const lb = lookbackMemories(memories, todayStr).filter((m) => m.date.slice(5) !== mmdd);
@@ -244,6 +237,16 @@ exports.coupleDigest = onSchedule(
       const hub = await readHubDoc();
       const openLists = (hub.lists || []).filter((l) => l.status === "active" && (l.items || []).some((i) => !i.checked)).length;
       if (openLists) lines.push(`📝 ${openLists} lists with open items`);
+
+      // Weekly trip countdowns — anything on the books in the next 60 days.
+      const tripStart = (t) => t.dates?.start || t.start;
+      const horizon = addDays(todayStr, 60);
+      for (const trip of (shared.trips || [])) {
+        const start = tripStart(trip);
+        if (!start || start < todayStr || start > horizon) continue;
+        const days = Math.round((new Date(start + "T12:00:00") - new Date(todayStr + "T12:00:00")) / 86400000);
+        lines.push(`✈️ ${trip.destination || trip.name} — ${days === 0 ? "TODAY!" : `in ${days} days`} (${fmtDate(start)})`);
+      }
     }
 
     if (lines.length === 0) {
@@ -256,6 +259,33 @@ exports.coupleDigest = onSchedule(
       { kind: "digest" }
     );
     logger.info("coupleDigest sent", { lines: lines.length, isSunday });
+  }
+);
+
+// ═══════════════════════════════════════════════
+// On this day — 9:00 AM ET daily. One shared memory, same for both,
+// deep-linked so the notification opens THAT memory in the feed.
+// ═══════════════════════════════════════════════
+exports.onThisDay = onSchedule(
+  { schedule: "0 9 * * *", timeZone: ET, retryCount: 1 },
+  async () => {
+    const todayStr = etTodayStr();
+    const memories = await readMemories();
+    const mmdd = todayStr.slice(5);
+    const hits = memories
+      .filter((m) => m.date && m.date.slice(5) === mmdd && m.date < todayStr && !m.autoStory)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (hits.length === 0) { logger.info("onThisDay: nothing today."); return; }
+    // Prefer the one with a photo; both partners get the SAME memory.
+    const m = hits.find((x) => (x.images || []).length > 0 || x.image) || hits[0];
+    const years = parseInt(todayStr.slice(0, 4), 10) - parseInt(m.date.slice(0, 4), 10);
+    await sendPush({
+      title: `💝 On this day ${years} year${years > 1 ? "s" : ""} ago`,
+      body: `${m.title}${m.location ? ` — ${m.location}` : ""}`,
+      url: `${APP_URL}/memories?memory=${encodeURIComponent(m.id)}`,
+      tag: "on-this-day",
+    }, { kind: "memory" });
+    logger.info("onThisDay sent", { memory: m.title, years });
   }
 );
 

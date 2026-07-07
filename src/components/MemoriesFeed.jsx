@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 
 /**
  * MemoriesFeed — the "our own social feed" view of memories.
@@ -106,7 +106,19 @@ const MemoryPost = ({ memory, currentUser, onReact, onAddComment, onOpen }) => {
   );
 };
 
-const MemoriesFeed = ({ memories, currentUser, todayStr, onReact, onAddComment, onOpen }) => {
+const MemoriesFeed = ({ memories, currentUser, todayStr, onReact, onAddComment, onOpen, focusMemoryId, onFocused }) => {
+  // Deep link (on-this-day push): scroll to + ring the target memory.
+  const postRefs = useRef({});
+  const [highlightId, setHighlightId] = useState(null);
+  useEffect(() => {
+    if (!focusMemoryId) return;
+    const el = postRefs.current[String(focusMemoryId)];
+    if (!el) return; // memories may not be loaded yet — retry on next render
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightId(String(focusMemoryId));
+    const t = setTimeout(() => { setHighlightId(null); onFocused && onFocused(); }, 4000);
+    return () => clearTimeout(t);
+  });
   const sorted = useMemo(
     () => [...memories].filter((m) => m.date).sort((a, b) => String(b.date).localeCompare(String(a.date))),
     [memories]
@@ -144,14 +156,19 @@ const MemoriesFeed = ({ memories, currentUser, todayStr, onReact, onAddComment, 
         <p className="text-center text-slate-400 py-12">No memories yet — add your first one! 💝</p>
       )}
       {sorted.map((m) => (
-        <MemoryPost
+        <div
           key={m.id}
-          memory={m}
-          currentUser={currentUser}
-          onReact={onReact}
-          onAddComment={onAddComment}
-          onOpen={onOpen}
-        />
+          ref={(el) => { postRefs.current[String(m.id)] = el; }}
+          className={highlightId === String(m.id) ? 'ring-2 ring-violet-400 rounded-3xl transition' : ''}
+        >
+          <MemoryPost
+            memory={m}
+            currentUser={currentUser}
+            onReact={onReact}
+            onAddComment={onAddComment}
+            onOpen={onOpen}
+          />
+        </div>
       ))}
     </div>
   );
