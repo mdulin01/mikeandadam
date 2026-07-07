@@ -108,16 +108,25 @@ const MemoryPost = ({ memory, currentUser, onReact, onAddComment, onOpen }) => {
 
 const MemoriesFeed = ({ memories, currentUser, todayStr, onReact, onAddComment, onOpen, focusMemoryId, onFocused }) => {
   // Deep link (on-this-day push): scroll to + ring the target memory.
+  // Instant jump + delayed re-pins: images above the target lazy-load and
+  // shift the layout, so a single smooth scroll drifts back toward the top.
   const postRefs = useRef({});
+  const scrolledRef = useRef(false);
   const [highlightId, setHighlightId] = useState(null);
   useEffect(() => {
-    if (!focusMemoryId) return;
+    if (!focusMemoryId || scrolledRef.current) return;
     const el = postRefs.current[String(focusMemoryId)];
     if (!el) return; // memories may not be loaded yet — retry on next render
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    scrolledRef.current = true;
+    const pin = () => {
+      const target = postRefs.current[String(focusMemoryId)];
+      if (target) target.scrollIntoView({ behavior: 'auto', block: 'center' });
+    };
+    pin();
+    const pins = [400, 1000, 2000].map((ms) => setTimeout(pin, ms));
     setHighlightId(String(focusMemoryId));
-    const t = setTimeout(() => { setHighlightId(null); onFocused && onFocused(); }, 4000);
-    return () => clearTimeout(t);
+    const t = setTimeout(() => { setHighlightId(null); onFocused && onFocused(); }, 6000);
+    return () => { pins.forEach(clearTimeout); clearTimeout(t); };
   });
   const sorted = useMemo(
     () => [...memories].filter((m) => m.date).sort((a, b) => String(b.date).localeCompare(String(a.date))),
