@@ -191,101 +191,171 @@ function daysSinceLastMemory(memories) {
 }
 
 // ═══════════════════════════════════════════════
-// Daily couple digest — 7:30 AM ET.
-// Weekdays: today's training + tasks due + near-term events/trips.
-// Sundays: week-ahead edition + "one year ago this week" lookback.
+// Week Kickoff — MONDAYS 7:30 AM ET only. The notification diet:
+// at most ONE scheduled push per day, themed by weekday —
+//   Mon: week kickoff · Wed: memory · Fri: training pulse · Sun: check-in
+//   + event-driven travel prep (T-21/14/7/2) and rare instants.
 // ═══════════════════════════════════════════════
 exports.coupleDigest = onSchedule(
-  { schedule: "30 7 * * *", timeZone: ET, retryCount: 1 },
+  { schedule: "30 7 * * 1", timeZone: ET, retryCount: 1 },
   async () => {
     const todayStr = etTodayStr();
-    const isSunday = etNow().getDay() === 0;
-    const [fitness, tasks, shared, partyEvents, memories] = await Promise.all([
-      readFitness(), readTasks(), readShared(), readPartyEvents(), readMemories(),
+    const weekEnd = addDays(todayStr, 6);
+    const [fitness, tasks, shared, partyEvents] = await Promise.all([
+      readFitness(), readTasks(), readShared(), readPartyEvents(),
     ]);
 
     const lines = [];
-    const training = todaysTraining(fitness, todayStr);
-    for (const t of training) {
-      lines.push(`🏃 ${t.eventName} wk${t.weekNumber}: ${t.runs.join(" · ")}`);
-      if (t.isRaceWeek) lines.push("🏁 RACE WEEK!");
+
+    // This week's training plan (the whole week once — no per-day nagging).
+    const plans = fitness.trainingPlans || {};
+    const events = fitness.events || [];
+    for (const [eventId, weeks] of Object.entries(plans)) {
+      const ev = events.find((e) => e.id === eventId);
+      if (ev && ev.status === "completed") continue;
+      if (!Array.isArray(weeks)) continue;
+      const week = weeks.find((w) => w.startDate <= todayStr && todayStr <= w.endDate);
+      if (!week || (week.runs || []).length === 0) continue;
+      const runList = (week.runs || []).map((r) => r.distance).join(" / ");
+      lines.push(`🏃 ${ev?.name || eventId} wk${week.weekNumber}: ${runList}${week.isRaceWeek ? " — 🏁 RACE WEEK!" : ""}`);
+      if (week.weekNotes) lines.push(`   ${week.weekNotes}`);
     }
 
-    const { due, overdue } = tasksDue(tasks, todayStr);
-    if (due.length > 0) {
-      const names = due.slice(0, 4).map((t) => t.title).join(", ");
-      lines.push(`✅ Due: ${names}${due.length > 4 ? ` +${due.length - 4}` : ""}${overdue.length ? ` (${overdue.length} overdue)` : ""}`);
+    // Tasks due this week.
+    const open = tasks.filter((t) => t.status !== "done");
+    const dueThisWeek = open.filter((t) => t.dueDate && t.dueDate <= weekEnd);
+    if (dueThisWeek.length > 0) {
+      lines.push(`✅ Due this week: ${dueThisWeek.slice(0, 4).map((t) => t.title).join(", ")}${dueThisWeek.length > 4 ? ` +${dueThisWeek.length - 4}` : ""}`);
     }
 
-    const near = upcoming(shared, partyEvents, todayStr, isSunday ? 7 : 3);
-    for (const trip of near.trips) {
-      lines.push(`✈️ ${trip.emoji || ""} ${trip.name || trip.destination} — ${fmtDate(trip.dates?.start || trip.start)}`);
-    }
-    for (const ev of near.events) {
-      lines.push(`🎉 ${ev.title || ev.name} — ${fmtDate(ev.date)}`);
-    }
-
-    // (On-this-day memories moved to the dedicated onThisDay push at 9 AM —
-    // it deep-links straight to the memory, same one for both.)
-
-    if (isSunday) {
-      const lb = lookbackMemories(memories, todayStr).filter((m) => m.date.slice(5) !== mmdd);
-      if (lb.length > 0) {
-        const m = lb[0];
-        lines.push(`💝 One year ago this week: ${m.title}${m.location ? ` (${m.location})` : ""}`);
-      }
-      const hub = await readHubDoc();
-      const openLists = (hub.lists || []).filter((l) => l.status === "active" && (l.items || []).some((i) => !i.checked)).length;
-      if (openLists) lines.push(`📝 ${openLists} lists with open items`);
-
-      // Weekly trip countdowns — anything on the books in the next 60 days.
-      const tripStart = (t) => t.dates?.start || t.start;
-      const horizon = addDays(todayStr, 60);
-      for (const trip of (shared.trips || [])) {
-        const start = tripStart(trip);
-        if (!start || start < todayStr || start > horizon) continue;
-        const days = Math.round((new Date(start + "T12:00:00") - new Date(todayStr + "T12:00:00")) / 86400000);
-        lines.push(`✈️ ${trip.destination || trip.name} — ${days === 0 ? "TODAY!" : `in ${days} days`} (${fmtDate(start)})`);
-      }
+    // Events this week + trip countdowns (60 days out).
+    const near = upcoming(shared, partyEvents, todayStr, 7);
+    for (const ev of near.events) lines.push(`🎉 ${ev.title || ev.name} — ${fmtDate(ev.date)}`);
+    const tripStart = (t) => t.dates?.start || t.start;
+    const horizon = addDays(todayStr, 60);
+    for (const trip of (shared.trips || [])) {
+      const start = tripStart(trip);
+      if (!start || start < todayStr || start > horizon) continue;
+      const days = Math.round((new Date(start + "T12:00:00") - new Date(todayStr + "T12:00:00")) / 86400000);
+      lines.push(`✈️ ${trip.destination || trip.name} — ${days === 0 ? "TODAY!" : `in ${days} days`}`);
     }
 
-    if (lines.length === 0) {
-      logger.info("coupleDigest: nothing to say today, skipping push.");
-      return;
-    }
-    const title = isSunday ? "🗓️ Your week together" : "☀️ Today together";
+    if (lines.length === 0) { logger.info("weekKickoff: quiet week."); return; }
     await sendPush(
-      { title, body: lines.join("\n"), url: APP_URL + "/home", tag: "digest" },
+      { title: "🗓️ Your week together", body: lines.join("\n"), url: APP_URL + "/home", tag: "digest" },
       { kind: "digest" }
     );
-    logger.info("coupleDigest sent", { lines: lines.length, isSunday });
+    logger.info("weekKickoff sent", { lines: lines.length });
   }
 );
 
 // ═══════════════════════════════════════════════
-// On this day — 9:00 AM ET daily. One shared memory, same for both,
-// deep-linked so the notification opens THAT memory in the feed.
+// Travel prep — checked daily 10 AM ET, but a trip only fires at EXACTLY
+// 21 / 14 / 7 / 2 days out: four well-spaced prompts per trip, total.
+// ═══════════════════════════════════════════════
+const TRAVEL_STAGES = {
+  21: (name) => `${name} is 3 weeks out 🗓️ — good week to book dinners & activities before they fill up.`,
+  14: (name) => `Two weeks to ${name} — lock in reservations and give the itinerary a once-over.`,
+  7: (name) => `One week to ${name}! Time to start the packing list 🧳`,
+  2: (name) => `${name} in 2 days — review the packing list + travel details today.`,
+};
+exports.travelPrep = onSchedule(
+  { schedule: "0 10 * * *", timeZone: ET, retryCount: 1 },
+  async () => {
+    const todayStr = etTodayStr();
+    const shared = await readShared();
+    const tripStart = (t) => t.dates?.start || t.start;
+    for (const trip of (shared.trips || [])) {
+      const start = tripStart(trip);
+      if (!start || start < todayStr) continue;
+      const days = Math.round((new Date(start + "T12:00:00") - new Date(todayStr + "T12:00:00")) / 86400000);
+      const stage = TRAVEL_STAGES[days];
+      if (!stage) continue;
+      const name = trip.destination || trip.name || "your trip";
+      await sendPush({
+        title: `✈️ ${name} — ${days} days to go`,
+        body: stage(name),
+        url: APP_URL + "/events",
+        tag: `travel-prep-${trip.id}`,
+      }, { kind: "digest" });
+      logger.info("travelPrep sent", { trip: name, days });
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════
+// Training pulse — FRIDAYS 5 PM ET. Positive-first: celebrate what got
+// logged this week; nudge gently only if the plan week is untouched.
+// ═══════════════════════════════════════════════
+exports.trainingPulse = onSchedule(
+  { schedule: "0 17 * * 5", timeZone: ET, retryCount: 1 },
+  async () => {
+    const todayStr = etTodayStr();
+    const fitness = await readFitness();
+    const plans = fitness.trainingPlans || {};
+    const events = fitness.events || [];
+    for (const [eventId, weeks] of Object.entries(plans)) {
+      const ev = events.find((e) => e.id === eventId);
+      if (ev && ev.status === "completed") continue;
+      if (!Array.isArray(weeks)) continue;
+      const week = weeks.find((w) => w.startDate <= todayStr && todayStr <= w.endDate);
+      if (!week || (week.runs || []).length === 0) continue;
+      const runs = week.runs || [];
+      const doneMike = runs.filter((r) => r.mike).length;
+      const doneAdam = runs.filter((r) => ("adam" in r ? r.adam : r.mike)).length;
+      const total = runs.length;
+      let body;
+      if (doneMike + doneAdam === 0) {
+        body = `Week ${week.weekNumber} of ${ev?.name || "training"} is still open — ${total} runs, and the weekend is right there. 🌤️`;
+      } else if (doneMike >= total && doneAdam >= total) {
+        body = `Week ${week.weekNumber} DONE — all ${total} runs, both of you. ${week.isRaceWeek ? "See you at the finish line! 🏁" : "Strong work 💪"}`;
+      } else {
+        body = `This week so far: Mike ${doneMike}/${total} · Adam ${doneAdam}/${total}. Weekend miles count double (emotionally). 💪`;
+      }
+      await sendPush({
+        title: "🏃 Training pulse",
+        body,
+        url: APP_URL + "/fitness",
+        tag: "training-pulse",
+      }, { kind: "digest" });
+      logger.info("trainingPulse sent", { eventId, doneMike, doneAdam, total });
+      return; // one active plan = one push
+    }
+    logger.info("trainingPulse: no active plan week.");
+  }
+);
+
+// ═══════════════════════════════════════════════
+// This week in your story — WEDNESDAYS 9 AM ET (weekly, not daily).
+// One shared memory from this week's anniversaries (Wed→Tue window),
+// the SAME one for both, deep-linked to open that memory in the feed.
 // ═══════════════════════════════════════════════
 exports.onThisDay = onSchedule(
-  { schedule: "0 9 * * *", timeZone: ET, retryCount: 1 },
+  { schedule: "0 9 * * 3", timeZone: ET, retryCount: 1 },
   async () => {
     const todayStr = etTodayStr();
     const memories = await readMemories();
-    const mmdd = todayStr.slice(5);
+    const windowDays = [];
+    for (let i = 0; i < 7; i++) windowDays.push(addDays(todayStr, i).slice(5));
+    const hasPhoto = (x) => (x.images || []).length > 0 || x.image;
     const hits = memories
-      .filter((m) => m.date && m.date.slice(5) === mmdd && m.date < todayStr && !m.autoStory)
-      .sort((a, b) => a.date.localeCompare(b.date));
-    if (hits.length === 0) { logger.info("onThisDay: nothing today."); return; }
-    // Prefer the one with a photo; both partners get the SAME memory.
-    const m = hits.find((x) => (x.images || []).length > 0 || x.image) || hits[0];
+      .filter((m) => m.date && m.date < todayStr && !m.autoStory && windowDays.includes(m.date.slice(5)))
+      .sort((a, b) => {
+        const d = windowDays.indexOf(a.date.slice(5)) - windowDays.indexOf(b.date.slice(5));
+        if (d !== 0) return d; // today's exact anniversary first, then soonest
+        return (hasPhoto(a) ? 0 : 1) - (hasPhoto(b) ? 0 : 1); // photos win ties
+      });
+    if (hits.length === 0) { logger.info("onThisDay: quiet week in history."); return; }
+    const m = hits.find(hasPhoto) || hits[0];
     const years = parseInt(todayStr.slice(0, 4), 10) - parseInt(m.date.slice(0, 4), 10);
+    const exact = m.date.slice(5) === todayStr.slice(5);
     await sendPush({
-      title: `💝 On this day ${years} year${years > 1 ? "s" : ""} ago`,
-      body: `${m.title}${m.location ? ` — ${m.location}` : ""}`,
+      title: exact ? `💝 On this day ${years} year${years > 1 ? "s" : ""} ago` : "💝 This week in your story",
+      body: `${m.title}${m.location ? ` — ${m.location}` : ""} (${fmtDate(m.date)}, ${m.date.slice(0, 4)})`,
       url: `${APP_URL}/memories?memory=${encodeURIComponent(m.id)}`,
       tag: "on-this-day",
     }, { kind: "memory" });
-    logger.info("onThisDay sent", { memory: m.title, years });
+    logger.info("onThisDay sent", { memory: m.title });
   }
 );
 
@@ -319,35 +389,6 @@ exports.memoryPrompt = onSchedule(
       tag: "memory-prompt",
     }, { kind: "memory" });
     logger.info("memoryPrompt sent", { prompts });
-  }
-);
-
-// ═══════════════════════════════════════════════
-// Biweekly fallback memory nudge — Saturdays 10 AM ET, every other
-// week, and only when it's actually been a while (≥10 days).
-// ═══════════════════════════════════════════════
-function isMemoryOnWeek() {
-  const weekMs = 7 * 24 * 60 * 60 * 1000;
-  const epochWeek = Math.floor(Date.now() / weekMs);
-  return epochWeek % 2 === 0;
-}
-exports.memoryReminder = onSchedule(
-  { schedule: "every saturday 10:00", timeZone: ET, retryCount: 1 },
-  async () => {
-    if (!isMemoryOnWeek()) return;
-    const memories = await readMemories();
-    const days = daysSinceLastMemory(memories);
-    if (days !== null && days < 10) {
-      logger.info(`memoryReminder: last memory ${days}d ago, skipping.`);
-      return;
-    }
-    const body = days === null
-      ? "You haven't logged any memories yet — capture a moment together. 💛"
-      : `It's been ${days} days since your last memory. Add one before it fades. 💛`;
-    await sendPush(
-      { title: "📸 Time to make a memory", body, url: APP_URL + "/memories", tag: "memory-nudge" },
-      { kind: "memory" }
-    );
   }
 );
 
@@ -458,12 +499,43 @@ exports.trainingActivity = onDocumentWritten("tripData/fitness", async (event) =
   }
   if (newlyDone.length === 0) return;
   const name = who === "mike" ? "Mike" : "Adam";
-  await sendPush({
-    title: `👟 ${name} just logged a workout`,
-    body: newlyDone.join(" · "),
-    url: APP_URL + "/fitness",
-    tag: "training-activity", // same tag → rapid check-offs replace, not stack
-  }, { except: who, kind: "instant" });
+
+  // Notification diet: at most one partner-activity push per person per day.
+  const todayStr = etTodayStr();
+  const stateRef = db.collection("tripData").doc("notifyState");
+  const state = (await stateRef.get()).data() || {};
+  const lastPush = state.trainingPushDate?.[who];
+  if (lastPush !== todayStr) {
+    await sendPush({
+      title: `👟 ${name} just logged a workout`,
+      body: newlyDone.join(" · "),
+      url: APP_URL + "/fitness",
+      tag: "training-activity", // same tag → rapid check-offs replace, not stack
+    }, { except: who, kind: "instant" });
+    await stateRef.set({ trainingPushDate: { [who]: todayStr } }, { merge: true });
+  } else {
+    logger.info("trainingActivity: daily cap hit for", who);
+  }
+
+  // Week complete? Celebrate once — both partners, every run, current week.
+  for (const [planId, aWeeks] of Object.entries(aPlans)) {
+    if (!Array.isArray(aWeeks)) continue;
+    const week = aWeeks.find((w) => w.startDate <= todayStr && todayStr <= w.endDate);
+    if (!week || (week.runs || []).length === 0) continue;
+    const allDone = (week.runs || []).every((r) => r.mike && ("adam" in r ? r.adam : true));
+    if (!allDone) continue;
+    const key = `${planId}-wk${week.weekNumber}`;
+    if (state.weekCelebrated === key) continue;
+    const ev = (after.events || []).find((e) => e.id === planId);
+    await sendPush({
+      title: "🎉 Week complete!",
+      body: `Week ${week.weekNumber} of ${ev?.name || "training"} — every run, both of you. ${week.isRaceWeek ? "RACE TIME! 🏁" : "Onward. 💪"}`,
+      url: APP_URL + "/fitness",
+      tag: `week-complete-${key}`,
+    }, { kind: "instant" });
+    await stateRef.set({ weekCelebrated: key }, { merge: true });
+    logger.info("week complete celebration", { key });
+  }
 });
 
 // ═══════════════════════════════════════════════

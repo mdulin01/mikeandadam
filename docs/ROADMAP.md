@@ -43,6 +43,21 @@ back to legacy array writes (no data loss, no new features active).
    read by nothing once *MigratedAt is set, and deleting them buys ~0).
    Client fallback write paths also stay (harmless resilience).
 
+## Notification schedule (the diet — 2026-07-07)
+At most ONE scheduled push per day, themed by weekday:
+
+| When | Push | Notes |
+|------|------|-------|
+| Mon 7:30a | 🗓️ Week kickoff | week's runs, tasks due, trip countdowns |
+| Wed 9a | 💝 This week in your story | ONE memory from the week's anniversaries, deep-linked |
+| Fri 5p | 🏃 Training pulse | celebrate runs logged; gentle nudge only if untouched |
+| Sun 5p | 💌 Check-in reminder | only for whoever hasn't checked in |
+| T-21/14/7/2 (10a) | ✈️ Travel prep | book dinners → reservations → packing list → final review |
+| event-driven | 📸 post-trip photo prompt · ⚡ partner activity (1/person/day) · 🎉 week-complete |
+
+Deleted: daily digest, daily on-this-day, biweekly memory nudge.
+Prefs (bell icon): digest = weekly rhythm + travel prep · memory = Wed story + photo prompts · instant = activity.
+
 ## Future ideas
 - Shared albums per trip/event; Adam-facing Rupert (couple chat).
 - Extract remaining Calendar/Apps sections + the modal zoo.

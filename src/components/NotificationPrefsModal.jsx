@@ -8,9 +8,9 @@ import { X, Bell, BellOff } from 'lucide-react';
  * only ever needs to store explicit choices.
  */
 const KINDS = [
-  { key: 'digest', emoji: '☀️', label: 'Daily digest', desc: '7:30 AM — training, tasks, what\'s coming up' },
-  { key: 'instant', emoji: '⚡', label: 'Activity', desc: 'Partner finished a task or logged a run' },
-  { key: 'memory', emoji: '📸', label: 'Memory nudges', desc: 'Post-trip photo prompts + the occasional reminder' },
+  { key: 'digest', emoji: '🗓️', label: 'Weekly rhythm', desc: 'Mon kickoff · Fri training pulse · trip-prep reminders' },
+  { key: 'instant', emoji: '⚡', label: 'Activity', desc: 'Partner finished a task or logged a run (max 1/day)' },
+  { key: 'memory', emoji: '💝', label: 'Memories', desc: 'Wednesday \'this week in your story\' + post-trip photo prompts' },
 ];
 
 const NotificationPrefsModal = ({ me, prefs, onToggle, onClose, onDisable }) => {
