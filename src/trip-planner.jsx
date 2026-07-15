@@ -614,6 +614,7 @@ export default function TripPlanner() {
   const [showNotifyPrefs, setShowNotifyPrefs] = useState(false);
   const [notifyPrefs, setNotifyPrefs] = useState(null); // tripData/notifyPrefs
   const [checkins, setCheckins] = useState([]); // tripData/checkins/entries (weekly couple check-in)
+  const [tripPolls, setTripPolls] = useState([]); // tripData/tripPolls/polls
   const [checkinMeta, setCheckinMeta] = useState(null); // tripData/checkins doc: {week, questionIndex} reroll override
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -622,6 +623,12 @@ export default function TripPlanner() {
   // Shared Google-calendar agenda (tripData/calendar), written each morning by
   // the mikeslife cron-couple-context job from the "Mike & Adam" calendar.
   const [calendarAgenda, setCalendarAgenda] = useState(null);
+  const activeTripPoll = useMemo(
+    () => tripPolls
+      .filter((poll) => poll.status === 'open')
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null,
+    [tripPolls]
+  );
   const [memoriesView, setMemoriesView] = useState('feed'); // 'feed' | 'timeline' | 'events' | 'media'
   // Deep link from the on-this-day push: /memories?memory=<id> scrolls the
   // feed to that memory and highlights it.
@@ -1650,6 +1657,25 @@ export default function TripPlanner() {
     }
   };
 
+  const submitTripPoll = async (pollId, answers) => {
+    const me = String(currentUser || '').trim().toLowerCase();
+    if (!['mike', 'adam'].includes(me)) return;
+    try {
+      await updateDoc(doc(db, 'tripData', 'tripPolls', 'polls', pollId), {
+        [`responses.${me}`]: {
+          answers,
+          by: currentUser,
+          submittedAt: new Date().toISOString(),
+        },
+      });
+      showToast('Your Durham picks are saved 🌈🚆', 'success');
+    } catch (e) {
+      console.error('trip poll save failed:', e);
+      showToast('Could not save your picks', 'error');
+      throw e;
+    }
+  };
+
   const enableNotifications = async () => {
     if (!user) return;
     setNotificationsLoading(true);
@@ -2016,6 +2042,13 @@ export default function TripPlanner() {
       (e) => console.error('checkins listener:', e)
     );
 
+    // Active trip polls and each partner's response.
+    const tripPollsUnsubscribe = onSnapshot(
+      collection(db, 'tripData', 'tripPolls', 'polls'),
+      (snap) => setTripPolls(snap.docs.map((pollDoc) => ({ id: pollDoc.id, ...pollDoc.data() }))),
+      (e) => console.error('trip polls listener:', e)
+    );
+
     // Per-person notification preferences (read by the Cloud Functions).
     const notifyPrefsUnsubscribe = onSnapshot(
       doc(db, 'tripData', 'notifyPrefs'),
@@ -2061,6 +2094,7 @@ export default function TripPlanner() {
     return () => {
       checkinMetaUnsubscribe();
       checkinsUnsubscribe();
+      tripPollsUnsubscribe();
       notifyPrefsUnsubscribe();
       calendarUnsubscribe();
       memoriesColUnsubscribe();
@@ -4007,7 +4041,7 @@ export default function TripPlanner() {
           {/* ========== HUB SECTION (formerly Home) ========== */}
           {activeSection === 'home' && (
             <SharedHubProvider value={sharedHub}>
-              <HubSection {...{ checkins, submitCheckin, weeklyQuestion, rerollQuestion, updateGoal, calendarAgenda, collapsedSections, completeSocial, completeTask, currentUser, deleteGoal, deleteIdea, deleteOdysseyPlan, deleteSocial, deleteTask, getEventLabel, getLinkedLabel, highlightGoal, highlightIdea, highlightSocial, highlightTask, hubGoalFilter, hubIdeaFilter, hubListFilter, hubSocialFilter, hubSubView, hubTaskFilter, hubTaskSort, navigateToEvent, navigateToLinked, promoteIdeaToTask, setActiveSection, setHubGoalFilter, setHubIdeaFilter, setHubListFilter, setHubSocialFilter, setHubSubView, setHubTaskFilter, setHubTaskSort, setShowAddGoalModal, setShowAddIdeaModal, setShowAddSocialModal, setShowAddTaskModal, setShowOdysseyPlanModal, setShowSharedListModal, sharedGoals, sharedIdeas, sharedLists, sharedOdysseyPlans, sharedSocial, sharedTasks, taskMatchesHorizon, todaySnapshot, toggleDashSection, toggleMilestone, updateTask }} />
+              <HubSection {...{ activeTripPoll, checkins, submitCheckin, submitTripPoll, weeklyQuestion, rerollQuestion, updateGoal, calendarAgenda, collapsedSections, completeSocial, completeTask, currentUser, deleteGoal, deleteIdea, deleteOdysseyPlan, deleteSocial, deleteTask, getEventLabel, getLinkedLabel, highlightGoal, highlightIdea, highlightSocial, highlightTask, hubGoalFilter, hubIdeaFilter, hubListFilter, hubSocialFilter, hubSubView, hubTaskFilter, hubTaskSort, navigateToEvent, navigateToLinked, promoteIdeaToTask, setActiveSection, setHubGoalFilter, setHubIdeaFilter, setHubListFilter, setHubSocialFilter, setHubSubView, setHubTaskFilter, setHubTaskSort, setShowAddGoalModal, setShowAddIdeaModal, setShowAddSocialModal, setShowAddTaskModal, setShowOdysseyPlanModal, setShowSharedListModal, sharedGoals, sharedIdeas, sharedLists, sharedOdysseyPlans, sharedSocial, sharedTasks, taskMatchesHorizon, todaySnapshot, toggleDashSection, toggleMilestone, updateTask }} />
             </SharedHubProvider>
           )}
           {/* ========== END HUB SECTION ========== */}

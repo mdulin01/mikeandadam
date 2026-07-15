@@ -8,6 +8,7 @@ import SocialCard from '../components/SharedHub/SocialCard';
 import TaskCard from '../components/SharedHub/TaskCard';
 import TodayCard from '../components/TodayCard';
 import CheckinCard from '../components/CheckinCard';
+import TripPollCard from '../components/TripPollCard';
 import { ideaCategories, listCategories, socialTypes, timeHorizons } from '../constants';
 
 /**
@@ -17,6 +18,8 @@ import { ideaCategories, listCategories, socialTypes, timeHorizons } from '../co
 const HubSection = (props) => {
   const {
     checkins,
+    activeTripPoll,
+    submitTripPoll,
     submitCheckin,
     weeklyQuestion,
     rerollQuestion,
@@ -81,6 +84,15 @@ const HubSection = (props) => {
               {/* ===== HUB DASHBOARD VIEW ===== */}
               {hubSubView === 'home' && (
                 <>
+                  {/* ACTIVE COUPLE POLL */}
+                  {activeTripPoll && (
+                    <TripPollCard
+                      poll={activeTripPoll}
+                      currentUser={currentUser}
+                      onSubmit={submitTripPoll}
+                    />
+                  )}
+
                   {/* TODAY TOGETHER (Phase 3) */}
                   <TodayCard
                     snapshot={todaySnapshot}

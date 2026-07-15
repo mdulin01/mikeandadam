@@ -105,6 +105,30 @@ async function sendPush({ title, body, url, tag }, opts = {}) {
   return { sent };
 }
 
+// ── Couple poll invitation ──
+// Creating a poll can optionally invite one partner. The poll stays generic;
+// content and recipient come from the document, while this function preserves
+// the app's data-only push pattern.
+exports.tripPollCreated = onDocumentCreated("tripData/tripPolls/polls/{pollId}", async (event) => {
+  const poll = event.data?.data();
+  const invite = poll?.invite;
+  if (!invite?.recipient || !['mike', 'adam'].includes(invite.recipient)) return;
+
+  const result = await sendPush({
+    title: invite.title || poll.title || "A new trip poll is ready",
+    body: invite.body || "Open Mike & Adam to make your picks.",
+    url: invite.url || `${APP_URL}/?poll=${event.params.pollId}`,
+    tag: invite.tag || `trip-poll-${event.params.pollId}`,
+  }, { only: invite.recipient, kind: 'instant' });
+
+  await event.data.ref.set({
+    inviteResult: {
+      sent: result.sent,
+      attemptedAt: new Date().toISOString(),
+    },
+  }, { merge: true });
+});
+
 // ── Firestore readers (subcollection first, legacy array fallback) ──
 async function readTasks() {
   const col = await db.collection("tripData").doc("sharedHub").collection("tasks").get();
