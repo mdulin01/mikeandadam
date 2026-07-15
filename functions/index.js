@@ -129,6 +129,35 @@ exports.tripPollCreated = onDocumentCreated("tripData/tripPolls/polls/{pollId}",
   }, { merge: true });
 });
 
+// Notify Mike as soon as Adam submits or changes a poll response. A write made
+// below records delivery, but the submittedAt guard prevents a notification
+// loop when that bookkeeping update re-triggers this function.
+exports.tripPollResponded = onDocumentUpdated("tripData/tripPolls/polls/{pollId}", async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  const beforeAt = before?.responses?.adam?.submittedAt;
+  const afterAt = after?.responses?.adam?.submittedAt;
+  if (!afterAt || beforeAt === afterAt) return;
+
+  const isUpdate = Boolean(beforeAt);
+  const result = await sendPush({
+    title: isUpdate ? "Adam updated his Durham picks" : "Adam finished the Durham survey 🗳️",
+    body: "Open Mike & Adam to compare his hotel, dinner and Sunday choices.",
+    url: `${APP_URL}/?poll=${event.params.pollId}`,
+    tag: `trip-poll-result-${event.params.pollId}`,
+  }, { only: 'mike', kind: 'instant' });
+
+  await event.data.after.ref.set({
+    responseNotifications: {
+      adam: {
+        sent: result.sent,
+        responseAt: afterAt,
+        attemptedAt: new Date().toISOString(),
+      },
+    },
+  }, { merge: true });
+});
+
 // ── Firestore readers (subcollection first, legacy array fallback) ──
 async function readTasks() {
   const col = await db.collection("tripData").doc("sharedHub").collection("tasks").get();

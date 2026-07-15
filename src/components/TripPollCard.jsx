@@ -34,12 +34,19 @@ const TripPollCard = ({ poll, currentUser, onSubmit }) => {
   }, [poll?.id]);
 
   const questions = poll?.questions || [];
+  const responses = poll?.responses || {};
+  const hasResults = Boolean(responses.mike?.submittedAt || responses.adam?.submittedAt);
   const complete = useMemo(
     () => questions.length > 0 && questions.every((question) => answers[question.id]),
     [answers, questions]
   );
 
   if (!poll || poll.status !== 'open') return null;
+
+  const answerLabel = (question, person) => {
+    const answerId = responses[person]?.answers?.[question.id];
+    return question.options?.find((option) => option.id === answerId)?.label || 'Waiting';
+  };
 
   const save = async () => {
     if (!complete || saving) return;
@@ -136,6 +143,46 @@ const TripPollCard = ({ poll, currentUser, onSubmit }) => {
           {myResponse ? 'Update my picks' : 'Send my picks'}
         </button>
         {!complete && <p className="mt-2 text-center text-[11px] text-white/35">Choose one answer for each question.</p>}
+
+        {hasResults && (
+          <div data-testid="trip-poll-results" className="mt-6 rounded-2xl border border-sky-300/20 bg-sky-950/25 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-300/70">Results so far</p>
+                <h3 className="mt-0.5 text-base font-black text-white">Your picks, side by side</h3>
+              </div>
+              <span className="text-xl">🗳️</span>
+            </div>
+            <div className="space-y-3">
+              {questions.map((question) => {
+                const mikeAnswer = responses.mike?.answers?.[question.id];
+                const adamAnswer = responses.adam?.answers?.[question.id];
+                const isMatch = Boolean(mikeAnswer && adamAnswer && mikeAnswer === adamAnswer);
+                return (
+                  <div key={question.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-white/65">{question.label}</p>
+                      {isMatch && <span className="shrink-0 rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold text-emerald-200">✨ Match</span>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['mike', 'adam'].map((person) => {
+                        const submitted = Boolean(responses[person]?.submittedAt);
+                        return (
+                          <div key={person} className={`rounded-lg px-2.5 py-2 ${submitted ? 'bg-white/[0.06]' : 'bg-white/[0.025]'}`}>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-white/35">{person === 'mike' ? 'Mike' : 'Adam'}</p>
+                            <p className={`mt-0.5 text-xs font-semibold leading-snug ${submitted ? 'text-white/90' : 'text-white/30'}`}>
+                              {answerLabel(question, person)}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
