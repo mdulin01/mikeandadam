@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Check, CheckSquare, ChevronLeft, ChevronRight, Clock, Edit3, Hotel, Link, Loader, MapPin, Plane, Plus, Share2, Trash2, Upload, UserPlus, Users, X } from 'lucide-react';
+import { Bell, Check, CheckSquare, ChevronLeft, ChevronRight, Clock, Edit3, Hotel, Image, Link, Loader, MapPin, Plane, Plus, Share2, Trash2, Upload, UserPlus, Users, X } from 'lucide-react';
 import TaskCard from '../components/SharedHub/TaskCard';
 import TripDetail from '../components/TripDetail';
 import { formatDate, parseLocalDate } from '../utils';
