@@ -562,7 +562,7 @@ const EventsSection = (props) => {
                     <div className="space-y-2 mb-4">
                       {(selectedPartyEvent.tasks || []).map(task => {
                         const isSwipingThis = swipeState.id === `task-${task.id}` && swipeState.swiping;
-                        const swipeOffset = isSwipingThis ? Math.min(0, swipeState.currentX - swipeState.startX) : 0;
+                        const swipeOffset = isSwipingThis ? Math.max(-112, Math.min(0, swipeState.currentX - swipeState.startX)) : 0;
                         const deleteTask = () => {
                           const newEvents = partyEvents.map(ev =>
                             ev.id === selectedPartyEvent.id
@@ -573,12 +573,18 @@ const EventsSection = (props) => {
                           setSelectedPartyEvent(newEvents.find(e => e.id === selectedPartyEvent.id));
                           savePartyEventsToFirestore(newEvents);
                         };
+                        const confirmDeleteTask = () => {
+                          if (window.confirm(`Delete task “${task.text}”?`)) {
+                            deleteTask();
+                          }
+                        };
 
                         return (
                           <div key={task.id} className="relative overflow-hidden rounded-xl">
                             {/* Delete action background */}
-                            <div className="absolute inset-y-0 right-0 w-20 bg-red-500 flex items-center justify-center">
-                              <Trash2 className="w-5 h-5 text-white" />
+                            <div className="absolute inset-y-0 right-0 w-28 bg-red-500 flex flex-col items-center justify-center gap-1 px-2 text-white" aria-hidden="true">
+                              <Trash2 className="w-4 h-4" />
+                              <span className="text-[10px] font-semibold leading-none">Delete task</span>
                             </div>
 
                             {/* Swipeable content */}
@@ -605,7 +611,7 @@ const EventsSection = (props) => {
                                 if (!isOwner || swipeState.id !== `task-${task.id}`) return;
                                 // If swiped more than 80px, delete
                                 if (swipeState.startX - swipeState.currentX > 80) {
-                                  deleteTask();
+                                  confirmDeleteTask();
                                 }
                                 setSwipeState({ id: null, startX: 0, currentX: 0, swiping: false });
                               }}
@@ -651,14 +657,16 @@ const EventsSection = (props) => {
                               {/* Desktop delete button (hidden on mobile to favor swipe) */}
                               {isOwner && (
                                 <button
-                                  onClick={deleteTask}
+                                  onClick={confirmDeleteTask}
                                   className="hidden md:block p-1 text-slate-400 hover:text-red-400 transition"
+                                  title={`Delete task: ${task.text}`}
+                                  aria-label={`Delete task: ${task.text}`}
                                 >
                                   <X className="w-4 h-4" />
                                 </button>
                               )}
                               {/* Mobile swipe hint */}
-                              <span className="md:hidden text-slate-600 text-xs">←</span>
+                              {!isSwipingThis && <span className="md:hidden text-slate-600 text-xs" aria-hidden="true">←</span>}
                             </div>
                           </div>
                         );
