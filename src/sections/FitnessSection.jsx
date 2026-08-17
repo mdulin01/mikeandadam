@@ -713,8 +713,12 @@ const FitnessSection = (props) => {
                                   </div>
                                   <span className="text-xs text-white/40">
                                     {pastWeeks.filter(w => {
-                                      const cc = isTriathlon ? (w.runs?.filter(r => r.mike).length || 0) + (w.crossTraining?.filter(c => c.mike).length || 0) : (w.runs?.filter(r => r.mike && r.adam).length || 0) + (w.crossTraining?.filter(c => c.mike && c.adam).length || 0);
-                                      const tc = (w.runs?.length || 0) + (w.crossTraining?.length || 0);
+                                      // Optional cross training never blocks completion.
+                                      const req = (w.crossTraining || []).filter(c => !c.optional);
+                                      const cc = isTriathlon
+                                        ? (w.runs?.filter(r => r.mike).length || 0) + req.filter(c => c.mike).length
+                                        : (w.runs?.filter(r => r.mike && r.adam).length || 0) + req.filter(c => c.mike && c.adam).length;
+                                      const tc = (w.runs?.length || 0) + req.length;
                                       return tc > 0 && cc === tc;
                                     }).length}/{pastWeeks.length} completed
                                   </span>
@@ -1025,8 +1029,10 @@ const FitnessSection = (props) => {
                           <div className="text-sm text-blue-300 mb-2">{event.emoji} {event.name}</div>
                           <div className="flex gap-2 flex-wrap">
                             {plan.map((week, i) => {
-                              const completed = (week.runs?.filter(r => r.mike).length || 0) + (week.crossTraining?.filter(c => c.mike).length || 0);
-                              const total = (week.runs?.length || 0) + (week.crossTraining?.length || 0);
+                              const reqCross = (week.crossTraining || []).filter(c => !c.optional);
+                              const bonus = (week.crossTraining || []).filter(c => c.optional && c.mike).length;
+                              const completed = (week.runs?.filter(r => r.mike).length || 0) + reqCross.filter(c => c.mike).length + bonus;
+                              const total = (week.runs?.length || 0) + reqCross.length + bonus;
                               const percentage = total > 0 ? (completed / total) * 100 : 0;
 
                               return (
@@ -1084,8 +1090,10 @@ const FitnessSection = (props) => {
                           <div className="text-sm text-purple-300 mb-2">{event.emoji} {event.name}</div>
                           <div className="flex gap-2 flex-wrap">
                             {plan.map((week, i) => {
-                              const completed = (week.runs?.filter(r => r.adam).length || 0) + (week.crossTraining?.filter(c => c.adam).length || 0);
-                              const total = (week.runs?.length || 0) + (week.crossTraining?.length || 0);
+                              const reqCross = (week.crossTraining || []).filter(c => !c.optional);
+                              const bonus = (week.crossTraining || []).filter(c => c.optional && c.adam).length;
+                              const completed = (week.runs?.filter(r => r.adam).length || 0) + reqCross.filter(c => c.adam).length + bonus;
+                              const total = (week.runs?.length || 0) + reqCross.length + bonus;
                               const percentage = total > 0 ? (completed / total) * 100 : 0;
 
                               return (
@@ -1151,20 +1159,24 @@ const FitnessSection = (props) => {
                       const isMikeOnlyPlan = plan[0]?.runs?.[0] && !('adam' in plan[0].runs[0]);
                       const isAdamOnlyPlan = plan[0]?.runs?.[0] && !('mike' in plan[0].runs[0]);
                       const completedWorkouts = plan.reduce((acc, week) => {
+                        // Optional cross training counts only when actually done
+                        // (it's bonus — it never inflates the denominator).
+                        const reqCross = (week.crossTraining || []).filter(c => !c.optional);
+                        const optCross = (week.crossTraining || []).filter(c => c.optional);
                         let runsDone, crossDone;
                         if (isMikeOnlyPlan) {
                           runsDone = week.runs?.filter(r => r.mike).length || 0;
-                          crossDone = week.crossTraining?.filter(c => c.mike).length || 0;
+                          crossDone = reqCross.filter(c => c.mike).length + optCross.filter(c => c.mike).length;
                         } else if (isAdamOnlyPlan) {
                           runsDone = week.runs?.filter(r => r.adam).length || 0;
-                          crossDone = week.crossTraining?.filter(c => c.adam).length || 0;
+                          crossDone = reqCross.filter(c => c.adam).length + optCross.filter(c => c.adam).length;
                         } else {
                           runsDone = week.runs?.filter(r => r.mike && r.adam).length || 0;
-                          crossDone = week.crossTraining?.filter(c => c.mike && c.adam).length || 0;
+                          crossDone = reqCross.filter(c => c.mike && c.adam).length + optCross.filter(c => c.mike && c.adam).length;
                         }
                         return acc + runsDone + crossDone;
                       }, 0);
-                      const totalWorkouts = plan.reduce((acc, week) => acc + (week.runs?.length || 0) + (week.crossTraining?.length || 0), 0);
+                      const totalWorkouts = plan.reduce((acc, week) => acc + (week.runs?.length || 0) + (week.crossTraining || []).filter(c => !c.optional).length, 0);
                       const totalMiles = plan.reduce((acc, week) => acc + (week.totalMiles || 0), 0);
                       // Photos persist on the week object (Storage URLs); collect any for hero display
                       const allPhotos = plan.flatMap(week => week.photos || []);
