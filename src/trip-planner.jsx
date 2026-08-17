@@ -1921,6 +1921,47 @@ export default function TripPlanner() {
             if (gsoW1 && (gsoW1.runs || []).some(r => r.label === 'Short Run' && r.distance === '3 mi')) {
               delete cleanedPlans['gso-half-2026'];
             }
+            // One-time TRIM (2026-07-07): cross training is now ONE optional
+            // session per week. The persisted plan still carries the old two,
+            // and getActiveTrainingPlan re-appends any Firebase extras beyond
+            // the template length — so the extra must be removed at the source.
+            const gsoWeeks = cleanedPlans['gso-half-2026'];
+            if (Array.isArray(gsoWeeks) && gsoWeeks.some(w => (w.crossTraining || []).length > 1) && !crossTrimRef.current) {
+              crossTrimRef.current = true;
+              const trimmed = gsoWeeks.map(w => {
+                const ct = w.crossTraining || [];
+                if (ct.length <= 1) return w;
+                const isRaceWk = !!w.isRaceWeek;
+                // Keep one entry; if EITHER old session was checked off, the
+                // surviving one inherits that credit (no lost progress).
+                return {
+                  ...w,
+                  crossTraining: [{
+                    id: 1,
+                    label: isRaceWk ? 'Race Day Prep (optional)' : 'Cross Train (optional)',
+                    optional: true,
+                    mike: ct.some(c => c.mike),
+                    adam: ct.some(c => c.adam),
+                    notes: ct.map(c => c.notes).filter(Boolean).join(' · '),
+                  }],
+                };
+              });
+              cleanedPlans['gso-half-2026'] = trimmed;
+              (async () => {
+                try {
+                  await updateDoc(doc(db, 'tripData', 'fitness'), {
+                    'trainingPlans.gso-half-2026': JSON.parse(JSON.stringify(trimmed)),
+                    lastUpdated: new Date().toISOString(),
+                    updatedBy: 'cleanup',
+                  });
+                  console.log('[cleanup] cross training trimmed to one optional session/week');
+                } catch (e) {
+                  console.error('[cleanup] cross-trim write failed (retry next load):', e);
+                  crossTrimRef.current = false;
+                }
+              })();
+            }
+
             setFitnessTrainingPlans(cleanedPlans);
 
             // One-time WRITE-BACK (2026-07-05): the filters above only cleaned
@@ -2526,6 +2567,7 @@ export default function TripPlanner() {
   const migratingMemoriesRef = useRef(false);
   const migratingTasksRef = useRef(false);
   const fitnessCleanupRef = useRef(false);
+  const crossTrimRef = useRef(false);
 
   // Stable stringify (sorted keys) so Firestore key reordering doesn't
   // register as a difference.
