@@ -139,8 +139,12 @@ const FitnessSection = (props) => {
                                     </div>
                                     <div className="h-2 bg-white/20 rounded-full overflow-hidden">
                                       <div
-                                        className="h-full bg-white rounded-full transition-all"
-                                        style={{ width: `${(completedWorkouts / totalWorkouts) * 100}%` }}
+                                        className="h-full rounded-full transition-all"
+                                        style={{
+                                          width: `${(completedWorkouts / totalWorkouts) * 100}%`,
+                                          background: 'linear-gradient(90deg,#e40303,#ff8c00,#ffed00,#008026,#004dff,#750787)',
+                                          boxShadow: '0 0 8px rgba(255,255,255,0.5)',
+                                        }}
                                       />
                                     </div>
                                   </div>
@@ -152,8 +156,12 @@ const FitnessSection = (props) => {
                                       </div>
                                       <div className="h-2 bg-white/20 rounded-full overflow-hidden">
                                         <div
-                                          className="h-full bg-white/70 rounded-full transition-all"
-                                          style={{ width: `${(completedMiles / totalMiles) * 100}%` }}
+                                          className="h-full rounded-full transition-all"
+                                          style={{
+                                            width: `${(completedMiles / totalMiles) * 100}%`,
+                                            background: 'linear-gradient(90deg,#e40303,#ff8c00,#ffed00,#008026,#004dff,#750787)',
+                                            boxShadow: '0 0 8px rgba(255,255,255,0.5)',
+                                          }}
                                         />
                                       </div>
                                     </div>
@@ -536,10 +544,15 @@ const FitnessSection = (props) => {
 
                         const renderWeekAccordion = (week, index, opts = {}) => {
                           const isPast = week.endDate < todayStr;
+                          // Optional cross training is bonus — it never counts toward
+                          // the week's done/total, so a week completes on runs alone.
+                          const countedCross = (week.crossTraining || []).filter(c => !c.optional);
                           const completedCount = isTriathlon
-                            ? (week.runs?.filter(r => r.mike).length || 0) + (week.crossTraining?.filter(c => c.mike).length || 0)
-                            : (week.runs?.filter(r => r.mike && r.adam).length || 0) + (week.crossTraining?.filter(c => c.mike && c.adam).length || 0);
-                          const totalCount = (week.runs?.length || 0) + (week.crossTraining?.length || 0);
+                            ? (week.runs?.filter(r => r.mike).length || 0) + countedCross.filter(c => c.mike).length
+                            : (week.runs?.filter(r => r.mike && r.adam).length || 0) + countedCross.filter(c => c.mike && c.adam).length;
+                          const totalCount = (week.runs?.length || 0) + countedCross.length;
+                          const bonusCross = (week.crossTraining || []).filter(c => c.optional &&
+                            (isTriathlon ? c.mike : (c.mike && c.adam))).length;
                           const weekPhotos = week.photos || [];
 
                           return (
@@ -576,9 +589,20 @@ const FitnessSection = (props) => {
                                       {weekPhotos.length > 3 && <span className="w-8 h-8 rounded-lg bg-white/20 border-2 border-slate-800 flex items-center justify-center text-[10px] text-white/70 font-medium">+{weekPhotos.length - 3}</span>}
                                     </div>
                                   )}
-                                  <div className="text-white/60 text-sm">{completedCount}/{totalCount} done</div>
+                                  <div className="text-white/60 text-sm flex items-center gap-1.5 justify-end">
+                                    <span>{completedCount}/{totalCount} done</span>
+                                    {bonusCross > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-300" title="Optional cross training — bonus!">+{bonusCross} 💪</span>}
+                                  </div>
                                   <div className="w-20 h-2 bg-white/10 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full ${completedCount === totalCount ? 'bg-green-500' : 'bg-orange-400'}`} style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }} />
+                                    <div
+                                      className="h-full rounded-full transition-all"
+                                      style={{
+                                        width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%`,
+                                        background: completedCount === totalCount && totalCount > 0
+                                          ? 'linear-gradient(90deg,#e40303,#ff8c00,#ffed00,#008026,#004dff,#750787)'
+                                          : '#fb923c',
+                                      }}
+                                    />
                                   </div>
                                   <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingTrainingWeek({ eventId: selectedFitnessEvent.id, week: { ...week } }); }} className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition" title="Edit week">
                                     <Pencil className="w-4 h-4" />

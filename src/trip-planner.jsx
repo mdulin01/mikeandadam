@@ -1341,8 +1341,14 @@ export default function TripPlanner() {
   const celebrateRunTogether = () => {
     vibrate(200); // Short buzz
     setConfetti({ type: 'run' });
-    showToast('High Five! 🙌 You both crushed it!', 'success');
-    setTimeout(() => setConfetti(null), 2000);
+    const cheers = [
+      'High five! 🙌 You both crushed it 🌈',
+      'Look at you two go 🏳️‍🌈💪',
+      'Done and done — together 💕',
+      'Iconic behavior, honestly ✨🌈',
+    ];
+    showToast(cheers[Math.floor(Math.random() * cheers.length)], 'success');
+    setTimeout(() => setConfetti(null), 2600);
   };
 
   // Trigger week completion celebration (both completed all runs)
@@ -3594,39 +3600,91 @@ export default function TripPlanner() {
       {confetti && (
         <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
           <style>{`
-            @keyframes confetti-fall {
-              0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
-              100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+            @keyframes pride-fall {
+              0%   { transform: translateY(-12vh) rotate(0deg); opacity: 0; }
+              8%   { opacity: 1; }
+              100% { transform: translateY(108vh) rotate(var(--spin, 720deg)); opacity: 0; }
             }
-            @keyframes confetti-fall-slow {
-              0% { transform: translateY(-100vh) rotate(0deg) scale(1); opacity: 1; }
-              100% { transform: translateY(100vh) rotate(1080deg) scale(0.5); opacity: 0; }
+            @keyframes pride-drift {
+              0%, 100% { margin-left: 0; }
+              50%      { margin-left: var(--drift, 20px); }
+            }
+            @keyframes pride-arc {
+              0%   { transform: translateY(40px) scale(0.9); opacity: 0; }
+              25%  { opacity: 0.95; }
+              75%  { opacity: 0.95; }
+              100% { transform: translateY(-10px) scale(1.06); opacity: 0; }
+            }
+            @keyframes pride-flash {
+              0%   { opacity: 0; }
+              15%  { opacity: 0.30; }
+              100% { opacity: 0; }
             }
           `}</style>
-          {[...Array(confetti.type === 'week' ? 60 : 25)].map((_, i) => {
-            // Yellow confetti for single run completion, rainbow for week completion
-            const rainbowColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
-            const yellowColors = ['#fbbf24', '#f59e0b', '#fcd34d', '#fde68a', '#d97706']; // Shades of yellow/gold
-            const colors = confetti.type === 'week' ? rainbowColors : yellowColors;
-            const color = colors[i % colors.length];
+
+          {/* Full-screen rainbow wash — a quick pride flag sweep */}
+          <div
+            style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(180deg,#e40303,#ff8c00,#ffed00,#008026,#004dff,#750787)',
+              animation: `pride-flash ${confetti.type === 'week' ? 2.2 : 1.4}s ease-out forwards`,
+            }}
+          />
+
+          {/* Rainbow arc rising from the bottom (week completion = full double arc) */}
+          <div
+            style={{
+              position: 'absolute', left: '50%', bottom: '-42vw',
+              width: '128vw', height: '128vw', transform: 'translateX(-50%)',
+              borderRadius: '50%',
+              border: `${confetti.type === 'week' ? 34 : 22}px solid transparent`,
+              borderTopColor: 'rgba(228,3,3,0.75)',
+              boxShadow: confetti.type === 'week'
+                ? 'inset 0 0 0 12px rgba(255,140,0,0.65), inset 0 0 0 24px rgba(255,237,0,0.6), inset 0 0 0 36px rgba(0,128,38,0.55), inset 0 0 0 48px rgba(0,77,255,0.5), inset 0 0 0 60px rgba(117,7,135,0.45)'
+                : 'inset 0 0 0 8px rgba(255,140,0,0.55), inset 0 0 0 16px rgba(255,237,0,0.5), inset 0 0 0 24px rgba(0,128,38,0.45)',
+              animation: `pride-arc ${confetti.type === 'week' ? 3.4 : 2.2}s ease-out forwards`,
+            }}
+          />
+
+          {/* Rainbow rain — flag stripes, hearts and sparkles */}
+          {[...Array(confetti.type === 'week' ? 90 : 44)].map((_, i) => {
+            const pride = ['#e40303', '#ff8c00', '#ffed00', '#008026', '#004dff', '#750787'];
+            const emojis = confetti.type === 'week'
+              ? ['🌈', '🏳️‍🌈', '💜', '💙', '💚', '💛', '🧡', '❤️', '✨', '🎉', '💕']
+              : ['🌈', '🏳️‍🌈', '💖', '✨', '💪'];
+            const isEmoji = i % 3 === 0;
+            const color = pride[i % pride.length];
             const left = Math.random() * 100;
-            const delay = Math.random() * (confetti.type === 'week' ? 1 : 0.5);
-            const duration = confetti.type === 'week' ? 3 + Math.random() * 2 : 1.5 + Math.random();
-            const size = confetti.type === 'week' ? 10 + Math.random() * 10 : 6 + Math.random() * 6;
+            const delay = Math.random() * (confetti.type === 'week' ? 1.4 : 0.8);
+            const duration = (confetti.type === 'week' ? 3.2 : 2.2) + Math.random() * 1.8;
+            const size = (confetti.type === 'week' ? 12 : 9) + Math.random() * 12;
+            const spin = `${(Math.random() > 0.5 ? 1 : -1) * (360 + Math.random() * 720)}deg`;
+            const drift = `${(Math.random() > 0.5 ? 1 : -1) * (10 + Math.random() * 40)}px`;
             return (
               <div
                 key={i}
                 style={{
-                  position: 'absolute',
-                  left: `${left}%`,
-                  top: 0,
-                  width: size,
-                  height: size,
-                  backgroundColor: color,
-                  borderRadius: Math.random() > 0.5 ? '50%' : '2px',
-                  animation: `${confetti.type === 'week' ? 'confetti-fall-slow' : 'confetti-fall'} ${duration}s ease-out ${delay}s forwards`,
+                  position: 'absolute', left: `${left}%`, top: 0,
+                  animation: `pride-fall ${duration}s ease-in ${delay}s forwards, pride-drift ${duration / 2}s ease-in-out ${delay}s infinite`,
+                  '--spin': spin, '--drift': drift,
                 }}
-              />
+              >
+                {isEmoji ? (
+                  <span style={{ fontSize: size + 8, lineHeight: 1 }}>
+                    {emojis[i % emojis.length]}
+                  </span>
+                ) : (
+                  <div
+                    style={{
+                      width: size * (Math.random() > 0.6 ? 2.2 : 1), // some stripes, some dots
+                      height: size,
+                      backgroundColor: color,
+                      borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                      boxShadow: `0 0 ${size / 2}px ${color}88`,
+                    }}
+                  />
+                )}
+              </div>
             );
           })}
         </div>
@@ -3635,9 +3693,16 @@ export default function TripPlanner() {
       {/* Week Completion Celebration Overlay */}
       {weekCelebration && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-pulse" style={{ animationDuration: '2s' }}>
-          <div className="text-center p-8 bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 rounded-3xl shadow-2xl transform animate-bounce" style={{ animationDuration: '0.5s' }}>
-            <div className="text-6xl mb-4">🎉🏃‍♂️🏃‍♂️🎉</div>
-            <h2 className="text-4xl font-bold text-white mb-2">Week {weekCelebration.weekNumber} Complete!</h2>
+          <div
+            className="text-center p-8 rounded-3xl shadow-2xl transform animate-bounce"
+            style={{
+              animationDuration: '0.5s',
+              background: 'linear-gradient(135deg,#750787,#004dff,#008026,#ffed00,#ff8c00,#e40303)',
+              boxShadow: '0 0 60px rgba(255,140,0,0.45), 0 0 120px rgba(117,7,135,0.35)',
+            }}
+          >
+            <div className="text-6xl mb-4">🏳️‍🌈🏃‍♂️🏃‍♂️🌈</div>
+            <h2 className="text-4xl font-bold text-white mb-2 drop-shadow">Week {weekCelebration.weekNumber} Complete!</h2>
             <p className="text-xl text-white/90 mb-4">{weekCelebration.eventName}</p>
             <div className="flex justify-center gap-4">
               <div className="bg-white/20 px-4 py-2 rounded-full">
@@ -3647,7 +3712,7 @@ export default function TripPlanner() {
                 <span className="text-white font-bold">Adam ✓</span>
               </div>
             </div>
-            <p className="text-white/80 mt-4 text-lg">You both crushed it! 💪</p>
+            <p className="text-white/90 mt-4 text-lg">You both crushed it — together. 💪🌈</p>
           </div>
         </div>
       )}
