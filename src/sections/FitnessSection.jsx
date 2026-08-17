@@ -858,6 +858,10 @@ const FitnessSection = (props) => {
                     let mikeRunMiles = 0, adamRunMiles = 0;
                     let mikeSwimYards = 0, adamSwimYards = 0;
                     let mikeBikeMiles = 0, adamBikeMiles = 0;
+                    // "This race" = the active (not-yet-run) event; all-time spans
+                    // every plan including finished races (2026-08-17).
+                    let raceName = '', raceMikeRuns = 0, raceAdamRuns = 0,
+                        raceMikeMiles = 0, raceAdamMiles = 0, raceTotalRuns = 0, raceTotalMiles = 0;
 
                     // Helper to detect activity type from label
                     const isSwim = (label) => label?.toLowerCase().includes('swim') || label?.includes('🏊');
@@ -866,6 +870,8 @@ const FitnessSection = (props) => {
                     // Use getActiveTrainingPlan to get merged hardcoded + Firebase data
                     fitnessEvents.forEach(event => {
                       const plan = getActiveTrainingPlan(event.id);
+                      const isCurrentRace = event.status !== 'completed';
+                      if (isCurrentRace && !raceName) raceName = event.name;
                       plan.forEach(week => {
                         week.runs?.forEach(activity => {
                           const label = activity.label || '';
@@ -903,6 +909,12 @@ const FitnessSection = (props) => {
                               adamRuns++;
                               adamRunMiles += distanceNum;
                             }
+                            if (isCurrentRace) {
+                              raceTotalRuns++;
+                              raceTotalMiles += distanceNum;
+                              if (activity.mike) { raceMikeRuns++; raceMikeMiles += distanceNum; }
+                              if (activity.adam) { raceAdamRuns++; raceAdamMiles += distanceNum; }
+                            }
                           }
                         });
                         week.crossTraining?.forEach(ct => {
@@ -918,7 +930,8 @@ const FitnessSection = (props) => {
                         {/* Runs */}
                         <div className="bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-2xl p-6 border border-orange-500/30">
                           <div className="text-4xl mb-2">🏃</div>
-                          <div className="text-xl font-bold text-white mb-2">Runs Completed</div>
+                          <div className="text-xl font-bold text-white mb-1">Runs Completed</div>
+                          <div className="text-[11px] uppercase tracking-wider text-white/40 mb-2">all time · all plans</div>
                           <div className="flex justify-around">
                             <div className="text-center">
                               <div className="text-2xl font-bold text-blue-400">{mikeRuns}</div>
@@ -931,7 +944,7 @@ const FitnessSection = (props) => {
                               <div className="text-xs text-purple-300">{adamRunMiles.toFixed(1)} mi</div>
                             </div>
                           </div>
-                          <div className="mt-2 text-sm text-orange-300 text-center">{totalRuns} total in plan</div>
+                          <div className="mt-2 text-sm text-orange-300 text-center">{totalRuns} total across all plans</div>
                         </div>
 
                         {/* Swims */}
@@ -993,21 +1006,48 @@ const FitnessSection = (props) => {
                         <div className="md:col-span-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-2xl p-6 border border-yellow-500/30">
                           <div className="text-4xl mb-2">📏</div>
                           <div className="text-xl font-bold text-white mb-4">Total Distance Logged</div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-blue-400 mb-1">Mike</div>
-                              <div className="space-y-1 text-sm">
-                                <div className="text-white/80">🏃 {mikeRunMiles.toFixed(1)} miles running</div>
-                                <div className="text-white/80">🏊 {mikeSwimYards.toFixed(0)} yards swimming</div>
-                                <div className="text-white/80">🚴 {mikeBikeMiles.toFixed(1)} miles biking</div>
+
+                          {/* THIS RACE — the plan you're training for right now */}
+                          {raceName && (
+                            <div className="mb-5">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[11px] uppercase tracking-wider text-yellow-200/80">🏁 This race · {raceName}</span>
+                                <span className="text-[11px] text-white/40">{raceTotalMiles.toFixed(1)} mi in plan</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="text-center bg-white/5 rounded-xl py-2">
+                                  <div className="text-sm font-bold text-blue-400">Mike</div>
+                                  <div className="text-lg font-bold text-white">{raceMikeMiles.toFixed(1)} mi</div>
+                                  <div className="text-xs text-white/50">{raceMikeRuns}/{raceTotalRuns} runs</div>
+                                </div>
+                                <div className="text-center bg-white/5 rounded-xl py-2">
+                                  <div className="text-sm font-bold text-purple-400">Adam</div>
+                                  <div className="text-lg font-bold text-white">{raceAdamMiles.toFixed(1)} mi</div>
+                                  <div className="text-xs text-white/50">{raceAdamRuns}/{raceTotalRuns} runs</div>
+                                </div>
                               </div>
                             </div>
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-purple-400 mb-1">Adam</div>
-                              <div className="space-y-1 text-sm">
-                                <div className="text-white/80">🏃 {adamRunMiles.toFixed(1)} miles running</div>
-                                <div className="text-white/80">🏊 {adamSwimYards.toFixed(0)} yards swimming</div>
-                                <div className="text-white/80">🚴 {adamBikeMiles.toFixed(1)} miles biking</div>
+                          )}
+
+                          {/* ALL TIME — every plan, including races already run */}
+                          <div className={raceName ? 'pt-4 border-t border-white/10' : ''}>
+                            <div className="text-[11px] uppercase tracking-wider text-yellow-200/80 mb-2">🏆 All time · every plan</div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="text-center">
+                                <div className="text-lg font-bold text-blue-400 mb-1">Mike</div>
+                                <div className="space-y-1 text-sm">
+                                  <div className="text-white/80">🏃 {mikeRunMiles.toFixed(1)} miles running</div>
+                                  {mikeSwimYards > 0 && <div className="text-white/80">🏊 {mikeSwimYards.toFixed(0)} yards swimming</div>}
+                                  {mikeBikeMiles > 0 && <div className="text-white/80">🚴 {mikeBikeMiles.toFixed(1)} miles biking</div>}
+                                </div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-lg font-bold text-purple-400 mb-1">Adam</div>
+                                <div className="space-y-1 text-sm">
+                                  <div className="text-white/80">🏃 {adamRunMiles.toFixed(1)} miles running</div>
+                                  {adamSwimYards > 0 && <div className="text-white/80">🏊 {adamSwimYards.toFixed(0)} yards swimming</div>}
+                                  {adamBikeMiles > 0 && <div className="text-white/80">🚴 {adamBikeMiles.toFixed(1)} miles biking</div>}
+                                </div>
                               </div>
                             </div>
                           </div>
