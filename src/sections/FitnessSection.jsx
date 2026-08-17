@@ -621,7 +621,10 @@ const FitnessSection = (props) => {
                                     <h4 className="text-sm font-semibold text-orange-300 mb-2">{isTriathlon ? '🏃 Activities' : '🏃 Runs'}</h4>
                                     <div className="space-y-1">
                                       {week.runs?.map(run => (
-                                        <div key={run.id} className={`flex items-center gap-2 p-2 rounded ${isTriathlon ? (run.mike ? 'bg-green-500/20' : 'bg-white/5') : ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')}`}>
+                                        <div key={run.id} className={`flex items-center gap-2 p-2 rounded ${isTriathlon ? (run.mike ? 'bg-green-500/20' : 'bg-white/5') : ((run.mike || run.adam) ? '' : 'bg-white/5')}`}
+                                          style={!isTriathlon && run.mike && run.adam
+                                            ? { background: 'linear-gradient(90deg,rgba(228,3,3,0.16),rgba(255,140,0,0.16),rgba(255,237,0,0.14),rgba(0,128,38,0.16),rgba(0,77,255,0.16),rgba(117,7,135,0.18))' }
+                                            : (!isTriathlon && (run.mike || run.adam) ? { background: 'rgba(234,179,8,0.18)' } : undefined)}>
                                           <div className="flex gap-1">
                                             <button onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'runs', run.id, { mike: !run.mike })} className={`w-5 h-5 rounded-full border flex items-center justify-center ${run.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40'}`} title="Mike">
                                               {run.mike && <Check className="w-3 h-3 text-white" />}
@@ -638,7 +641,10 @@ const FitnessSection = (props) => {
                                     <h4 className="text-sm font-semibold text-red-300 mb-2">💪 Cross Training</h4>
                                     <div className="space-y-1">
                                       {week.crossTraining?.map(ct => (
-                                        <div key={ct.id} className={`flex items-center gap-2 p-2 rounded ${isTriathlon ? (ct.mike ? 'bg-green-500/20' : 'bg-white/5') : ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')}`}>
+                                        <div key={ct.id} className={`flex items-center gap-2 p-2 rounded ${isTriathlon ? (ct.mike ? 'bg-green-500/20' : 'bg-white/5') : ((ct.mike || ct.adam) ? '' : 'bg-white/5')}`}
+                                          style={!isTriathlon && ct.mike && ct.adam
+                                            ? { background: 'linear-gradient(90deg,rgba(228,3,3,0.16),rgba(255,140,0,0.16),rgba(255,237,0,0.14),rgba(0,128,38,0.16),rgba(0,77,255,0.16),rgba(117,7,135,0.18))' }
+                                            : (!isTriathlon && (ct.mike || ct.adam) ? { background: 'rgba(234,179,8,0.18)' } : undefined)}>
                                           <div className="flex gap-1">
                                             <button onClick={() => updateWorkout(selectedFitnessEvent.id, week.id, 'crossTraining', ct.id, { mike: !ct.mike })} className={`w-5 h-5 rounded-full border flex items-center justify-center ${ct.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40'}`} title="Mike">
                                               {ct.mike && <Check className="w-3 h-3 text-white" />}
@@ -749,7 +755,10 @@ const FitnessSection = (props) => {
                                     <h4 className="text-lg font-semibold text-orange-300 mb-3 flex items-center gap-2"><span>🏃</span> {isTriathlon ? 'Activities' : 'Runs'}</h4>
                                     <div className="space-y-2">
                                       {currentWeek.runs?.map(run => (
-                                        <div key={run.id} className={`flex items-center gap-3 p-3 rounded-lg ${isTriathlon ? (run.mike ? 'bg-green-500/20' : 'bg-white/5') : ((run.mike && run.adam) ? 'bg-green-500/20' : (run.mike || run.adam) ? 'bg-yellow-500/20' : 'bg-white/5')}`}>
+                                        <div key={run.id} className={`flex items-center gap-3 p-3 rounded-lg ${isTriathlon ? (run.mike ? 'bg-green-500/20' : 'bg-white/5') : ((run.mike || run.adam) ? '' : 'bg-white/5')}`}
+                                          style={!isTriathlon && run.mike && run.adam
+                                            ? { background: 'linear-gradient(90deg,rgba(228,3,3,0.16),rgba(255,140,0,0.16),rgba(255,237,0,0.14),rgba(0,128,38,0.16),rgba(0,77,255,0.16),rgba(117,7,135,0.18))' }
+                                            : (!isTriathlon && (run.mike || run.adam) ? { background: 'rgba(234,179,8,0.18)' } : undefined)}>
                                           <div className="flex gap-2">
                                             <button onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { mike: !run.mike })} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${run.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40 hover:border-white'}`} title="Mike">{run.mike && <Check className="w-4 h-4 text-white" />}</button>
                                             {!isTriathlon && <button onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'runs', run.id, { adam: !run.adam })} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${run.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'}`} title="Adam">{run.adam && <Check className="w-4 h-4 text-white" />}</button>}
@@ -767,7 +776,10 @@ const FitnessSection = (props) => {
                                     <h4 className="text-lg font-semibold text-red-300 mb-3 flex items-center gap-2"><span>💪</span> Cross Training</h4>
                                     <div className="space-y-2">
                                       {currentWeek.crossTraining?.map(ct => (
-                                        <div key={ct.id} className={`flex items-center gap-3 p-3 rounded-lg ${isTriathlon ? (ct.mike ? 'bg-green-500/20' : 'bg-white/5') : ((ct.mike && ct.adam) ? 'bg-green-500/20' : (ct.mike || ct.adam) ? 'bg-yellow-500/20' : 'bg-white/5')}`}>
+                                        <div key={ct.id} className={`flex items-center gap-3 p-3 rounded-lg ${isTriathlon ? (ct.mike ? 'bg-green-500/20' : 'bg-white/5') : ((ct.mike || ct.adam) ? '' : 'bg-white/5')}`}
+                                          style={!isTriathlon && ct.mike && ct.adam
+                                            ? { background: 'linear-gradient(90deg,rgba(228,3,3,0.16),rgba(255,140,0,0.16),rgba(255,237,0,0.14),rgba(0,128,38,0.16),rgba(0,77,255,0.16),rgba(117,7,135,0.18))' }
+                                            : (!isTriathlon && (ct.mike || ct.adam) ? { background: 'rgba(234,179,8,0.18)' } : undefined)}>
                                           <div className="flex gap-2">
                                             <button onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { mike: !ct.mike })} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${ct.mike ? 'bg-blue-500 border-blue-500' : 'border-white/40 hover:border-white'}`} title="Mike">{ct.mike && <Check className="w-4 h-4 text-white" />}</button>
                                             {!isTriathlon && <button onClick={() => updateWorkout(selectedFitnessEvent.id, currentWeek.id, 'crossTraining', ct.id, { adam: !ct.adam })} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${ct.adam ? 'bg-purple-500 border-purple-500' : 'border-white/40 hover:border-white'}`} title="Adam">{ct.adam && <Check className="w-4 h-4 text-white" />}</button>}
@@ -862,6 +874,7 @@ const FitnessSection = (props) => {
                     // every plan including finished races (2026-08-17).
                     let raceName = '', raceMikeRuns = 0, raceAdamRuns = 0,
                         raceMikeMiles = 0, raceAdamMiles = 0, raceTotalRuns = 0, raceTotalMiles = 0;
+                    let raceMikeCross = 0, raceAdamCross = 0, raceTotalCross = 0;
 
                     // Helper to detect activity type from label
                     const isSwim = (label) => label?.toLowerCase().includes('swim') || label?.includes('🏊');
@@ -921,6 +934,11 @@ const FitnessSection = (props) => {
                           totalCross++;
                           if (ct.mike) mikeCross++;
                           if (ct.adam) adamCross++;
+                          if (isCurrentRace) {
+                            raceTotalCross++;
+                            if (ct.mike) raceMikeCross++;
+                            if (ct.adam) raceAdamCross++;
+                          }
                         });
                       });
                     });
@@ -988,18 +1006,37 @@ const FitnessSection = (props) => {
                         {/* Cross Training */}
                         <div className="bg-gradient-to-br from-red-500/20 to-pink-500/20 rounded-2xl p-6 border border-red-500/30">
                           <div className="text-4xl mb-2">💪</div>
-                          <div className="text-xl font-bold text-white mb-2">Cross Training</div>
-                          <div className="flex justify-around">
-                            <div className="text-center">
-                              <div className="text-2xl font-bold text-blue-400">{mikeCross}</div>
-                              <div className="text-xs text-white/60">Mike</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold text-purple-400">{adamCross}</div>
-                              <div className="text-xs text-white/60">Adam</div>
+                          <div className="text-xl font-bold text-white mb-1">Cross Training</div>
+                          <div className="text-[11px] uppercase tracking-wider text-white/40 mb-2">optional · bonus only</div>
+                          {raceTotalCross > 0 && (
+                            <>
+                              <div className="text-[11px] uppercase tracking-wider text-fuchsia-200/80 mb-1">🏁 This race</div>
+                              <div className="flex justify-around mb-2">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-blue-400">{raceMikeCross}</div>
+                                  <div className="text-xs text-white/60">Mike</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-purple-400">{raceAdamCross}</div>
+                                  <div className="text-xs text-white/60">Adam</div>
+                                </div>
+                              </div>
+                              <div className="text-xs text-fuchsia-300/70 text-center mb-3">{raceTotalCross} optional sessions available</div>
+                            </>
+                          )}
+                          <div className={raceTotalCross > 0 ? 'pt-3 border-t border-white/10' : ''}>
+                            <div className="text-[11px] uppercase tracking-wider text-fuchsia-200/80 mb-1">🏆 All time</div>
+                            <div className="flex justify-around">
+                              <div className="text-center">
+                                <div className="text-xl font-bold text-blue-400">{mikeCross}</div>
+                                <div className="text-xs text-white/60">Mike</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-xl font-bold text-purple-400">{adamCross}</div>
+                                <div className="text-xs text-white/60">Adam</div>
+                              </div>
                             </div>
                           </div>
-                          <div className="mt-2 text-sm text-red-300 text-center">{totalCross} total in plan</div>
                         </div>
 
                         {/* Total Distance Summary */}
