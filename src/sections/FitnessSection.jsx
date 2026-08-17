@@ -75,23 +75,21 @@ const FitnessSection = (props) => {
                     // Mike-only plans (e.g., triathlon, custom mike-only events) don't have `adam` field — count just mike
                     const isMikeOnlyPlan = trainingPlan[0]?.runs?.[0] && !('adam' in trainingPlan[0].runs[0]);
                     const isAdamOnlyPlan = trainingPlan[0]?.runs?.[0] && !('mike' in trainingPlan[0].runs[0]);
-                    const completedWorkouts = trainingPlan.reduce((acc, week) => {
-                      let runsDone, crossDone;
-                      if (isMikeOnlyPlan) {
-                        runsDone = week.runs?.filter(r => r.mike).length || 0;
-                        crossDone = week.crossTraining?.filter(c => c.mike).length || 0;
-                      } else if (isAdamOnlyPlan) {
-                        runsDone = week.runs?.filter(r => r.adam).length || 0;
-                        crossDone = week.crossTraining?.filter(c => c.adam).length || 0;
-                      } else {
-                        runsDone = week.runs?.filter(r => r.mike && r.adam).length || 0;
-                        crossDone = week.crossTraining?.filter(c => c.mike && c.adam).length || 0;
-                      }
-                      return acc + runsDone + crossDone;
-                    }, 0);
-                    const totalWorkouts = trainingPlan.reduce((acc, week) => {
-                      return acc + (week.runs?.length || 0) + (week.crossTraining?.length || 0);
-                    }, 0);
+                    // Progress counts RUNS ONLY — cross training is optional and
+                    // never counts toward sessions or mileage (2026-07-07).
+                    const runDone = (r) => isMikeOnlyPlan ? !!r.mike : isAdamOnlyPlan ? !!r.adam : (!!r.mike && !!r.adam);
+                    const miles = (r) => parseFloat(String(r.distance || '').replace(/[^0-9.]/g, '')) || 0;
+                    const completedWorkouts = trainingPlan.reduce((acc, week) =>
+                      acc + (week.runs || []).filter(runDone).length, 0);
+                    const totalWorkouts = trainingPlan.reduce((acc, week) =>
+                      acc + (week.runs?.length || 0), 0);
+                    // Mileage — the plan's final long run IS the race, so the total
+                    // already includes race day.
+                    const completedMiles = trainingPlan.reduce((acc, week) =>
+                      acc + (week.runs || []).filter(runDone).reduce((m, r) => m + miles(r), 0), 0);
+                    const totalMiles = trainingPlan.reduce((acc, week) =>
+                      acc + (week.runs || []).reduce((m, r) => m + miles(r), 0), 0);
+                    const fmtMi = (n) => (Math.round(n * 10) / 10).toLocaleString();
 
                     return (
                       <div
@@ -131,19 +129,35 @@ const FitnessSection = (props) => {
                                 <span>{weeksUntil} weeks of training</span>
                               </div>
 
-                              {/* Progress Bar */}
+                              {/* Progress — runs only (cross training is optional) */}
                               {totalWorkouts > 0 && (
-                                <div className="mb-3">
-                                  <div className="flex justify-between text-sm text-white/80 mb-1">
-                                    <span>Progress</span>
-                                    <span>{completedWorkouts}/{totalWorkouts} workouts</span>
+                                <div className="mb-3 space-y-2">
+                                  <div>
+                                    <div className="flex justify-between text-sm text-white/80 mb-1">
+                                      <span>Runs</span>
+                                      <span>{completedWorkouts}/{totalWorkouts} sessions</span>
+                                    </div>
+                                    <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-white rounded-full transition-all"
+                                        style={{ width: `${(completedWorkouts / totalWorkouts) * 100}%` }}
+                                      />
+                                    </div>
                                   </div>
-                                  <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full bg-white rounded-full transition-all"
-                                      style={{ width: `${(completedWorkouts / totalWorkouts) * 100}%` }}
-                                    />
-                                  </div>
+                                  {totalMiles > 0 && (
+                                    <div>
+                                      <div className="flex justify-between text-sm text-white/80 mb-1">
+                                        <span>Miles <span className="text-white/50">(incl. race day)</span></span>
+                                        <span>{fmtMi(completedMiles)}/{fmtMi(totalMiles)} mi</span>
+                                      </div>
+                                      <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-white/70 rounded-full transition-all"
+                                          style={{ width: `${(completedMiles / totalMiles) * 100}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </>
@@ -157,7 +171,7 @@ const FitnessSection = (props) => {
                                   e.stopPropagation();
                                   const text = `🏃 Training for ${event.emoji} ${event.name}!\n\n` +
                                     `📅 ${daysUntil > 0 ? `${daysUntil} days to go!` : 'Race day!'}\n` +
-                                    `✅ ${completedWorkouts}/${totalWorkouts} workouts completed\n` +
+                                    `✅ ${completedWorkouts}/${totalWorkouts} runs · ${fmtMi(completedMiles)}/${fmtMi(totalMiles)} mi\n` +
                                     `📊 ${Math.round((completedWorkouts / totalWorkouts) * 100)}% progress\n\n` +
                                     `#TrainingTogether #${event.name.replace(/[^a-zA-Z]/g, '')}`;
                                   if (navigator.share) {

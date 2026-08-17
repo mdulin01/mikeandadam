@@ -165,134 +165,120 @@ export const indyHalfTrainingPlan = [
 // Re-planned 2026-07-05 from Mike's "GSO Half Plan" sheet — 247.1 total miles.
 // Weekly notes carry trip/race conflicts (PTown, Mike Holland, Tri, Atlanta, FMX, PS Pride).
 // ============================================================
+// Cross training is ONE optional session per week (2026-07-07): it never
+// counts toward session/mileage progress — only runs do.
 export const gsoHalfTrainingPlan = [
   { weekNumber: 1, startDate: '2026-08-02', endDate: '2026-08-08', runs: [
     { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '5 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 10, weekNotes: 'PTown 8/1-8/8' },
   { weekNumber: 2, startDate: '2026-08-09', endDate: '2026-08-15', runs: [
     { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '5 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 10, weekNotes: '' },
   { weekNumber: 3, startDate: '2026-08-16', endDate: '2026-08-22', runs: [
     { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '6 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 11, weekNotes: '' },
   { weekNumber: 4, startDate: '2026-08-23', endDate: '2026-08-29', runs: [
     { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '6 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 12, weekNotes: '' },
   { weekNumber: 5, startDate: '2026-08-30', endDate: '2026-09-05', runs: [
     { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 13, weekNotes: 'Mike Holland 8/30-9/6' },
   { weekNumber: 6, startDate: '2026-09-06', endDate: '2026-09-12', runs: [
     { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '7 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 14, weekNotes: 'Mike Holland 8/30-9/6' },
   { weekNumber: 7, startDate: '2026-09-13', endDate: '2026-09-19', runs: [
     { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 16, weekNotes: '' },
   { weekNumber: 8, startDate: '2026-09-20', endDate: '2026-09-26', runs: [
     { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 16, weekNotes: 'Triathlon 9/24-9/27' },
   { weekNumber: 9, startDate: '2026-09-27', endDate: '2026-10-03', runs: [
     { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '9 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 17, weekNotes: 'Triathlon 9/24-9/27' },
   { weekNumber: 10, startDate: '2026-10-04', endDate: '2026-10-10', runs: [
     { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '6 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '9 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 18, weekNotes: 'Atlanta 10/8-10/12' },
   { weekNumber: 11, startDate: '2026-10-11', endDate: '2026-10-17', runs: [
     { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '6 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '10 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 20, weekNotes: 'Atlanta 10/8-10/12' },
   { weekNumber: 12, startDate: '2026-10-18', endDate: '2026-10-24', runs: [
     { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '6 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '11 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 21, weekNotes: 'FMX 10/20-10/25?' },
   { weekNumber: 13, startDate: '2026-10-25', endDate: '2026-10-31', runs: [
     { id: 1, label: 'Short Run',  distance: '4 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '6 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '12 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 22, weekNotes: 'FMX 10/20-10/25? · 🔝 Peak week' },
   { weekNumber: 14, startDate: '2026-11-01', endDate: '2026-11-07', runs: [
     { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '5 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '8 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 16, weekNotes: 'PS Pride 11/4-11/9 · 📉 Taper Week 1' },
   { weekNumber: 15, startDate: '2026-11-08', endDate: '2026-11-14', runs: [
     { id: 1, label: 'Short Run',  distance: '3 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '4 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '6 mi', mike: false, adam: false, notes: '' }
   ], crossTraining: [
-    { id: 1, label: 'Cross Train #1', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Cross Train #2', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Cross Train (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 13, weekNotes: 'PS Pride 11/4-11/9 · 📉 Taper Week 2' },
   { weekNumber: 16, startDate: '2026-11-15', endDate: '2026-11-21', runs: [
     { id: 1, label: 'Short Run',  distance: '2 mi', mike: false, adam: false, notes: '' },
     { id: 2, label: 'Medium Run', distance: '3 mi', mike: false, adam: false, notes: '' },
     { id: 3, label: 'Long Run',   distance: '13.1 mi', mike: false, adam: false, notes: '🏁 RACE!' }
   ], crossTraining: [
-    { id: 1, label: 'Race Day Prep', mike: false, adam: false, notes: '' },
-    { id: 2, label: 'Rest', mike: false, adam: false, notes: '' }
+    { id: 1, label: 'Race Day Prep (optional)', optional: true, mike: false, adam: false, notes: '' }
   ], totalMiles: 18.1, weekNotes: '🏁 RACE WEEK! Greensboro Half — let\'s do this! 🎉', isRaceWeek: true }
 ].map(week => ({ ...week, id: `gso-half-2026-week-${week.weekNumber}` }));
 /* eslint-enable */
