@@ -331,11 +331,16 @@ const FitnessSection = (props) => {
                         const isTriathlon = isMikeOnlyPlan;
 
                         // A week is "done" based on plan type
+                        // A week is DONE on runs alone — optional cross training is
+                        // bonus and must never block a week from counting (2026-08-17).
+                        const requiredCross = (w) => (w.crossTraining || []).filter(c => !c.optional);
                         const completedWeeks = plan.filter(w => {
+                          const runs = w.runs || [];
+                          if (runs.length === 0) return false;
                           if (isMikeOnlyPlan) {
-                            return w.runs?.every(r => r.mike) && w.crossTraining?.every(c => c.mike);
+                            return runs.every(r => r.mike) && requiredCross(w).every(c => c.mike);
                           }
-                          return w.runs?.every(r => r.mike && r.adam) && w.crossTraining?.every(c => c.mike && c.adam);
+                          return runs.every(r => r.mike && r.adam) && requiredCross(w).every(c => c.mike && c.adam);
                         }).length;
 
                         // For triathlon, separate by activity type
