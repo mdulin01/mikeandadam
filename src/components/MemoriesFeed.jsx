@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { PrideAvatar } from './PrideAvatar';
+import { PRIDE_STRIPES, PRIDE_LINEAR } from '../prideTheme';
 
 /**
  * MemoriesFeed — the "our own social feed" view of memories.
@@ -27,8 +29,75 @@ const MemoryPost = ({ memory, currentUser, onReact, onAddComment, onOpen }) => {
   const img = (memory.images && memory.images[0]) || memory.image || '';
   const counts = REACTIONS.map((e) => ({ e, n: Object.values(reactions).filter((v) => v === e).length }));
 
+  // Both of us reacted to the same memory — the most "us" moment in the app.
+  const bothReacted = !!(reactions.mike && reactions.adam);
+  // Burst only on the TRANSITION into both-reacted, never on mount/scroll.
+  const [burst, setBurst] = useState(false);
+  const wasBoth = useRef(null);
+  useEffect(() => {
+    if (wasBoth.current === null) { wasBoth.current = bothReacted; return; } // first render = baseline
+    if (bothReacted && !wasBoth.current) {
+      setBurst(true);
+      if ('vibrate' in navigator) navigator.vibrate(120);
+      const t = setTimeout(() => setBurst(false), 2200);
+      wasBoth.current = bothReacted;
+      return () => clearTimeout(t);
+    }
+    wasBoth.current = bothReacted;
+  }, [bothReacted]);
+
   return (
-    <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+    <div
+      className="relative bg-white/5 border rounded-3xl overflow-hidden transition-colors"
+      style={bothReacted
+        ? { borderColor: 'transparent', boxShadow: '0 0 0 1.5px rgba(168,85,247,0.45), 0 0 24px rgba(236,72,153,0.12)' }
+        : { borderColor: 'rgba(255,255,255,0.1)' }}
+    >
+      {burst && (
+        <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden rounded-3xl">
+          <style>{`
+            @keyframes bothBurst {
+              0%   { transform: translate(-50%,-50%) translate(0,0) scale(0.3); opacity: 0; }
+              12%  { opacity: 1; }
+              100% { transform: translate(-50%,-50%) translate(var(--bx), var(--by)) scale(1.1); opacity: 0; }
+            }
+            @keyframes bothGlow {
+              0%   { opacity: 0; }
+              20%  { opacity: 0.4; }
+              100% { opacity: 0; }
+            }
+          `}</style>
+          <div style={{ position: 'absolute', inset: 0, background: PRIDE_LINEAR, animation: 'bothGlow 1.6s ease-out forwards' }} />
+          {[...Array(26)].map((_, i) => {
+            const angle = (i / 26) * Math.PI * 2 + Math.random() * 0.3;
+            const dist = 90 + Math.random() * 130;
+            const emoji = ['🌈', '🏳️‍🌈', '💕', '✨', '💜'][i % 5];
+            const isEmoji = i % 2 === 0;
+            const sz = 8 + Math.random() * 10;
+            return (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute', left: '50%', top: '55%',
+                  '--bx': `${Math.cos(angle) * dist}px`,
+                  '--by': `${Math.sin(angle) * dist}px`,
+                  animation: `bothBurst ${1.1 + Math.random() * 0.8}s cubic-bezier(0.15,0.7,0.3,1) ${Math.random() * 0.2}s forwards`,
+                }}
+              >
+                {isEmoji ? (
+                  <span style={{ fontSize: sz + 8, lineHeight: 1 }}>{emoji}</span>
+                ) : (
+                  <div style={{
+                    width: sz * 1.8, height: sz, borderRadius: 2,
+                    backgroundColor: PRIDE_STRIPES[i % PRIDE_STRIPES.length],
+                    boxShadow: `0 0 ${sz}px ${PRIDE_STRIPES[i % PRIDE_STRIPES.length]}99`,
+                  }} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
       {img && (
         <button onClick={() => onOpen?.(memory)} className="block w-full">
           <img src={img} alt={memory.title} className="w-full max-h-[420px] object-cover" loading="lazy" />
@@ -67,15 +136,27 @@ const MemoryPost = ({ memory, currentUser, onReact, onAddComment, onOpen }) => {
               {e}{n > 0 && <span className="ml-1 text-xs text-slate-300">{n}</span>}
             </button>
           ))}
+          {bothReacted && (
+            <span
+              className="ml-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white/90 inline-flex items-center gap-1"
+              style={{ background: 'linear-gradient(90deg,rgba(228,3,3,0.25),rgba(255,140,0,0.25),rgba(0,128,38,0.25),rgba(0,77,255,0.25),rgba(117,7,135,0.3))' }}
+              title="Mike and Adam both reacted to this"
+            >
+              🏳️‍🌈 you both loved this
+            </span>
+          )}
         </div>
 
         {/* Comments */}
         {comments.length > 0 && (
           <div className="mt-3 space-y-1.5">
             {comments.map((c, i) => (
-              <p key={i} className="text-sm text-slate-300">
-                <span className="font-semibold text-white capitalize">{c.by}</span>{' '}
-                {c.text}
+              <p key={i} className="text-sm text-slate-300 flex items-start gap-2">
+                <PrideAvatar person={c.by} size={20} className="mt-0.5" />
+                <span>
+                  <span className="font-semibold text-white capitalize">{c.by}</span>{' '}
+                  {c.text}
+                </span>
               </p>
             ))}
           </div>
@@ -162,7 +243,11 @@ const MemoriesFeed = ({ memories, currentUser, todayStr, onReact, onAddComment, 
         </div>
       )}
       {sorted.length === 0 && (
-        <p className="text-center text-slate-400 py-12">No memories yet — add your first one! 💝</p>
+        <div className="text-center py-14">
+          <div className="mx-auto mb-3 rounded-full" style={{ width: 120, height: 4, background: PRIDE_LINEAR }} />
+          <p className="text-slate-300 font-medium">Your story starts here 🏳️‍🌈</p>
+          <p className="text-slate-500 text-sm mt-1">Add your first memory and it lives here forever.</p>
+        </div>
       )}
       {sorted.map((m) => (
         <div

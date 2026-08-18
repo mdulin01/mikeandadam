@@ -1,6 +1,7 @@
 import React from 'react';
 import { Camera, Check, ChevronDown, ChevronRight, Clock, Loader, Pencil, Share2, Upload, X } from 'lucide-react';
 import { formatDate, parseLocalDate, toLocalDateStr } from '../utils';
+import { PrideAvatar } from '../components/PrideAvatar';
 
 /**
  * FitnessSection — extracted verbatim from trip-planner.jsx (Phase 2 refactor,
@@ -953,12 +954,12 @@ const FitnessSection = (props) => {
                           <div className="flex justify-around">
                             <div className="text-center">
                               <div className="text-2xl font-bold text-blue-400">{mikeRuns}</div>
-                              <div className="text-xs text-white/60">Mike</div>
+                              <div className="text-xs text-white/60 flex items-center justify-center gap-1"><PrideAvatar person="mike" size={16} />Mike</div>
                               <div className="text-xs text-blue-300">{mikeRunMiles.toFixed(1)} mi</div>
                             </div>
                             <div className="text-center">
                               <div className="text-2xl font-bold text-purple-400">{adamRuns}</div>
-                              <div className="text-xs text-white/60">Adam</div>
+                              <div className="text-xs text-white/60 flex items-center justify-center gap-1"><PrideAvatar person="adam" size={16} />Adam</div>
                               <div className="text-xs text-purple-300">{adamRunMiles.toFixed(1)} mi</div>
                             </div>
                           </div>
@@ -972,12 +973,12 @@ const FitnessSection = (props) => {
                           <div className="flex justify-around">
                             <div className="text-center">
                               <div className="text-2xl font-bold text-blue-400">{mikeSwims}</div>
-                              <div className="text-xs text-white/60">Mike</div>
+                              <div className="text-xs text-white/60 flex items-center justify-center gap-1"><PrideAvatar person="mike" size={16} />Mike</div>
                               <div className="text-xs text-blue-300">{mikeSwimYards.toFixed(0)} yds</div>
                             </div>
                             <div className="text-center">
                               <div className="text-2xl font-bold text-purple-400">{adamSwims}</div>
-                              <div className="text-xs text-white/60">Adam</div>
+                              <div className="text-xs text-white/60 flex items-center justify-center gap-1"><PrideAvatar person="adam" size={16} />Adam</div>
                               <div className="text-xs text-purple-300">{adamSwimYards.toFixed(0)} yds</div>
                             </div>
                           </div>
@@ -991,12 +992,12 @@ const FitnessSection = (props) => {
                           <div className="flex justify-around">
                             <div className="text-center">
                               <div className="text-2xl font-bold text-blue-400">{mikeBikes}</div>
-                              <div className="text-xs text-white/60">Mike</div>
+                              <div className="text-xs text-white/60 flex items-center justify-center gap-1"><PrideAvatar person="mike" size={16} />Mike</div>
                               <div className="text-xs text-blue-300">{mikeBikeMiles.toFixed(1)} mi</div>
                             </div>
                             <div className="text-center">
                               <div className="text-2xl font-bold text-purple-400">{adamBikes}</div>
-                              <div className="text-xs text-white/60">Adam</div>
+                              <div className="text-xs text-white/60 flex items-center justify-center gap-1"><PrideAvatar person="adam" size={16} />Adam</div>
                               <div className="text-xs text-purple-300">{adamBikeMiles.toFixed(1)} mi</div>
                             </div>
                           </div>
@@ -1014,11 +1015,11 @@ const FitnessSection = (props) => {
                               <div className="flex justify-around mb-2">
                                 <div className="text-center">
                                   <div className="text-2xl font-bold text-blue-400">{raceMikeCross}</div>
-                                  <div className="text-xs text-white/60">Mike</div>
+                                  <div className="text-xs text-white/60 flex items-center justify-center gap-1"><PrideAvatar person="mike" size={16} />Mike</div>
                                 </div>
                                 <div className="text-center">
                                   <div className="text-2xl font-bold text-purple-400">{raceAdamCross}</div>
-                                  <div className="text-xs text-white/60">Adam</div>
+                                  <div className="text-xs text-white/60 flex items-center justify-center gap-1"><PrideAvatar person="adam" size={16} />Adam</div>
                                 </div>
                               </div>
                               <div className="text-xs text-fuchsia-300/70 text-center mb-3">{raceTotalCross} optional sessions available</div>
@@ -1029,11 +1030,11 @@ const FitnessSection = (props) => {
                             <div className="flex justify-around">
                               <div className="text-center">
                                 <div className="text-xl font-bold text-blue-400">{mikeCross}</div>
-                                <div className="text-xs text-white/60">Mike</div>
+                                <div className="text-xs text-white/60 flex items-center justify-center gap-1"><PrideAvatar person="mike" size={16} />Mike</div>
                               </div>
                               <div className="text-center">
                                 <div className="text-xl font-bold text-purple-400">{adamCross}</div>
-                                <div className="text-xs text-white/60">Adam</div>
+                                <div className="text-xs text-white/60 flex items-center justify-center gap-1"><PrideAvatar person="adam" size={16} />Adam</div>
                               </div>
                             </div>
                           </div>
@@ -1053,12 +1054,12 @@ const FitnessSection = (props) => {
                               </div>
                               <div className="grid grid-cols-2 gap-4">
                                 <div className="text-center bg-white/5 rounded-xl py-2">
-                                  <div className="text-sm font-bold text-blue-400">Mike</div>
+                                  <div className="text-sm font-bold text-blue-400 flex items-center justify-center gap-1.5"><PrideAvatar person="mike" size={20} />Mike</div>
                                   <div className="text-lg font-bold text-white">{raceMikeMiles.toFixed(1)} mi</div>
                                   <div className="text-xs text-white/50">{raceMikeRuns}/{raceTotalRuns} runs</div>
                                 </div>
                                 <div className="text-center bg-white/5 rounded-xl py-2">
-                                  <div className="text-sm font-bold text-purple-400">Adam</div>
+                                  <div className="text-sm font-bold text-purple-400 flex items-center justify-center gap-1.5"><PrideAvatar person="adam" size={20} />Adam</div>
                                   <div className="text-lg font-bold text-white">{raceAdamMiles.toFixed(1)} mi</div>
                                   <div className="text-xs text-white/50">{raceAdamRuns}/{raceTotalRuns} runs</div>
                                 </div>
@@ -1071,7 +1072,7 @@ const FitnessSection = (props) => {
                             <div className="text-[11px] uppercase tracking-wider text-yellow-200/80 mb-2">🏆 All time · every plan</div>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="text-center">
-                                <div className="text-lg font-bold text-blue-400 mb-1">Mike</div>
+                                <div className="text-lg font-bold text-blue-400 mb-1 flex items-center justify-center gap-2"><PrideAvatar person="mike" size={24} />Mike</div>
                                 <div className="space-y-1 text-sm">
                                   <div className="text-white/80">🏃 {mikeRunMiles.toFixed(1)} miles running</div>
                                   {mikeSwimYards > 0 && <div className="text-white/80">🏊 {mikeSwimYards.toFixed(0)} yards swimming</div>}
@@ -1079,7 +1080,7 @@ const FitnessSection = (props) => {
                                 </div>
                               </div>
                               <div className="text-center">
-                                <div className="text-lg font-bold text-purple-400 mb-1">Adam</div>
+                                <div className="text-lg font-bold text-purple-400 mb-1 flex items-center justify-center gap-2"><PrideAvatar person="adam" size={24} />Adam</div>
                                 <div className="space-y-1 text-sm">
                                   <div className="text-white/80">🏃 {adamRunMiles.toFixed(1)} miles running</div>
                                   {adamSwimYards > 0 && <div className="text-white/80">🏊 {adamSwimYards.toFixed(0)} yards swimming</div>}

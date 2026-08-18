@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { PrideAvatar } from './PrideAvatar';
 
 /**
  * CheckinCard — the weekly couple check-in (Hub).
@@ -74,10 +75,12 @@ const CheckinCard = ({ me, checkins, onSubmit, question, onRerollQuestion }) => 
           <span className="text-xs text-white/30 font-normal">week of {fmtWeek(week)}</span>
         </h3>
         <div className="flex items-center gap-1.5 text-xs">
-          <span className={`px-2 py-0.5 rounded-full ${mine ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-white/40'}`}>
+          <span className={`pl-0.5 pr-2 py-0.5 rounded-full inline-flex items-center gap-1.5 ${mine ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-white/40'}`}>
+            <PrideAvatar person={me} size={20} muted={!mine} />
             {me === 'mike' ? 'Mike' : 'Adam'} {mine ? '✓' : '…'}
           </span>
-          <span className={`px-2 py-0.5 rounded-full ${theirs ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-white/40'}`}>
+          <span className={`pl-0.5 pr-2 py-0.5 rounded-full inline-flex items-center gap-1.5 ${theirs ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-white/40'}`}>
+            <PrideAvatar person={partner} size={20} muted={!theirs} />
             {partner === 'mike' ? 'Mike' : 'Adam'} {theirs ? '✓' : '…'}
           </span>
         </div>
@@ -180,7 +183,9 @@ const CheckinCard = ({ me, checkins, onSubmit, question, onRerollQuestion }) => 
                 <p className="text-[11px] uppercase tracking-wider text-rose-300/60 mb-1.5">Week of {fmtWeek(wk)}</p>
                 {entries.sort((a, b) => a.by.localeCompare(b.by)).map((c) => (
                   <div key={c.by} className="mb-2 last:mb-0">
-                    <p className="text-xs font-semibold text-white capitalize">{c.by} {c.mood}</p>
+                    <p className="text-xs font-semibold text-white capitalize flex items-center gap-1.5">
+                      <PrideAvatar person={c.by} size={18} /> {c.by} {c.mood}
+                    </p>
                     <Answer label="Went well" text={c.wentWell} />
                     <Answer label="Stressed" text={c.stressed} />
                     <Answer label="Appreciated" text={c.appreciated} />

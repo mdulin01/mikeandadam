@@ -9,6 +9,7 @@ import {
   airlines, ownerEmails, months, days, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES,
   timeHorizons, listCategories, ideaCategories, taskPriorities, socialTypes, habitCategories
 } from './constants';
+import { getPrideMoment, PRIDE_MOMENTS, PRIDE_LINEAR, PRIDE_CONIC } from './prideTheme';
 import {
   parseLocalDate, formatDate, validateFileSize, getEmojiSuggestion,
   getRandomExperience, getDaysInMonth, isHeicFile, getSafeFileName,
@@ -1312,6 +1313,30 @@ export default function TripPlanner() {
   const [showTypeFilterDropdown, setShowTypeFilterDropdown] = useState(false); // events type filter dropdown
   const [showFullMonthCalendar, setShowFullMonthCalendar] = useState(false); // week vs month toggle in Hub
   const [showAddNewMenu, setShowAddNewMenu] = useState(false); // home page add new menu
+
+  // ========== PRIDE MOMENT (auto-theme) ==========
+  // June, our anniversary, race day: the app dresses up on its own and
+  // undresses on its own. Re-checked hourly so a PWA left open overnight
+  // crosses into (or out of) the day correctly.
+  // ?pride=1 (or ?pride=official / ?pride=race-day) previews the theme on any
+  // day — handy for checking it in August without waiting for June.
+  const pridePreview = () => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('pride');
+      if (!q) return null;
+      return PRIDE_MOMENTS.find((m) => m.key === q) || PRIDE_MOMENTS[0];
+    } catch { return null; }
+  };
+  const [prideMoment, setPrideMoment] = useState(() => pridePreview() || getPrideMoment());
+  const [prideBannerDismissed, setPrideBannerDismissed] = useState(false);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const next = pridePreview() || getPrideMoment();
+      setPrideMoment((prev) => (prev?.key === next?.key ? prev : next));
+    }, 60 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => { setPrideBannerDismissed(false); }, [prideMoment?.key]);
 
   // ========== CELEBRATION STATE ==========
   const [confetti, setConfetti] = useState(null); // { type: 'run' | 'week', x?, y? }
@@ -3577,8 +3602,35 @@ export default function TripPlanner() {
         }
       `}</style>
 
-      {/* Rainbow top bar */}
-      <div className="h-1.5 w-full bg-gradient-to-r from-red-500 via-orange-500 via-yellow-400 via-green-500 via-blue-500 to-purple-500" />
+      {/* Rainbow top bar — thicker + animated during a pride moment */}
+      <div
+        className="w-full"
+        style={{
+          height: prideMoment ? 6 : 6,
+          background: PRIDE_LINEAR,
+          backgroundSize: prideMoment ? '200% 100%' : '100% 100%',
+          animation: prideMoment ? 'rainbow-shift 4s linear infinite' : undefined,
+        }}
+      />
+
+      {/* Pride moment banner — auto-appears, auto-reverts, dismissible */}
+      {prideMoment && !prideBannerDismissed && (
+        <div
+          className="relative w-full px-4 py-2 flex items-center justify-center gap-2 text-sm text-white"
+          style={{ background: 'linear-gradient(90deg,rgba(228,3,3,0.22),rgba(255,140,0,0.22),rgba(255,237,0,0.18),rgba(0,128,38,0.22),rgba(0,77,255,0.22),rgba(117,7,135,0.28))' }}
+        >
+          <span className="text-base">{prideMoment.emoji}</span>
+          <span className="font-semibold">{prideMoment.label}</span>
+          <span className="hidden sm:inline text-white/75">— {prideMoment.blurb}</span>
+          <button
+            onClick={() => setPrideBannerDismissed(true)}
+            className="absolute right-3 text-white/60 hover:text-white transition"
+            title="Hide for now"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast && (
@@ -3859,8 +3911,13 @@ export default function TripPlanner() {
                     <polygon points="232,390 320,130 356,130 452,390 402,390 382,328 294,328 274,390" fill="url(#logoSpectrum)" opacity="0.92"/>
                     <polygon points="308,288 368,288 338,218" fill="#1e293b"/>
                   </svg>
-                  <span className="hidden md:inline text-sm font-semibold bg-gradient-to-r from-teal-400 via-indigo-400 to-pink-400 bg-clip-text text-transparent">
-                    Mike & Adam
+                  <span
+                    className="hidden md:inline text-sm font-semibold bg-clip-text text-transparent"
+                    style={prideMoment
+                      ? { backgroundImage: PRIDE_LINEAR, backgroundSize: '200% 100%', animation: 'rainbow-shift 4s linear infinite' }
+                      : { backgroundImage: 'linear-gradient(90deg,#2dd4bf,#818cf8,#f472b6)' }}
+                  >
+                    Mike &amp; Adam
                   </span>
                 </button>
                 {/* Hearts icon - clickable */}
@@ -8180,6 +8237,15 @@ export default function TripPlanner() {
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
+        /* Slow-rotating pride halo behind the + button */
+        @keyframes fab-halo-spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes fab-halo-breathe {
+          0%, 100% { opacity: 0.75; }
+          50%      { opacity: 1; }
+        }
       `}</style>
 
       {/* Desktop FAB - Top left, only on desktop */}
@@ -8221,9 +8287,32 @@ export default function TripPlanner() {
               `}</style>
             </>
           )}
-          <button onClick={() => setShowAddNewMenu(!showAddNewMenu)} className={`w-12 h-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 active:scale-90 ${showAddNewMenu ? 'bg-gradient-to-r from-pink-500 to-rose-500 rotate-45' : 'bg-gradient-to-r from-purple-500 to-violet-600 hover:shadow-purple-500/30'}`} style={{ boxShadow: showAddNewMenu ? '0 8px 32px rgba(236, 72, 153, 0.4)' : '0 8px 32px rgba(139, 92, 246, 0.4)' }}>
-            <Plus className="w-6 h-6 text-white transition-transform duration-200" />
-          </button>
+          <div className="relative w-12 h-12">
+            {/* Rotating pride halo */}
+            <span
+              aria-hidden
+              className="absolute rounded-full pointer-events-none"
+              style={{
+                inset: -4,
+                background: PRIDE_CONIC,
+                filter: 'blur(6px)',
+                animation: `fab-halo-spin ${prideMoment ? '5s' : '9s'} linear infinite, fab-halo-breathe 3.5s ease-in-out infinite`,
+                opacity: prideMoment ? 1 : 0.8,
+              }}
+            />
+            <span
+              aria-hidden
+              className="absolute rounded-full pointer-events-none"
+              style={{ inset: -1.5, background: PRIDE_CONIC, animation: 'fab-halo-spin 9s linear infinite' }}
+            />
+            <button
+              onClick={() => setShowAddNewMenu(!showAddNewMenu)}
+              className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 ${showAddNewMenu ? 'rotate-45' : ''}`}
+              style={{ background: showAddNewMenu ? 'linear-gradient(135deg,#ec4899,#f43f5e)' : 'linear-gradient(135deg,#8b5cf6,#7c3aed)' }}
+            >
+              <Plus className="w-6 h-6 text-white transition-transform duration-200" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -8276,22 +8365,35 @@ export default function TripPlanner() {
             {/* Atlas is the visual bridge between FAB and nav — no splash needed */}
             {/* Raised FAB button - centered, overlapping top of nav */}
             {isOwner && (
-              <button
-                onClick={() => setShowAddNewMenu(!showAddNewMenu)}
-                className={`absolute left-1/2 -translate-x-1/2 -top-3 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 z-[101] ${
-                  showAddNewMenu
-                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 rotate-45'
-                    : 'bg-gradient-to-r from-purple-500 to-violet-600'
-                }`}
-                style={{
-                  width: '3rem', height: '3rem',
-                  boxShadow: showAddNewMenu
-                    ? '0 4px 30px rgba(236, 72, 153, 0.7), 0 0 0 4px rgba(236, 72, 153, 0.12), 0 8px 16px rgba(0,0,0,0.4)'
-                    : '0 4px 30px rgba(139, 92, 246, 0.7), 0 0 0 4px rgba(139, 92, 246, 0.12), 0 8px 16px rgba(0,0,0,0.4)',
-                }}
-              >
-                <Plus className="w-6 h-6 text-white transition-transform duration-200" />
-              </button>
+              <div className="absolute left-1/2 -translate-x-1/2 -top-3 z-[101]" style={{ width: '3rem', height: '3rem' }}>
+                {/* Rotating pride halo */}
+                <span
+                  aria-hidden
+                  className="absolute rounded-full pointer-events-none"
+                  style={{
+                    inset: -5,
+                    background: PRIDE_CONIC,
+                    filter: 'blur(7px)',
+                    animation: `fab-halo-spin ${prideMoment ? '5s' : '9s'} linear infinite, fab-halo-breathe 3.5s ease-in-out infinite`,
+                    opacity: prideMoment ? 1 : 0.85,
+                  }}
+                />
+                <span
+                  aria-hidden
+                  className="absolute rounded-full pointer-events-none"
+                  style={{ inset: -2, background: PRIDE_CONIC, animation: 'fab-halo-spin 9s linear infinite' }}
+                />
+                <button
+                  onClick={() => setShowAddNewMenu(!showAddNewMenu)}
+                  className={`relative w-full h-full rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 ${showAddNewMenu ? 'rotate-45' : ''}`}
+                  style={{
+                    background: showAddNewMenu ? 'linear-gradient(135deg,#ec4899,#f43f5e)' : 'linear-gradient(135deg,#8b5cf6,#7c3aed)',
+                    boxShadow: '0 8px 16px rgba(0,0,0,0.45)',
+                  }}
+                >
+                  <Plus className="w-6 h-6 text-white transition-transform duration-200" />
+                </button>
+              </div>
             )}
             {/* Tab buttons — 4 items: Fitness, Hub, [FAB gap], Events, Memories */}
             <div className="flex items-end justify-around px-1 pt-1 pb-1">
