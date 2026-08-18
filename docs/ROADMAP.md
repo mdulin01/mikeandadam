@@ -58,6 +58,25 @@ At most ONE scheduled push per day, themed by weekday:
 Deleted: daily digest, daily on-this-day, biweekly memory nudge.
 Prefs (bell icon): digest = weekly rhythm + travel prep · memory = Wed story + photo prompts · instant = activity.
 
+## Pride design system (2026-08-17)
+`src/prideTheme.js` is the single source of the flag — every rainbow in the
+app pulls from it (`PRIDE_STRIPES` / `PRIDE_LINEAR` / `PRIDE_CONIC` /
+`PRIDE_WASH`). Don't hand-roll another gradient.
+
+| Piece | Where |
+|-------|-------|
+| `PrideAvatar` / `PrideNameChip` | `src/components/PrideAvatar.jsx` — initial in a conic pride ring. Used on the check-in card (live + archive), memory comments, every fitness stat card. `muted` dims it (hasn't checked in / hasn't logged). |
+| Rainbow FAB halo | blurred conic ring + crisp conic edge behind the ＋, desktop and mobile. Spins 9s normally, 5s during a pride moment. |
+| Both-reacted memory | `reactions.mike && reactions.adam` → pride-glow card border + "you both loved this" badge + a 26-particle radial burst. Burst fires only on the TRANSITION (a `wasBoth` ref seeds a baseline on first render), so it never goes off on mount or scroll. |
+| Auto-theme | `getPrideMoment()` — June (Pride Month), May 17 (Becoming Official), Nov 21 (race day). Drives the animated top bar, flag wordmark, and a dismissible banner. Re-checked hourly so a PWA left open overnight rolls correctly. |
+| Preview | `?pride=1` (or `?pride=official` / `?pride=race-day`) forces a moment on any day — that's how to check it in August. |
+
+Rule of thumb: rainbow is for **state** (done, complete, celebrating) and for
+rings/borders. Body text keeps a solid background — gradient-behind-text kills
+contrast fast in dark mode.
+
 ## Future ideas
+- Next pride pass: check-in streak confetti, rainbow section dividers,
+  pride-flavored notification copy, progress-flag palette toggle.
 - Shared albums per trip/event; Adam-facing Rupert (couple chat).
 - Extract remaining Calendar/Apps sections + the modal zoo.
